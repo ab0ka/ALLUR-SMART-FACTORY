@@ -280,7 +280,7 @@ export class AssemblyScene {
   }
   createCar(v) {
     const el = document.createElementNS(NS, 'g');
-    el.setAttribute('class', 'sc-car'); el.setAttribute('role', 'button'); el.setAttribute('tabindex', '0'); el.dataset.vehicle = v.id;
+    el.setAttribute('class', 'sc-car'); el.setAttribute('role', 'button'); el.setAttribute('tabindex', '0'); el.dataset.vehicle = v.id; el.dataset.focusKey = `scene-vehicle-${v.id}`;
     el.innerHTML = `<g class="sc-orient"><g transform="${ISO}"><rect x="-14" y="-10" width="138" height="70" rx="14" class="sc-selring"/></g><use href="#sc-shadow"/><g class="sc-lift"><use class="sc-model-b" href="#sc-car-body"/></g></g>`;
     this.objectsEl.append(el);
     const car = { el, orient: el.firstChild, lift: el.querySelector('.sc-lift'), model: el.querySelector('.sc-lift use'), pos: null, path: null, v };
@@ -319,7 +319,14 @@ export class AssemblyScene {
       if (!car.path) continue;
       const { p, done } = this.sample(car.path, now);
       car.pos = p; this.applyCar(car); changed = true;
-      if (done) { car.path = null; if (car.leaving) { car.el.remove(); this.cars.delete(id); } } else moving = true;
+      if (done) {
+        car.path = null;
+        if (car.leaving) {
+          const focused = car.el.contains(document.activeElement);
+          car.el.remove(); this.cars.delete(id);
+          if (focused) this.svg.querySelector('[data-focus-key="scene-post-A1"]')?.focus({ preventScroll: true });
+        }
+      } else moving = true;
     }
     if (this.tech.path) {
       const { p, done } = this.sample(this.tech.path, now);
@@ -349,7 +356,15 @@ export class AssemblyScene {
     const order = depthOrder(objs).map(o => o.el);
     const current = [...this.objectsEl.children];
     if (!force && order.every((el, i) => current[i] === el)) return;
-    for (const el of order) this.objectsEl.append(el);
+    // Moving the focused SVG node with append/insertBefore drops browser focus.
+    // Reorder its siblings instead, including during animation frames between snapshots.
+    const focused = order.find(el => el.contains(document.activeElement));
+    let next = null;
+    for (let i = order.length - 1; i >= 0; i--) {
+      const el = order[i];
+      if (el !== focused && el.nextSibling !== next) this.objectsEl.insertBefore(el, next);
+      next = el;
+    }
   }
   positionTag() {
     const tag = this.overlay.querySelector('.sc-seltag');
@@ -406,7 +421,7 @@ export class AssemblyScene {
       const [x0, y0] = [sx + 95.3, sy + 13];
       out += `<circle cx="${r1(x0)}" cy="${r1(y0)}" r="3" class="sc-leaderdot"/><path d="M${r1(x0)} ${r1(y0)}L${ax} ${ay + 26}" class="sc-leader"/>`;
       const sel = ui.selected?.type === 'post' && ui.selected.id === postId;
-      out += `<g class="sc-plate ${kind}${sel ? ' selected' : ''}" role="button" tabindex="0" data-post="${postId}" aria-label="${esc(`${p.code}: ${label}${p.vehicleId ? `, ${p.vehicleId}, ${Math.round((p.progress ?? 0) * 100)}%` : ''}${sub ? `, ${sub}` : ''}`)}" transform="translate(${ax} ${ay})">
+      out += `<g class="sc-plate ${kind}${sel ? ' selected' : ''}" role="button" tabindex="0" data-post="${postId}" data-focus-key="scene-post-${postId}" aria-label="${esc(`${p.code}: ${label}${p.vehicleId ? `, ${p.vehicleId}, ${Math.round((p.progress ?? 0) * 100)}%` : ''}${sub ? `, ${sub}` : ''}${diag ? `, ${diag}` : ''}`)}" transform="translate(${ax} ${ay})">
         <rect width="216" height="${h}" rx="10" class="sc-platebox"/>
         <text x="10" y="20" class="sc-plate-code">${esc(p.code)}</text>${icon(kind, 54, 9)}<text x="72" y="20" class="sc-plate-status ${kind}">${esc(label)}</text>
         <text x="10" y="38" class="sc-plate-line">${p.vehicleId ? `${esc(p.vehicleId)} · сборка ${Math.round((p.progress ?? 0) * 100)}%` : 'нет автомобиля'}</text>
@@ -416,26 +431,26 @@ export class AssemblyScene {
       </g>`;
       if (p.problemId && !(ui.selected?.type === 'vehicle' && ui.selected.id === p.vehicleId)) {
         const [px, py] = [sx + 25.4, sy - 53 - (p.state === 'idle' ? -30 : 0)];
-        out += `<g class="sc-pin" role="button" tabindex="0" data-problem="${esc(p.problemId)}" aria-label="${esc(`Проблема ${p.problemId} на ${p.code}`)}"><path d="M${r1(px)} ${r1(py + 14)}V${r1(py + 30)}" class="sc-pinstem"/><circle cx="${r1(px)}" cy="${r1(py)}" r="13" class="sc-pulse"/><circle cx="${r1(px)}" cy="${r1(py)}" r="13" class="sc-pinhead"/><rect x="${r1(px - 1.6)}" y="${r1(py - 8.5)}" width="3.2" height="10" rx="1" class="sc-pinmark"/><circle cx="${r1(px)}" cy="${r1(py + 6)}" r="1.9" class="sc-pinmark"/></g>`;
+        out += `<g class="sc-pin" role="button" tabindex="0" data-problem="${esc(p.problemId)}" data-focus-key="scene-problem-${esc(p.problemId)}" aria-label="${esc(`Проблема ${p.problemId} на ${p.code}`)}"><path d="M${r1(px)} ${r1(py + 14)}V${r1(py + 30)}" class="sc-pinstem"/><circle cx="${r1(px)}" cy="${r1(py)}" r="13" class="sc-pulse"/><circle cx="${r1(px)}" cy="${r1(py)}" r="13" class="sc-pinhead"/><rect x="${r1(px - 1.6)}" y="${r1(py - 8.5)}" width="3.2" height="10" rx="1" class="sc-pinmark"/><circle cx="${r1(px)}" cy="${r1(py + 6)}" r="1.9" class="sc-pinmark"/></g>`;
       }
     }
     const stock = Object.fromEntries(state.stock.map(s => [s.id, s]));
     const tech = state.technicians[0], tjob = tech?.jobId ? state.jobs.find(j => j.id === tech.jobId) : null;
     const b2 = state.stages.find(s => s.id === 'assembly').buffer, b3 = state.stages.find(s => s.id === 'quality').buffer;
-    out += chip(30, 280, 230, `B2 · Буфер перед сборкой ${b2.vehicleIds.length}/${b2.capacity}`, b2.vehicleIds.length ? `${b2.vehicleIds[0]} ждёт свободный пост` : 'Очередь пуста', b2.vehicleIds.length ? 'wait' : 'muted', b2.vehicleIds[0] ? `data-vehicle="${esc(b2.vehicleIds[0])}"` : 'data-table="1"');
-    out += chip(760, 524, 230, `B3 · Буфер перед контролем ${b3.vehicleIds.length}/${b3.capacity}`, b3.vehicleIds.length ? `${b3.vehicleIds[0]} ждёт свободный КК` : 'Очередь пуста', b3.vehicleIds.length ? 'wait' : 'muted', b3.vehicleIds[0] ? `data-vehicle="${esc(b3.vehicleIds[0])}"` : 'data-space="tests"');
-    out += chip(20, 420, 250, tjob ? `ТЕХ-1 · ${tjob.id} на ${tjob.postCode ?? state.posts.find(p => p.id === tjob.postId)?.code}` : 'ТЕХ-1 · свободен', `Склад: уплотнения ${stock.seal_kit?.available ?? '—'} · насос ${stock.pump?.available ?? '—'}`, 'tech', tjob?.problemId ? `data-problem="${esc(tjob.problemId)}"` : 'data-table="1"');
-    out += chip(818, 386, 176, 'Испытания: КК-1, КК-2 →', '', 'nav', 'data-space="tests"');
-    out += chip(64, 172, 196, '← Вход из окраски', '', 'muted', 'data-space="paint"');
+    out += chip(30, 280, 230, `B2 · Буфер перед сборкой ${b2.vehicleIds.length}/${b2.capacity}`, b2.vehicleIds.length ? `${b2.vehicleIds[0]} ждёт свободный пост` : 'Очередь пуста', b2.vehicleIds.length ? 'wait' : 'muted', b2.vehicleIds[0] ? `data-vehicle="${esc(b2.vehicleIds[0])}"` : 'data-table="1"', 'buffer-B2');
+    out += chip(760, 524, 230, `B3 · Буфер перед контролем ${b3.vehicleIds.length}/${b3.capacity}`, b3.vehicleIds.length ? `${b3.vehicleIds[0]} ждёт свободный КК` : 'Очередь пуста', b3.vehicleIds.length ? 'wait' : 'muted', b3.vehicleIds[0] ? `data-vehicle="${esc(b3.vehicleIds[0])}"` : 'data-space="tests"', 'buffer-B3');
+    out += chip(20, 420, 250, tjob ? `ТЕХ-1 · ${tjob.id} на ${tjob.postCode ?? state.posts.find(p => p.id === tjob.postId)?.code}` : 'ТЕХ-1 · свободен', `Склад: уплотнения ${stock.seal_kit?.available ?? '—'} · насос ${stock.pump?.available ?? '—'}`, 'tech', tjob?.problemId ? `data-problem="${esc(tjob.problemId)}"` : 'data-table="1"', 'technician');
+    out += chip(818, 386, 176, 'Испытания: КК-1, КК-2 →', '', 'nav', 'data-space="tests"', 'go-tests');
+    out += chip(64, 172, 196, '← Вход из окраски', '', 'muted', 'data-space="paint"', 'go-paint');
     const sel = ui.selected?.type === 'vehicle' ? ui.selected.id : null;
     if (sel && this.cars.has(sel)) out += `<g class="sc-seltag" data-for="${esc(sel)}" visibility="hidden"><path d="M0 0L-18 -40" class="sc-tagstem"/><rect x="-104" y="-70" width="150" height="28" rx="14" class="sc-tagbox"/><text x="-29" y="-51" class="sc-tagtext">${esc(sel)} · выбран</text></g>`;
     this.overlay.innerHTML = out;
     this.positionTag();
   }
 }
-function chip(x, y, w, title, sub, kind, data) {
+function chip(x, y, w, title, sub, kind, data, key) {
   const h = sub ? 46 : 30;
-  return `<g class="sc-chip ${kind}" role="button" tabindex="0" ${data} aria-label="${esc(`${title}${sub ? `. ${sub}` : ''}`)}" transform="translate(${x} ${y})"><rect width="${w}" height="${h}" rx="10" class="sc-chipbox"/><text x="11" y="19" class="sc-chip-title">${esc(title)}</text>${sub ? `<text x="11" y="36" class="sc-chip-sub">${esc(sub)}</text>` : ''}</g>`;
+  return `<g class="sc-chip ${kind}" role="button" tabindex="0" ${data} data-focus-key="scene-${key}" aria-label="${esc(`${title}${sub ? `. ${sub}` : ''}`)}" transform="translate(${x} ${y})"><rect width="${w}" height="${h}" rx="10" class="sc-chipbox"/><text x="11" y="19" class="sc-chip-title">${esc(title)}</text>${sub ? `<text x="11" y="36" class="sc-chip-sub">${esc(sub)}</text>` : ''}</g>`;
 }
 export function icon(kind, x, y) {
   const t = `transform="translate(${x} ${y}) scale(.8125)"`;
@@ -481,13 +496,14 @@ export function enterpriseSvg(state) {
   out += `<g transform="${FACE_Y(-277.12, 160)}"><rect x="670" y="0" width="140" height="14" class="sc-slab1"/></g><g transform="${FACE_X(701.46, 405)}"><rect x="210" y="0" width="110" height="14" class="sc-slab2"/></g><g transform="translate(0 -14) ${ISO}"><rect x="670" y="210" width="140" height="110" class="em-shop"/><text x="678" y="312" class="sc-floortext sc-small">ДОРАБОТКА</text></g></g>`;
   for (const s of [...SHOPS, REWORK_SHOP]) for (const [id, x, y] of s.posts) {
     const [sx, sy] = eiso(x, y, 14), p = post(id);
-    out += `<g class="em-post" role="button" tabindex="0" data-space="${s.space}" aria-label="${esc(`${p.code}: ${p.vehicleId ?? 'нет автомобиля'}`)}"><use href="#em-post" transform="translate(${r1(sx)} ${r1(sy)})"/><circle cx="${r1(sx)}" cy="${r1(sy - 16)}" r="5.5" class="sc-postlamp ${lamp(p)}"/></g>`;
+    const status = { working: 'Работает', idle: 'Свободен', slow: 'Темп снижен', blocked: 'Ждёт место', fault: 'Неисправность', maintenance: 'Работы', shift_over: 'Смена окончена' }[p.state] ?? p.state;
+    out += `<g class="em-post" role="button" tabindex="0" data-space="${s.space}" data-focus-key="enterprise-post-${id}" aria-label="${esc(`${p.code}: ${status}, ${p.vehicleId ?? 'нет автомобиля'}. Открыть участок ${s.name}`)}"><use href="#em-post" transform="translate(${r1(sx)} ${r1(sy)})"/><circle cx="${r1(sx)}" cy="${r1(sy - 16)}" r="5.5" class="sc-postlamp ${lamp(p)}"/></g>`;
   }
   const open = state.problems.find(p => p.status === 'open');
   if (open) {
     const sh = [...SHOPS, REWORK_SHOP].find(s => s.posts.some(([id]) => id === open.postId));
     const pp = sh?.posts.find(([id]) => id === open.postId);
-    if (pp) { const [sx, sy] = eiso(pp[1], pp[2], 14); out += `<g class="sc-pin" role="button" tabindex="0" data-problem="${esc(open.id)}" aria-label="${esc(`Проблема ${open.id}`)}"><path d="M${r1(sx)} ${r1(sy - 36)}V${r1(sy - 22)}" class="sc-pinstem"/><circle cx="${r1(sx)}" cy="${r1(sy - 50)}" r="12" class="sc-pinhead"/><rect x="${r1(sx - 1.5)}" y="${r1(sy - 58)}" width="3" height="9" rx="1" class="sc-pinmark"/><circle cx="${r1(sx)}" cy="${r1(sy - 44.5)}" r="1.8" class="sc-pinmark"/></g>`; }
+    if (pp) { const [sx, sy] = eiso(pp[1], pp[2], 14); out += `<g class="sc-pin" role="button" tabindex="0" data-problem="${esc(open.id)}" data-focus-key="enterprise-problem-${esc(open.id)}" aria-label="${esc(`Проблема ${open.id}`)}"><path d="M${r1(sx)} ${r1(sy - 36)}V${r1(sy - 22)}" class="sc-pinstem"/><circle cx="${r1(sx)}" cy="${r1(sy - 50)}" r="12" class="sc-pinhead"/><rect x="${r1(sx - 1.5)}" y="${r1(sy - 58)}" width="3" height="9" rx="1" class="sc-pinmark"/><circle cx="${r1(sx)}" cy="${r1(sy - 44.5)}" r="1.8" class="sc-pinmark"/></g>`; }
   }
   return out;
 }

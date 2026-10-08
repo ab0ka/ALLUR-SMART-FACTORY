@@ -1,15 +1,24 @@
 // ---------- Selection and navigation inside spaces ----------
+let panelReturnFocus = null;
+function rememberPanelFocus() {
+  if (!$('side').contains(document.activeElement)) panelReturnFocus = focusKey(document.activeElement);
+}
 function openPanel(panel, selected, ctx) {
+  rememberPanelFocus();
   ui.panel = panel; if (selected !== undefined) ui.selected = selected; if (ctx) chatContext = ctx;
   if (view !== 'space') { location.hash = `space/${['assembly', 'diag'].includes(space) ? space : 'assembly'}`; return; }
   syncHash(); render();
   if (narrow() && scene && ui.selected) { if (ui.selected.type === 'vehicle') scene.focusVehicle(ui.selected.id, 1.6); else if (ui.selected.type === 'post') scene.focusPost(ui.selected.id, 1.6); }
-  requestAnimationFrame(() => $('side').querySelector('h2')?.focus?.());
+  requestAnimationFrame(() => $('side').querySelector('h2')?.focus({ preventScroll: true }));
 }
 const selectVehicle = id => openPanel({ type: 'vehicle', id }, { type: 'vehicle', id }, { type: 'vehicle', id });
 const selectPost = id => openPanel({ type: 'post', id }, { type: 'post', id }, { type: 'post', id });
 const selectProblem = id => { const p = problem(id); openPanel({ type: 'problem', id }, p ? { type: 'post', id: p.postId } : null, { type: 'problem', id }); };
-function closePanel() { ui.panel = null; ui.selected = null; ui.ribbonOnlySelected = false; syncHash(); render(); }
+function closePanel() {
+  ui.panel = null; ui.selected = null; ui.ribbonOnlySelected = false; syncHash(); render();
+  if (!restoreFocus(panelReturnFocus)) { const heading = $('space-title'); heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
+  panelReturnFocus = null;
+}
 // The address bar follows the open card, so a link can be shared or opened again; replaceState does not fire hashchange.
 function syncHash() { if (view !== 'space') return; const p = ui.panel; history.replaceState(null, '', `#space/${space}${p ? `/${p.type}${p.id ? `/${encodeURIComponent(p.id)}` : ''}` : ''}`); }
 function goSpace(id) { location.hash = `space/${id}`; }
@@ -41,7 +50,7 @@ async function spaceClick(t, d) {
   if (d.post || d.postLink) { selectPost(d.post || d.postLink); return true; }
   if (d.problem) { selectProblem(d.problem); return true; }
   if (d.table) { ui.table = true; render(); return true; }
-  if (d.openChat) { if (d.ctxType) chatContext = { type: d.ctxType, id: d.ctxId }; else if (ui.selected) chatContext = ui.selected.type === 'vehicle' ? { type: 'vehicle', id: ui.selected.id } : ui.panel?.type === 'problem' ? { type: 'problem', id: ui.panel.id } : { type: 'post', id: ui.selected.id }; ui.panel = { type: 'chat' }; syncHash(); render(); requestAnimationFrame(() => $('side-chat-input')?.focus()); return true; }
+  if (d.openChat) { rememberPanelFocus(); if (d.ctxType) chatContext = { type: d.ctxType, id: d.ctxId }; else if (ui.selected) chatContext = ui.selected.type === 'vehicle' ? { type: 'vehicle', id: ui.selected.id } : ui.panel?.type === 'problem' ? { type: 'problem', id: ui.panel.id } : { type: 'post', id: ui.selected.id }; ui.panel = { type: 'chat' }; syncHash(); render(); requestAnimationFrame(() => $('side-chat-input')?.focus()); return true; }
   if (d.refType) { openRefSpace(d.refType, d.refId); return true; }
   if (d.ask) { const input = $('side-chat-input'); if (input) input.value = d.ask; ask(d.ask, SIDE_CHAT); return true; }
   if (d.chatClear) { chatContext = null; updateSideChat(); return true; }

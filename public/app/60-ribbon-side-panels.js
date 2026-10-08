@@ -40,7 +40,7 @@ function renderSide() {
   side.innerHTML = html; lastPanelKey = key;
   if (scroll) side.querySelector('.side-body').scrollTop = scroll;
 }
-const sideHead = (eyebrow, title, chips = '', extra = '') => `<div class="side-head"><div class="side-top"><span class="eyebrow">${eyebrow}</span><span class="side-tools">${extra}<button class="icon-btn small" data-close-panel="1" aria-label="Закрыть карточку">✕</button></span></div><h2>${title}</h2>${chips ? `<div class="chipline">${chips}</div>` : ''}</div>`;
+const sideHead = (eyebrow, title, chips = '', extra = '') => `<div class="side-head"><div class="side-top"><span class="eyebrow">${eyebrow}</span><span class="side-tools">${extra}<button class="icon-btn small" data-close-panel="1" aria-label="Закрыть карточку">✕</button></span></div><h2 tabindex="-1" data-focus-key="side-heading">${title}</h2>${chips ? `<div class="chipline">${chips}</div>` : ''}</div>`;
 const tag = (t, cls = '') => `<span class="tagchip ${cls}">${t}</span>`;
 const chatBtn = (type, id) => `<button class="icon-btn small" data-open-chat="1" data-ctx-type="${type}" data-ctx-id="${esc(id)}" aria-label="Спросить в чате об этом объекте"><svg viewBox="0 0 20 20" aria-hidden="true"><path class="ico-chat" d="M3 4.5A2.5 2.5 0 0 1 5.5 2h9A2.5 2.5 0 0 1 17 4.5v6a2.5 2.5 0 0 1-2.5 2.5H9l-4 3.5V13a2.5 2.5 0 0 1-2-2.5z"/></svg></button>`;
 const lockNote = '<p class="lock">Проверки, ремонт, перевод и снятие поста с загрузки меняют производство — каждое такое действие запросит подтверждение.</p>';
@@ -150,7 +150,7 @@ function panelCompare(pr) {
 }
 
 function chatPanelShell() {
-  return `<div class="side-head"><div class="side-top"><span class="eyebrow">ЧАТ ПО СМЕНЕ</span><span class="side-tools"><button class="icon-btn small" data-close-panel="1" aria-label="Закрыть чат">✕</button></span></div><h2>Чат</h2><div class="chipline" id="side-chat-context"></div><p class="fine-print" id="side-chat-mode"></p></div>
+  return `<div class="side-head"><div class="side-top"><span class="eyebrow">ЧАТ ПО СМЕНЕ</span><span class="side-tools"><button class="icon-btn small" data-close-panel="1" aria-label="Закрыть чат">✕</button></span></div><h2 tabindex="-1" data-focus-key="side-heading">Чат</h2><div class="chipline" id="side-chat-context"></div><p class="fine-print" id="side-chat-mode"></p></div>
   <div class="side-body chat-body"><ol id="side-chat-log" class="chat-log" aria-live="polite"></ol></div>
   <div class="side-foot chat-foot"><div class="chips small" id="side-chat-suggest" role="group" aria-label="Предложенные вопросы"></div>
   <form id="side-chat-form" class="chat-form"><label for="side-chat-input" class="sr-only">Вопрос о выбранном объекте</label><textarea id="side-chat-input" rows="2" maxlength="500" placeholder="Вопрос о посте, автомобиле, событии…"></textarea><div class="chat-send"><span id="side-chat-count" class="fine-print">0/500</span><button class="primary" type="submit" id="side-chat-send">Спросить</button></div></form></div>`;
