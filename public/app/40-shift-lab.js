@@ -1,4 +1,14 @@
 // ---------- Shift and analytics ----------
+// Engine defaults for empty denominators are not observed measurements.
+function shiftOeeValue(p, metric) {
+  const available = {
+    availability: state.elapsed > 0,
+    performance: p.stats.run > 0,
+    quality: p.stats.completed > 0,
+    oee: state.elapsed > 0 && p.stats.run > 0 && p.stats.completed > 0,
+  };
+  return available[metric] ? pct(p.metrics[metric]) : '<span title="Нет данных для расчёта" aria-label="Нет данных для расчёта">—</span>';
+}
 function renderShift() {
   const t = state.totals, f = state.forecast, ref = state.plan.reference, max = Math.max(state.plan.target, ref?.total ?? 0, t.created, 4);
   const summary = [
@@ -30,7 +40,7 @@ function renderShift() {
   const q = state.quality;
   $('quality-box').innerHTML = `<h3>Качество (из проверок контроля)</h3><dl class="numbers"><div><dt>С первого предъявления</dt><dd>${q.firstPassYield === null ? '—' : `${pct(q.firstPassYield)} (${q.firstPass}/${q.firstInspections})`}</dd></div><div><dt>Не прошли контроль</dt><dd>${q.failed}</dd></div><div><dt>Приняты после доработки</dt><dd>${q.reworkedAccepted}</dd></div><div><dt>Сейчас в доработке</dt><dd>${q.inRework}</dd></div></dl><p class="fine-print">Каждый автомобиль засчитывается в годный выпуск один раз — после успешного контроля. Дефекты синтетические (~15%).</p>`;
   const cols = ['Пост', 'Участок', 'Состояние', 'A', 'P', 'Q', 'OEE', 'Работа, мин', 'Неисправность, мин', 'Техник, мин', 'Нет входа, мин', 'Блокировка, мин', 'Операций'];
-  $('oee-table').innerHTML = `<caption>Показатели каждого поста к ${clock(state.elapsed)} · синтетические данные</caption><thead><tr>${cols.map(c => `<th scope="col">${c}</th>`).join('')}</tr></thead><tbody>${state.posts.map(p => `<tr><th scope="row"><button class="link" data-post-link="${esc(p.id)}">${esc(p.code)}</button></th><td>${esc(p.stageName)}</td><td>${esc(POST_SHORT[p.state])}</td><td>${pct(p.metrics.availability)}</td><td>${pct(p.metrics.performance)}</td><td>${pct(p.metrics.quality)}</td><td><b>${pct(p.metrics.oee)}</b></td><td>${p.stats.run}</td><td>${p.stats.fault}</td><td>${p.stats.maintenance}</td><td>${p.stats.starved}</td><td>${p.stats.blocked}</td><td>${p.stats.completed}</td></tr>`).join('')}</tbody>`;
+  $('oee-table').innerHTML = `<caption>Показатели каждого поста к ${clock(state.elapsed)} · синтетические данные</caption><thead><tr>${cols.map(c => `<th scope="col">${c}</th>`).join('')}</tr></thead><tbody>${state.posts.map(p => `<tr><th scope="row"><button class="link" data-post-link="${esc(p.id)}">${esc(p.code)}</button></th><td>${esc(p.stageName)}</td><td>${esc(POST_SHORT[p.state])}</td><td>${shiftOeeValue(p, 'availability')}</td><td>${shiftOeeValue(p, 'performance')}</td><td>${shiftOeeValue(p, 'quality')}</td><td><b>${shiftOeeValue(p, 'oee')}</b></td><td>${p.stats.run}</td><td>${p.stats.fault}</td><td>${p.stats.maintenance}</td><td>${p.stats.starved}</td><td>${p.stats.blocked}</td><td>${p.stats.completed}</td></tr>`).join('')}</tbody>`;
   const jobs = state.jobs.map(j => `<article class="incident ${j.status === 'done' ? 'resolved' : 'active'}"><div class="incident-head"><strong>${esc(j.id)} · ${esc(j.title)}</strong><span>${postLink(j.postId)} · ${clock(j.createdAt)}${j.completedAt !== null ? ` → ${clock(j.completedAt)}` : ''}</span></div><p class="fine-print">${esc(JOB_STATUS[j.status])}${j.status === 'running' ? `, осталось ${j.remaining} мин` : ''}${j.part ? ` · запчасть: ${esc(state.stock.find(s => s.id === j.part)?.name)}` : ''}${j.decisionId ? ` · по решению ${esc(j.decisionId)}` : ''}${j.result ? ` · ${esc(j.result.text)}` : ''}</p></article>`).join('');
   const incidents = state.incidents.map(i => `<article class="incident ${esc(i.status)}"><div class="incident-head"><strong>${i.severity === 'critical' ? '●' : '◇'} ${esc(i.title)}</strong><span>${clock(i.start)} → ${i.end !== null ? clock(i.end) : i.status === 'unresolved' ? 'не устранён' : '…'}</span></div><p class="fine-print">${postLink(i.postId)} · ${esc(i.cause)} · ${esc(i.status === 'active' ? 'активен — нужен ремонт' : i.resolution)}</p></article>`).join('');
   $('incident-log').innerHTML = (incidents + jobs) || '<p class="muted">Инцидентов и работ нет.</p>';
