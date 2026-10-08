@@ -28,19 +28,21 @@ function renderRibbon() {
 // ---------- Side panel ----------
 function renderSide() {
   const side = $('side'), p = ui.panel;
-  if (!p) { side.hidden = true; side.innerHTML = ''; lastPanelKey = null; return; }
+  if (!p) { side.hidden = true; side.innerHTML = ''; lastPanelKey = null; resetSheet(); return; }
   side.hidden = false;
   const key = `${p.type}:${p.id ?? ''}`;
-  if (p.type === 'chat') { if (lastPanelKey !== key) side.innerHTML = chatPanelShell(); lastPanelKey = key; updateSideChat(); return; }
+  if (p.type === 'chat') { if (lastPanelKey !== key) side.innerHTML = chatPanelShell(); lastPanelKey = key; updateSideChat(); finishSheet(key); return; }
   const body = side.querySelector('.side-body'), scroll = body && lastPanelKey === key ? body.scrollTop : 0;
+  const sheetScroll = lastPanelKey === key ? side.querySelector('.sheet-content')?.scrollTop ?? 0 : 0;
   let html = '';
   if (p.type === 'vehicle') html = vehicle(p.id) ? vehiclePanel(vehicle(p.id)) : '';
   else if (p.type === 'post') html = post(p.id) ? panelPost(post(p.id)) : '';
   else if (p.type === 'problem') html = problem(p.id) ? panelProblem(problem(p.id)) : '';
   else if (p.type === 'compare') html = problem(p.id) ? panelCompare(problem(p.id)) : '';
-  if (!html) { ui.panel = null; side.hidden = true; lastPanelKey = null; return; }
+  if (!html) { ui.panel = null; side.hidden = true; lastPanelKey = null; resetSheet(); return; }
   side.innerHTML = html; lastPanelKey = key;
   if (scroll) side.querySelector('.side-body').scrollTop = scroll;
+  finishSheet(key, sheetScroll);
 }
 const sideHead = (eyebrow, title, chips = '', extra = '') => `<div class="side-head"><div class="side-top"><span class="eyebrow">${eyebrow}</span><span class="side-tools">${extra}<button class="icon-btn small" data-close-panel="1" aria-label="Закрыть карточку">✕</button></span></div><h2>${title}</h2>${chips ? `<div class="chipline">${chips}</div>` : ''}</div>`;
 const tag = (t, cls = '') => `<span class="tagchip ${cls}">${t}</span>`;
