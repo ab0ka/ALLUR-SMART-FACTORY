@@ -1,4 +1,6 @@
 import http from 'node:http';
+import { createHandover } from './handover.mjs';
+import { formatHandover } from './handover-export.mjs';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -61,6 +63,12 @@ export function createApp({ simulation = new Workshop(), aiOptions = {}, tickMs 
       // A plain top-level link from another site may open the page itself; API and assets stay same-origin only.
       const pageNavigation = req.method === 'GET' && url.pathname === '/' && req.headers['sec-fetch-mode'] === 'navigate' && req.headers['sec-fetch-dest'] === 'document';
       if (req.headers['sec-fetch-site'] === 'cross-site' && !pageNavigation) return send(403, { error: 'Внешние запросы запрещены' });
+      if (req.method === 'GET' && url.pathname === '/api/handover') {
+        const format = url.searchParams.get('format');
+        if (format !== null && format !== 'json' && format !== 'csv') throw clientError('Неизвестный формат передачи смены');
+        const output = formatHandover(createHandover(sim.snapshot()), format);
+        res.writeHead(200, output.headers); return res.end(output.body);
+      }
       if (req.method === 'GET' && url.pathname === '/api/state') return send(200, state());
       if (req.method === 'GET' && url.pathname === '/api/health') return send(200, { ok: true, synthetic: true, aiProvider: aiOptions.provider || 'nvidia', aiConfigured: aiOptions.provider !== 'local' && Boolean(aiOptions.key?.trim()) });
       if (req.method === 'GET' && url.pathname === '/api/lab') return send(200, { ...labSummary(riskModel), policies: policyReport });
