@@ -8,8 +8,8 @@ const pct = n => `${fmt(n * 100)}%`;
 const signed = n => `${n > 0 ? '+' : n < 0 ? '−' : '±'}${fmt(Math.abs(n))}`;
 const clock = m => `${String(Math.floor((480 + m) / 60)).padStart(2, '0')}:${String((480 + m) % 60).padStart(2, '0')}`;
 const requestId = () => (crypto.randomUUID?.() ?? [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join(''));
-const POST_STATES = { idle: 'Свободен', working: 'Выполняет операцию', slow: 'Снижен темп / отклонение', blocked: 'Блокирован следующим буфером', fault: 'Неисправность', maintenance: 'Работы техника', shift_over: 'Смена завершена' };
-const POST_SHORT = { idle: 'Свободен', working: 'Выполняет', slow: 'Отклонение', blocked: 'Блокирован', fault: 'Неисправность', maintenance: 'Ремонт/ТО', shift_over: 'Конец смены' };
+const POST_STATES = { diagnosis: 'Ожидает диагностики узлов', idle: 'Свободен', working: 'Выполняет операцию', slow: 'Снижен темп / отклонение', blocked: 'Блокирован следующим буфером', fault: 'Неисправность', maintenance: 'Работы техника', shift_over: 'Смена завершена' };
+const POST_SHORT = { diagnosis: 'Диагностика', idle: 'Свободен', working: 'Выполняет', slow: 'Отклонение', blocked: 'Блокирован', fault: 'Неисправность', maintenance: 'Ремонт/ТО', shift_over: 'Конец смены' };
 const VEHICLE_STATES = { not_started: 'Не начат', waiting: 'Ожидает', processing: 'В работе', rework: 'Доработка', rework_wait: 'Ждёт доработки', paused: 'Пауза', blocked: 'Ждёт буфер', stopped: 'Остановлен концом смены', ready: 'Принят', shipped: 'Отгружен' };
 const ORDER_STATES = { released: 'Выпущено', in_progress: 'В работе', completed: 'Выполнено' };
 const PRIORITY = { high: 'Высокий', normal: 'Обычный', low: 'Низкий' };
@@ -17,9 +17,9 @@ const HYP_STATUS = { confirmed: 'подтверждена проверкой', r
 const JOB_STATUS = { queued: 'в очереди техника', running: 'выполняется', done: 'выполнена' };
 const FILTERS = [['all', 'Все'], ['active', 'В работе'], ['queued', 'В очередях'], ['problem', 'Пауза, блокировки, доработка'], ['done', 'Приняты и отгружены']];
 const filterOf = { all: () => true, active: v => ['processing', 'rework'].includes(v.state), queued: v => ['not_started', 'waiting'].includes(v.state), problem: v => ['paused', 'blocked', 'stopped', 'rework_wait', 'rework'].includes(v.state), done: v => v.accepted };
-const SUGGESTED = ['Что сейчас угрожает плану?', 'Почему задерживается этот автомобиль?', 'На чём основана гипотеза неисправности?', 'Какую проверку выполнить?', 'Сравни ремонт сейчас и продолжение работы', 'Что даст перевод на другой пост?', 'Почему результат отличается от прогноза?'];
+const SUGGESTED = ['Что сейчас угрожает плану?', 'Что делать с этой машиной?', 'Почему задерживается этот автомобиль?', 'На чём основана гипотеза неисправности?', 'Какую проверку выполнить?', 'Сравни ремонт сейчас и продолжение работы', 'Что даст перевод на другой пост?', 'Почему результат отличается от прогноза?'];
 const VIEWS = ['dispatcher', 'workshop', 'vehicles', 'orders', 'shift', 'lab'];
-let state = null, view = 'space', selectedPost = 'A2', selectedVehicle = null, selectedProblem = null, vehicleFilter = 'all', chatContext = null;
+let state = null, view = 'space', selectedPost = 'A2', selectedVehicle = null, vehicleFilter = 'all', chatContext = null;
 let updating = false, fetching = false, aiRevision = null, aiBusy = false, chatBusy = false, lab = null;
 const text = (id, value) => { $(id).textContent = value; };
 function error(message) { $('error').hidden = !message; text('error', message || ''); }
@@ -37,7 +37,7 @@ async function action(body) {
   catch (e) { error(e.message); return false; }
   finally { updating = false; }
 }
-function resetAi() { aiRevision = null; selectedProblem = null; text('ai-text', 'Смена сброшена. Запросите объяснение нового снимка.'); text('ai-source', 'Локальный режим доступен без ключа'); }
+function resetAi() { aiRevision = null; text('ai-text', 'Смена сброшена. Запросите объяснение нового снимка.'); text('ai-source', 'Локальный режим доступен без ключа'); }
 // Every shift-changing action from the dispatcher, chat or proposals goes through this confirmation.
 function confirmAction(title, bodyHtml) {
   return new Promise(resolve => {
@@ -74,10 +74,12 @@ function renderChrome() {
   $('pf-fill').setAttribute('width', String(Math.min(100, t.accepted / state.plan.target * 100)));
   $('pf-mark').setAttribute('x', String(Math.min(98.5, f.projected / state.plan.target * 100)));
   $('planfact').setAttribute('aria-label', `План-факт: принято ${t.accepted} из ${state.plan.target}, прогноз к 16:00 — ${f.projected}`);
-  const open = state.problems.filter(p => p.status === 'open').length;
-  $('alerts').hidden = !open; text('alerts-count', open); $('alerts').setAttribute('aria-label', `Открытых проблем: ${open}`);
+  // The counter is the length of the server task list shown in «Задачи и решения» — never a separate calculation.
+  const open = state.tasks.length, eq = state.tasks.filter(x => ['equipment', 'incident'].includes(x.category)).length;
+  $('alerts').hidden = !open; text('alerts-count', open); $('alerts').setAttribute('aria-label', `Задачи смены: ${open} (оборудование ${eq}, автомобили и сроки ${open - eq})`);
+  $('alerts').href = '#dispatcher';
   $('diag-count').hidden = !open; text('diag-count', open);
-  text('nav-vehicles', t.created); text('nav-orders', state.orders.length); text('nav-problems', open ? `${open} откр.` : '');
+  text('nav-vehicles', t.created); text('nav-orders', state.orders.length); text('nav-problems', open ? `${open}` : '');
   if (view === 'space') return;
   $('summary').innerHTML = [
     ['Факт: принято', `${t.accepted}`],

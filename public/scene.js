@@ -80,24 +80,14 @@ export function techRoute(fromPost, toPost) {
 
 // ---------- Static models (local coordinates, origin = min corner of the car footprint on a lift) ----------
 const rect = (x, y, w, h, cls, extra = '') => `<rect x="${x}" y="${y}" width="${w}" height="${h}" class="${cls}"${extra}/>`;
-function carModel(id, done) {
-  const glass = done ? 'sc-glass' : 'sc-open';
-  return `<g id="${id}">
-  ${done ? '' : `<g transform="${FACE_Y(-36.37, 21)}">${rect(6, 0, 98, 8, 'sc-skid')}</g><g transform="${FACE_X(90.06, 52)}">${rect(8, 0, 34, 8, 'sc-skid2')}</g>`}
-  <g transform="${FACE_Y(-43.3, 25)}">${rect(0, 8, 110, 20, 'sc-body', ' rx="3" fill="currentColor"')}${rect(0, 8, 110, 20, 'sc-shade1', ' rx="3"')}${done ? rect(0, 8, 110, 3, 'sc-sill') : ''}</g>
-  <g transform="${FACE_X(95.26, 55)}">${rect(0, 8, 50, 20, 'sc-body', ' rx="3" fill="currentColor"')}${rect(0, 8, 50, 20, 'sc-shade2', ' rx="3"')}${done ? rect(4, 19, 10, 4.5, 'sc-lamp', ' rx="1.5"') + rect(36, 19, 10, 4.5, 'sc-lamp', ' rx="1.5"') : ''}</g>
-  <g transform="translate(0 -28) ${ISO}">${rect(0, 0, 110, 50, 'sc-body', ' rx="6" fill="currentColor"')}</g>
-  <g transform="${FACE_Y(-38.97, 22.5)}">${rect(26, 28, 58, 16, 'sc-body', ' fill="currentColor"')}${rect(31, 31, 22, 10, glass, ' rx="1.5"')}${rect(56, 31, 23, 10, glass, ' rx="1.5"')}</g>
-  <g transform="${FACE_X(72.74, 42)}">${rect(5, 28, 40, 16, 'sc-body', ' fill="currentColor"')}${rect(5, 28, 40, 16, 'sc-shade2')}${rect(8, 30, 34, 12, glass, ' rx="2"')}</g>
-  <g transform="translate(0 -44) ${ISO}">${rect(26, 5, 58, 40, 'sc-body', ' rx="5" fill="currentColor"')}</g>
-  ${done ? `<g transform="${FACE_Y(-45.03, 26)}"><circle cx="24" cy="9" r="9" class="sc-tire"/><circle cx="24" cy="9" r="4" class="sc-hub"/><circle cx="86" cy="9" r="9" class="sc-tire"/><circle cx="86" cy="9" r="4" class="sc-hub"/></g>` : ''}
-</g>`;
-}
+// Cars: isometric sprites of the "Kia Sportage" model by karaman.arman (Sketchfab, CC BY 4.0), rendered in this scene's
+// projection by scripts/render-car-sprites.mjs. Frame in local units (footprint 110 × 50 from the origin corner).
+const CAR_SPRITE = { x: -45.2, y: -41, w: 142.37, h: 122.94 };
+const carModel = (id, file) => `<g id="${id}"><image href="/${file}" x="${CAR_SPRITE.x}" y="${CAR_SPRITE.y}" width="${CAR_SPRITE.w}" height="${CAR_SPRITE.h}" preserveAspectRatio="none"/></g>`;
 const DEFS = `<defs>
 <pattern id="sc-grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" class="sc-gridline"/></pattern>
 <g id="sc-shadow"><g transform="${ISO}"><rect x="-9" y="-7" width="128" height="64" rx="22" class="sc-shadow"/><rect x="-3" y="-2" width="116" height="54" rx="14" class="sc-shadow"/></g></g>
-${carModel('sc-car-body', false)}
-${carModel('sc-car-done', true)}
+${['a', 'b', 'c'].flatMap(m => ['done', 'body'].map(st => carModel(`sc-car-${m}-${st}`, `car-kia-${m}-${st}.webp`))).join('')}
 <g id="sc-back">
   <g transform="${FACE_Y(5.2, -3)}">${rect(49, 0, 12, 76, 'sc-col')}</g><g transform="${FACE_X(52.83, 30.5)}">${rect(-18, 0, 12, 76, 'sc-col2')}</g><g transform="translate(0 -76) ${ISO}">${rect(49, -18, 12, 12, 'sc-colt')}</g>
   <g transform="${FACE_Y(-6.93, 4)}">${rect(50, 14, 10, 6, 'sc-col')}</g><g transform="${FACE_X(51.96, 30)}">${rect(-6, 14, 14, 6, 'sc-col2')}</g><g transform="translate(0 -20) ${ISO}">${rect(50, -6, 10, 14, 'sc-colt')}</g>
@@ -227,12 +217,20 @@ export class AssemblyScene {
     this.camEl.setAttribute('transform', `translate(${r1(VIEW.w / 2 - s * cx)} ${r1(VIEW.h / 2 - s * cy)}) scale(${s})`);
   }
   zoom(f, cx, cy) {
+    this.atHome = false;
     this.cam.s = Math.min(2.6, Math.max(.7, this.cam.s * f));
     if (cx !== undefined) { this.cam.cx = cx; this.cam.cy = cy; }
     this.applyCamera();
   }
-  pan(dx, dy) { this.cam.cx -= dx / this.cam.s; this.cam.cy -= dy / this.cam.s; this.cam.cx = Math.min(950, Math.max(50, this.cam.cx)); this.cam.cy = Math.min(620, Math.max(40, this.cam.cy)); this.applyCamera(); }
-  home(minScale = 1) { this.cam = { s: minScale, cx: 500, cy: 330 }; this.applyCamera(); }
+  pan(dx, dy) { this.atHome = false; this.cam.cx -= dx / this.cam.s; this.cam.cy -= dy / this.cam.s; this.cam.cx = Math.min(950, Math.max(50, this.cam.cx)); this.cam.cy = Math.min(620, Math.max(40, this.cam.cy)); this.applyCamera(); }
+  // Scale that fits the floor and equipment (not the empty margins of the view box) into the visible area.
+  fitScale() {
+    const w = this.svg.clientWidth, h = this.svg.clientHeight;
+    if (!w || !h) return 1;
+    const base = Math.min(w / VIEW.w, h / VIEW.h);
+    return Math.min(2.4, Math.max(1, Math.min(w / 980, h / 590) / base));
+  }
+  home(s = this.fitScale()) { this.cam = { s, cx: 509, cy: 338 }; this.atHome = true; this.applyCamera(); }
   focusVehicle(id, s) { const c = this.cars.get(id); if (!c) return; const [x, y] = iso(c.pos.x, c.pos.y); this.cam = { s: Math.max(s, this.cam.s), cx: x, cy: y - 30 }; this.applyCamera(); }
   focusPost(postId, s) { if (BAY_Y[postId] === undefined) return; const [x, y] = iso(310, BAY_Y[postId] + 25); this.cam = { s: Math.max(s, this.cam.s), cx: x + 60, cy: y - 20 }; this.applyCamera(); }
 
@@ -257,7 +255,7 @@ export class AssemblyScene {
         const path = route(car.place, place); car.place = place; this.startMove(car, path);
       }
       car.v = v;
-      car.model.setAttribute('href', assembled ? '#sc-car-done' : '#sc-car-body');
+      car.model.setAttribute('href', `#sc-car-${['a', 'b', 'c'].includes(v.modelId?.toLowerCase()) ? v.modelId.toLowerCase() : 'b'}-${assembled ? 'done' : 'body'}`);
       car.model.setAttribute('class', MODEL_COLOR[v.modelId] ?? 'sc-model-b');
       car.el.setAttribute('aria-label', `${v.id}, ${v.modelName}: ${v.status}`);
       car.el.classList.toggle('selected', ui.selected?.type === 'vehicle' && ui.selected.id === v.id);
@@ -281,7 +279,7 @@ export class AssemblyScene {
   createCar(v) {
     const el = document.createElementNS(NS, 'g');
     el.setAttribute('class', 'sc-car'); el.setAttribute('role', 'button'); el.setAttribute('tabindex', '0'); el.dataset.vehicle = v.id;
-    el.innerHTML = `<g class="sc-orient"><g transform="${ISO}"><rect x="-14" y="-10" width="138" height="70" rx="14" class="sc-selring"/></g><use href="#sc-shadow"/><g class="sc-lift"><use class="sc-model-b" href="#sc-car-body"/></g></g>`;
+    el.innerHTML = `<g class="sc-orient"><g transform="${ISO}"><rect x="-14" y="-10" width="138" height="70" rx="14" class="sc-selring"/></g><use href="#sc-shadow"/><g class="sc-lift"><use class="sc-model-b" href="#sc-car-b-body"/></g></g>`;
     this.objectsEl.append(el);
     const car = { el, orient: el.firstChild, lift: el.querySelector('.sc-lift'), model: el.querySelector('.sc-lift use'), pos: null, path: null, v };
     this.cars.set(v.id, car);
@@ -425,7 +423,7 @@ export class AssemblyScene {
     out += chip(30, 280, 230, `B2 · Буфер перед сборкой ${b2.vehicleIds.length}/${b2.capacity}`, b2.vehicleIds.length ? `${b2.vehicleIds[0]} ждёт свободный пост` : 'Очередь пуста', b2.vehicleIds.length ? 'wait' : 'muted', b2.vehicleIds[0] ? `data-vehicle="${esc(b2.vehicleIds[0])}"` : 'data-table="1"');
     out += chip(760, 524, 230, `B3 · Буфер перед контролем ${b3.vehicleIds.length}/${b3.capacity}`, b3.vehicleIds.length ? `${b3.vehicleIds[0]} ждёт свободный КК` : 'Очередь пуста', b3.vehicleIds.length ? 'wait' : 'muted', b3.vehicleIds[0] ? `data-vehicle="${esc(b3.vehicleIds[0])}"` : 'data-space="tests"');
     out += chip(20, 420, 250, tjob ? `ТЕХ-1 · ${tjob.id} на ${tjob.postCode ?? state.posts.find(p => p.id === tjob.postId)?.code}` : 'ТЕХ-1 · свободен', `Склад: уплотнения ${stock.seal_kit?.available ?? '—'} · насос ${stock.pump?.available ?? '—'}`, 'tech', tjob?.problemId ? `data-problem="${esc(tjob.problemId)}"` : 'data-table="1"');
-    out += chip(818, 386, 176, 'Испытания: КК-1, КК-2 →', '', 'nav', 'data-space="tests"');
+    out += chip(818, 386, 176, 'Контроль: КК-1, КК-2 →', '', 'nav', 'data-space="tests"');
     out += chip(64, 172, 196, '← Вход из окраски', '', 'muted', 'data-space="paint"');
     const sel = ui.selected?.type === 'vehicle' ? ui.selected.id : null;
     if (sel && this.cars.has(sel)) out += `<g class="sc-seltag" data-for="${esc(sel)}" visibility="hidden"><path d="M0 0L-18 -40" class="sc-tagstem"/><rect x="-104" y="-70" width="150" height="28" rx="14" class="sc-tagbox"/><text x="-29" y="-51" class="sc-tagtext">${esc(sel)} · выбран</text></g>`;
@@ -454,7 +452,7 @@ export const SHOPS = [
   { id: 'weld', space: 'weld', name: 'Сварка', x0: 0, w: 140, posts: [['W1', 50, 26], ['W2', 50, 80]] },
   { id: 'paint', space: 'paint', name: 'Окраска', x0: 210, w: 140, posts: [['P1', 260, 26], ['P2', 260, 80]] },
   { id: 'assembly', space: 'assembly', name: 'Сборка', x0: 420, w: 180, posts: [['A1', 480, 14], ['A2', 480, 54], ['A3', 480, 94]] },
-  { id: 'quality', space: 'tests', name: 'Испытания · контроль', x0: 670, w: 140, posts: [['Q1', 720, 26], ['Q2', 720, 80]] },
+  { id: 'quality', space: 'tests', name: 'Контроль качества', x0: 670, w: 140, posts: [['Q1', 720, 26], ['Q2', 720, 80]] },
   { id: 'shipping', space: 'ship', name: 'Отгрузка', x0: 880, w: 120, posts: [['S1', 920, 52]] },
 ];
 const REWORK_SHOP = { id: 'rework', space: 'rework', name: 'Доработка', posts: [['R1', 720, 246]] };
@@ -502,8 +500,8 @@ export function enterpriseCards(state) {
     { space: 'weld', left: 360, top: 4, title: 'Сварка', later: true, lines: [`СВ-1, СВ-2 · заняты ${busy(['W1', 'W2'])} из 2`, `Входной буфер: ${b('weld').vehicleIds.length} кузовов`], problems: probFor('weld') },
     { space: 'paint', left: 542, top: 109, title: 'Окраска', later: true, lines: [`ОК-1, ОК-2 · заняты ${busy(['P1', 'P2'])} из 2`, `B1: ${b('paint').vehicleIds.length} из ${b('paint').capacity}`], problems: probFor('paint') },
     { space: 'assembly', left: 724, top: 206, title: 'Сборка', live: true, lines: [`СБ-1…СБ-3 · заняты ${busy(['A1', 'A2', 'A3'])} из 3 · B2: ${b('assembly').vehicleIds.length} из ${b('assembly').capacity}`], problems: probFor('assembly') },
-    { space: 'tests', left: 940, top: 331, title: 'Испытания · контроль', later: true, lines: [`КК-1, КК-2 · заняты ${busy(['Q1', 'Q2'])} из 2 · B3: ${b('quality').vehicleIds.length} из ${b('quality').capacity}`, `С первого предъявления: ${q.firstInspections ? `${q.firstPass} из ${q.firstInspections}` : '—'}`, 'Испытательных стендов в модели нет'], problems: probFor('quality') },
+    { space: 'tests', left: 940, top: 331, title: 'Контроль качества', later: true, lines: [`КК-1, КК-2 · заняты ${busy(['Q1', 'Q2'])} из 2 · B3: ${b('quality').vehicleIds.length} из ${b('quality').capacity}`, `С первого предъявления: ${q.firstInspections ? `${q.firstPass} из ${q.firstInspections}` : '—'}`, 'Испытательных стендов в модели нет'], problems: probFor('quality') },
     { space: 'ship', left: 1122, top: 444, title: 'Отгрузка', later: true, lines: [`ОТ-1 · ${post('S1').vehicleId ? `занят ${post('S1').vehicleId}` : 'свободен'} · FG: ${b('shipping').vehicleIds.length} из ${b('shipping').capacity}`, `Отгружено за смену: ${state.totals.shipped}`], problems: probFor('shipping') },
-    { space: 'rework', left: 470, top: 556, title: 'Доработка', later: true, lines: [`ДР-1 · ${post('R1').vehicleId ? `занят ${post('R1').vehicleId}` : 'свободен'} · очередь ${state.rework.buffer.vehicleIds.length}`, `Приняты после доработки: ${q.reworkedAccepted}`], problems: probFor('rework') },
+    { space: 'rework', left: 470, top: 556, title: 'Ремонт автомобилей', later: true, lines: [`ДР-1 · ${post('R1').vehicleId ? `занят ${post('R1').vehicleId}` : 'свободен'} · очередь ${state.rework.buffer.vehicleIds.length}`, `Приняты после доработки: ${q.reworkedAccepted}`], problems: probFor('rework') },
   ];
 }

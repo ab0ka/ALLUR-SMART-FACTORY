@@ -8,3 +8,6 @@ coverage/
 build-quarantine/
 
 data/
+
+# Downloaded 3D sources (large; CC BY attribution kept in docs/ASSETS.md)
+assets-src/

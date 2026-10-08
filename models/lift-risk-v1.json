@@ -1,0 +1,184 @@
+{
+ "format": "allur-lift-risk",
+ "modelVersion": "lift-risk-v1",
+ "generatorVersion": "lift-degradation-v1",
+ "trainingSeed": 7001,
+ "task": "Вероятность отказа гидроподъёмника в ближайшие 30 мин по измерениям за последние 30 мин",
+ "modelType": "логистическая регрессия, стандартизованные признаки, L2, веса классов, сдвиг свободного члена под долю отказов",
+ "horizon": 30,
+ "featureWindow": 30,
+ "features": [
+  "pressure_mean",
+  "pressure_slope",
+  "temperature_mean",
+  "temperature_slope",
+  "cycle_mean",
+  "cycle_slope",
+  "cycle_missing"
+ ],
+ "weights": [
+  -0.6826,
+  -0.2545,
+  0.1307,
+  0.0736,
+  0.8198,
+  0.2038,
+  0.0806
+ ],
+ "bias": -8.6231,
+ "mean": [
+  178.952,
+  -0.0113,
+  45.2104,
+  0.0024,
+  42.8024,
+  0.0078,
+  0.1758
+ ],
+ "std": [
+  4.1922,
+  0.1506,
+  1.1384,
+  0.0732,
+  3.175,
+  0.1229,
+  0.3543
+ ],
+ "threshold": 0.419,
+ "baseline": {
+  "feature": "cycle_mean",
+  "threshold": 57.95
+ },
+ "selected": "model",
+ "selectionReason": "на сменах настройки F1 модели 0.750 против 0.695 у правила; тестовые смены в выборе не участвовали",
+ "data": {
+  "shifts": {
+   "total": 300,
+   "train": 180,
+   "validation": 60,
+   "test": 60
+  },
+  "shiftSeeds": {
+   "train": [
+    7001,
+    7180
+   ],
+   "validation": [
+    7181,
+    7240
+   ],
+   "test": [
+    7241,
+    7300
+   ]
+  },
+  "samples": {
+   "total": 79757,
+   "train": 47909,
+   "validation": 15957,
+   "test": 15891
+  },
+  "positiveRate": 0.011
+ },
+ "metrics": {
+  "validation": {
+   "model": {
+    "precision": 0.7595,
+    "recall": 0.7407,
+    "f1": 0.75,
+    "prAuc": 0.8014,
+    "falseAlarmsPerShift": 0.6333,
+    "leadTime": {
+     "median": 20,
+     "warned": 27,
+     "failures": 27
+    },
+    "brier": 0.0041
+   },
+   "baseline": {
+    "precision": 0.6018,
+    "recall": 0.821,
+    "f1": 0.6945,
+    "prAuc": 0.7645,
+    "falseAlarmsPerShift": 1.4667,
+    "leadTime": {
+     "median": 33,
+     "warned": 27,
+     "failures": 27
+    },
+    "brier": null
+   }
+  },
+  "test": {
+   "model": {
+    "precision": 0.7611,
+    "recall": 0.6919,
+    "f1": 0.7249,
+    "prAuc": 0.8375,
+    "falseAlarmsPerShift": 0.7167,
+    "leadTime": {
+     "median": 18,
+     "warned": 33,
+     "failures": 33
+    },
+    "brier": 0.0048
+   },
+   "baseline": {
+    "precision": 0.6185,
+    "recall": 0.7778,
+    "f1": 0.689,
+    "prAuc": 0.7803,
+    "falseAlarmsPerShift": 1.5833,
+    "leadTime": {
+     "median": 27,
+     "warned": 32,
+     "failures": 33
+    },
+    "brier": null
+   }
+  }
+ },
+ "calibration": [
+  {
+   "from": 0,
+   "to": 0.2,
+   "count": 15555,
+   "meanPredicted": 0.0022,
+   "observedRate": 0.0009
+  },
+  {
+   "from": 0.2,
+   "to": 0.4,
+   "count": 148,
+   "meanPredicted": 0.2956,
+   "observedRate": 0.3041
+  },
+  {
+   "from": 0.4,
+   "to": 0.6,
+   "count": 89,
+   "meanPredicted": 0.4921,
+   "observedRate": 0.5506
+  },
+  {
+   "from": 0.6,
+   "to": 0.8,
+   "count": 85,
+   "meanPredicted": 0.7014,
+   "observedRate": 0.8941
+  },
+  {
+   "from": 0.8,
+   "to": 1,
+   "count": 14,
+   "meanPredicted": 0.8306,
+   "observedRate": 1
+  }
+ ],
+ "limitations": [
+  "Данные полностью синтетические: генератор деградации тот же, что в демо. Хорошее качество здесь не означает пригодность для реального оборудования.",
+  "Две причины (утечка и износ насоса) дают похожие сигналы; модель предсказывает отказ, а не причину — причину устанавливает проверка.",
+  "Окна одной смены попадают только в одну часть (обучение, настройка или тест); демо-смена (seed 42) в данных не участвует.",
+  "Признаки считаются только по измерениям до момента прогноза; после отказа окна не используются."
+ ]
+}

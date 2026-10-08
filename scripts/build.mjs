@@ -3,7 +3,8 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-export const PUBLIC_ASSETS = ['index.html', 'styles.css', 'app.js', 'scene.js', 'favicon.svg'];
+export const CAR_SPRITES = ["car-kia-a-done.webp", "car-kia-a-body.webp", "car-kia-b-done.webp", "car-kia-b-body.webp", "car-kia-c-done.webp", "car-kia-c-body.webp"]; // scripts/render-car-sprites.mjs
+export const PUBLIC_ASSETS = ['index.html', 'styles.css', 'app.js', 'scene.js', 'viewer3d.js', 'three.module.js', 'three-orbit-controls.js', 'favicon.svg', ...CAR_SPRITES];
 // The client script is kept as ordered parts in public/app/ (NN-name.js) so several people can work on different
 // screens without editing one large file. The build joins them in name order into a single dist/app.js.
 export const APP_PART = /^\d{2}-[a-z0-9-]+\.js$/;
@@ -25,6 +26,7 @@ export async function buildDist({ publicDir = path.join(root, 'public'), distDir
   }
   const secrets = [process.env.NVIDIA_API_KEY, process.env.OPENAI_API_KEY].map(s => s?.trim()).filter(Boolean);
   for (const file of PUBLIC_ASSETS) {
+    if (file.endsWith('.webp')) { await writeFile(path.join(distDir, file), await readFile(path.join(publicDir, file))); continue; }
     const data = file === 'app.js' ? (await assembleApp(publicDir)).code : await readFile(path.join(publicDir, file), 'utf8');
     if (/(?:nvapi-|sk-)[A-Za-z0-9_-]{16,}/.test(data) || secrets.some(secret => data.includes(secret))) throw new Error(`Possible secret in client asset ${file}`);
     await writeFile(path.join(distDir, file), data);
@@ -34,7 +36,7 @@ export async function buildDist({ publicDir = path.join(root, 'public'), distDir
   return { files: result, strays, quarantineDir };
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  for (const file of ['public/scene.js', 'server/index.mjs', 'server/simulation.mjs', 'server/ai.mjs', 'server/ai-config.mjs', 'scripts/build.mjs']) execFileSync(process.execPath, ['--check', path.join(root, file)], { stdio: 'inherit' });
+  for (const file of ['public/scene.js', 'public/viewer3d.js', 'server/index.mjs', 'server/simulation.mjs', 'server/ai.mjs', 'server/ai-config.mjs', 'scripts/build.mjs']) execFileSync(process.execPath, ['--check', path.join(root, file)], { stdio: 'inherit' });
   const { files, strays, quarantineDir } = await buildDist();
   execFileSync(process.execPath, ['--check', path.join(root, 'dist', 'app.js')], { stdio: 'inherit' });
   const { parts } = await assembleApp(path.join(root, 'public'));

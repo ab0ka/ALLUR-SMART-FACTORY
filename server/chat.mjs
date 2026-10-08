@@ -11,6 +11,7 @@ export const CHAT_LIMITS = { message: 500, history: 40, modelHistory: 6, llmInte
 export const SUGGESTED = [
   'Что сейчас угрожает плану?',
   'Почему задерживается этот автомобиль?',
+  'Что делать с этой машиной?',
   'На чём основана гипотеза неисправности?',
   'Какую проверку выполнить?',
   'Сравни ремонт сейчас и продолжение работы',
@@ -25,6 +26,7 @@ const sign = n => `${n > 0 ? '+' : n < 0 ? '−' : '±'}${f1(Math.abs(n))}`;
 
 function intentOf(text) {
   const t = text.toLowerCase();
+  if (/что (мне )?делать|что дальше|следующ(ее|ий) (шаг|действие)|какое действие/.test(t)) return 'next_action';
   if (/отлича|расход|не совпа|почему результат|почему факт/.test(t)) return 'forecast_diff';
   if (/перев(од|ести|ед)|друг(ой|ом) пост|параллельн/.test(t)) return 'transfer';
   if (/сравн|вариант|ремонт сейчас|что лучше|продолжени/.test(t)) return 'compare';
@@ -51,8 +53,9 @@ function resolveContext(w, message, context) {
   for (const [code, id] of Object.entries(POST_BY_CODE)) if (message.toLowerCase().includes(code)) out.post = id;
   if (!out.problem && out.post) out.problem = w.problems.find(p => p.postId === out.post && p.status === 'open')?.id ?? w.problems.find(p => p.postId === out.post)?.id;
   if (!out.problem && out.vehicle) { const v = w.vehicle(out.vehicle); if (v.location.type === 'post') out.problem = w.problems.find(p => p.postId === v.location.id && p.status === 'open')?.id; }
-  if (!out.problem) out.problem = w.problems.find(p => p.status === 'open')?.id;
   if (!out.vehicle && out.post) out.vehicle = w.posts[out.post].vehicleId ?? undefined;
+  if (!out.vehicle && out.problem) out.vehicle = w.posts[w.problem(out.problem).postId].vehicleId ?? undefined;
+  if (!out.problem) out.problem = w.problems.find(p => p.status === 'open')?.id;
   return out;
 }
 const ref = (type, id, label = id) => ({ type, id, label });
@@ -63,8 +66,10 @@ function threat(w) {
   const s = w.snapshot(), f = s.forecast, open = s.problems.filter(p => p.status === 'open');
   const lines = [`${clock(s.elapsed)}. План смены (задан оператором): ${s.plan.target}. Прогноз без новых вмешательств: ${f.projected}${f.low < f.high ? ` (по гипотезам ${f.low}–${f.high})` : ''}; ${f.gap >= 0 ? 'запас' : 'дефицит'} ${Math.abs(f.gap)}. Эталонная мощность симуляции: ${s.plan.reference?.total ?? '—'}. Принято сейчас: ${s.totals.accepted}.`];
   if (f.lateOrders.length) lines.push(`Под угрозой срок: ${f.lateOrders.join(', ')}.`);
-  if (open.length) lines.push(`Открытые проблемы: ${open.map(p => `${p.id} — ${p.title} (${p.postCode})`).join('; ')}.`);
-  else lines.push('Открытых проблем нет.');
+  if (open.length) lines.push(`Неисправности оборудования: ${open.map(p => `${p.id} — ${p.title} (${p.postCode})`).join('; ')}.`);
+  else lines.push('Неисправностей оборудования нет.');
+  const cars = s.tasks.filter(t => t.object.type === 'vehicle');
+  if (cars.length) lines.push(`Задачи по автомобилям: ${cars.map(t => `${t.object.id} — ${t.status} (${t.next.toLowerCase()})`).join('; ')}.`);
   if (f.limiting) lines.push(`Ограничивающий участок: ${f.limiting.name.toLowerCase()}, загрузка ${pct(f.limiting.utilization)}.`);
   return { text: lines.join(' '), refs: [...open.map(p => ref('problem', p.id, `${p.id} ${p.postCode}`)), ...f.lateOrders.map(id => ref('order', id))], facts: { time: clock(s.elapsed), planTarget: s.plan.target, forecast: { projected: f.projected, low: f.low, high: f.high, gap: f.gap, lateOrders: f.lateOrders }, reference: s.plan.reference?.total, accepted: s.totals.accepted, problems: open.map(p => ({ id: p.id, title: p.title, post: p.postCode })) }, tools: ['read_state'] };
 }
@@ -82,11 +87,21 @@ function vehicleDelay(w, ctx) {
     if (posts.length) lines.push(`Посты участка «${stage.name}»: ${posts.map(p => `${p.code} — ${p.vehicleId ? `${p.vehicleId}, ${pct(p.progress ?? 0)}` : 'свободен'}${['fault', 'maintenance'].includes(p.state) ? ` (${p.state === 'fault' ? 'неисправность' : 'работы техника'})` : ''}`).join('; ')}.`);
     posts.filter(p => p.problemId).forEach(p => refs.push(ref('problem', p.problemId)));
   }
+  const na = v.nextAction;
+  lines.push(`Следующее действие: ${na.title}.${na.why ? ` ${na.why}` : ''}${na.blockers.length ? ` Мешает: ${na.blockers.join('; ')}.` : ''}`);
+  if (na.target) refs.push(ref(na.target.type, na.target.id, na.target.type === 'post' ? postCode(w, na.target.id) : na.target.id));
   const failed = v.inspections.filter(i => i.result === 'fail');
   if (failed.length) lines.push(`Контроль: ${failed.map(i => `${clock(i.minute)} не пройден — ${i.defect}`).join('; ')}${v.reworked ? '; доработка выполнена' : ''}.`);
   const events = w.events.filter(e => e.vehicleId === v.id).slice(-3);
   for (const e of events) refs.push(ref('event', String(e.seq), `${clock(e.minute)} событие`));
   return { text: lines.join(' '), refs, facts: { vehicle: { id: v.id, status: v.status, state: v.state, order: v.orderId, operation: v.currentOperation && { name: v.currentOperation.operation, progress: v.currentOperation.progress, remaining: v.currentOperation.remaining } }, lastEvents: events.map(e => `${clock(e.minute)} ${e.text}`) }, tools: ['read_state', 'read_history'] };
+}
+// What to do now: the server's next action for a vehicle, or the first tasks of the shift.
+function nextStep(w, ctx) {
+  if (ctx.vehicle) return vehicleDelay(w, ctx);
+  const tasks = w.tasks().slice(0, 4);
+  if (!tasks.length) return { text: 'Активных задач нет: оборудование без отклонений, машин на доработке нет, рисков срока по прогнозу нет.', refs: [], facts: { tasks: 0 }, tools: ['read_state'] };
+  return { text: `Задачи смены (${w.tasks().length}): ${tasks.map(t => `${t.title} — ${t.status}; дальше: ${t.next.toLowerCase()}`).join('. ')}.`, refs: tasks.map(t => ref(t.object.type, t.object.id, t.object.type === 'post' ? postCode(w, t.object.id) : t.object.id)), facts: { tasks: tasks.map(t => ({ id: t.id, title: t.title, status: t.status, next: t.next })) }, tools: ['read_state', 'tasks'] };
 }
 function problemFacts(w, id, riskModel) {
   const p = w.problemView(w.problem(id)), risk = assessRisk(w, riskModel).items?.find(i => i.postId === p.postId) ?? null;
@@ -165,7 +180,7 @@ export async function answerChat(w, body, { aiOptions = {}, llm = { busy: false,
   if (message.length > CHAT_LIMITS.message) throw new SimulationError(`Сообщение длиннее ${CHAT_LIMITS.message} символов`);
   const ctx = resolveContext(w, message, body.context);
   const intent = intentOf(message);
-  const handlers = { threat: () => threat(w), vehicle_delay: () => vehicleDelay(w, ctx), basis: () => basis(w, ctx, riskModel), which_check: () => whichCheck(w, ctx), compare: () => compare(w, ctx), transfer: () => transfer(w, ctx), forecast_diff: () => forecastDiff(w) };
+  const handlers = { next_action: () => nextStep(w, ctx), threat: () => threat(w), vehicle_delay: () => vehicleDelay(w, ctx), basis: () => basis(w, ctx, riskModel), which_check: () => whichCheck(w, ctx), compare: () => compare(w, ctx), transfer: () => transfer(w, ctx), forecast_diff: () => forecastDiff(w) };
   const local = handlers[intent]?.() ?? null;
   const configured = aiOptions.provider && aiOptions.provider !== 'local' && aiOptions.key?.trim();
   let text = local?.text ?? null, source = 'local', note = null;

@@ -12,7 +12,10 @@ import { answerChat, CHAT_LIMITS } from './chat.mjs';
 import { loadRiskModel, assessRisk, labSummary, loadPolicyReport } from './risk-model.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const assets = { '/': ['index.html', 'text/html; charset=utf-8'], '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/scene.js': ['scene.js', 'text/javascript; charset=utf-8'], '/styles.css': ['styles.css', 'text/css; charset=utf-8'], '/favicon.svg': ['favicon.svg', 'image/svg+xml'] };
+const assets = { '/': ['index.html', 'text/html; charset=utf-8'], '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/scene.js': ['scene.js', 'text/javascript; charset=utf-8'], '/viewer3d.js': ['viewer3d.js', 'text/javascript; charset=utf-8'], '/three.module.js': ['three.module.js', 'text/javascript; charset=utf-8'], '/three-orbit-controls.js': ['three-orbit-controls.js', 'text/javascript; charset=utf-8'], '/styles.css': ['styles.css', 'text/css; charset=utf-8'], '/favicon.svg': ['favicon.svg', 'image/svg+xml'], '/car-kia-a-done.webp': ['car-kia-a-done.webp', 'image/webp'], '/car-kia-a-body.webp': ['car-kia-a-body.webp', 'image/webp'], '/car-kia-b-done.webp': ['car-kia-b-done.webp', 'image/webp'], '/car-kia-b-body.webp': ['car-kia-b-body.webp', 'image/webp'], '/car-kia-c-done.webp': ['car-kia-c-done.webp', 'image/webp'], '/car-kia-c-body.webp': ['car-kia-c-body.webp', 'image/webp'] };
+// Optional exterior model downloaded by the user (CC BY 4.0, see docs/ASSETS.md). It is not in Git or dist: exactly two
+// files are served from assets-src/kia-sportage if they exist; nothing else in that folder is reachable.
+const MODEL_FILES = { '/models/kia-sportage/scene.gltf': ['scene.gltf', 'model/gltf+json'], '/models/kia-sportage/scene.bin': ['scene.bin', 'application/octet-stream'] };
 const safeEqual = (a, b) => typeof a === 'string' && Buffer.byteLength(a) === Buffer.byteLength(b) && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 // Expected client errors carry `expose`; anything else is an unexpected server error (500, generic message).
 const clientError = (message, status = 400) => Object.assign(new Error(message), { status, expose: true });
@@ -32,7 +35,7 @@ export function fullState(sim, { aiOptions = {}, riskModel = null } = {}) {
   s.ai = { provider: aiOptions.provider || 'nvidia', configured: aiOptions.provider !== 'local' && Boolean(aiOptions.key?.trim()), chatLimits: CHAT_LIMITS };
   return s;
 }
-export function createApp({ simulation = new Workshop(), aiOptions = {}, tickMs = 1200, publicDir = path.join(root, 'dist'), storePath = null, riskModel = null, policyReport = null, chatMinIntervalMs = 1000 } = {}) {
+export function createApp({ simulation = new Workshop(), aiOptions = {}, tickMs = 1200, publicDir = path.join(root, 'dist'), modelDir = path.join(root, 'assets-src', 'kia-sportage'), storePath = null, riskModel = null, policyReport = null, chatMinIntervalMs = 1000 } = {}) {
   let sim = simulation;
   const token = randomBytes(32).toString('hex'), llm = { busy: false, last: 0 };
   let lastChat = 0, ticksSinceSave = 0;
@@ -104,6 +107,13 @@ export function createApp({ simulation = new Workshop(), aiOptions = {}, tickMs 
         try { content = await readFile(path.join(publicDir, name)); }
         catch (error) { if (error.code === 'ENOENT') return send(503, { error: 'Сначала выполните npm run build' }); throw error; }
         res.writeHead(200, { 'Content-Type': type }); return res.end(content);
+      }
+      if (req.method === 'GET' && MODEL_FILES[url.pathname]) {
+        const [name, type] = MODEL_FILES[url.pathname];
+        let content;
+        try { content = await readFile(path.join(modelDir, name)); }
+        catch (error) { if (error.code === 'ENOENT') return send(404, { error: 'Модель Kia Sportage не найдена в assets-src/kia-sportage' }); throw error; }
+        res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'private, max-age=3600' }); return res.end(content);
       }
       return send(404, { error: 'Не найдено' });
     } catch (error) {

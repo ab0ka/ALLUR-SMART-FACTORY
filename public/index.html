@@ -4,13 +4,11 @@
 <body>
 <header class="topbar">
   <a class="brand" href="#space/assembly" aria-label="Allur Smart Factory — к цеху «Сборка»"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 22 22"><path d="M2.5 19 11 2.5 19.5 19h-4.4L11 10.6 6.9 19z"/><rect x="8.2" y="14.2" width="5.6" height="2.2"/></svg></span><span class="brand-text"><b>ALLUR</b><span>Smart Factory</span></span></a>
-  <nav class="spaces" aria-label="Пространства">
-    <a href="#space/enterprise" data-space-link="enterprise">Предприятие</a>
-    <a href="#space/assembly" data-space-link="assembly">Сборка</a>
-    <a href="#space/tests" data-space-link="tests">Испытания<i class="later" title="Подробная сцена в разработке" aria-hidden="true"></i></a>
-    <a href="#space/diag" data-space-link="diag">Диагностика<span id="diag-count" class="badge" hidden></span></a>
-    <a href="#space/rework" data-space-link="rework">Доработка<i class="later" title="Подробная сцена в разработке" aria-hidden="true"></i></a>
-    <a href="#space/ship" data-space-link="ship">Отгрузка<i class="later" title="Подробная сцена в разработке" aria-hidden="true"></i></a>
+  <nav class="spaces primary-nav" aria-label="Основные разделы">
+    <a href="#space/assembly" data-section="shops">Цеха</a>
+    <a href="#vehicles" data-section="vehicles">Автомобили <span id="nav-vehicles" class="nav-count"></span></a>
+    <a href="#dispatcher" data-section="manage">Управление</a>
+    <a href="#shift" data-section="analytics">Аналитика</a>
   </nav>
   <div class="timebox">
     <div class="clockbox"><strong id="clock">--:--</strong><span id="run-status">Загрузка…</span></div>
@@ -23,19 +21,29 @@
   <a class="alerts" id="alerts" href="#space/diag" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path class="ic-warn" d="M8 1.2 15.3 14.3H.7z"/><rect class="ic-dark" x="7.1" y="5.6" width="1.8" height="4.6" rx=".6"/><circle class="ic-dark" cx="8" cy="12" r="1"/></svg><span id="alerts-count">0</span></a>
   <span class="synthetic">Синтетические данные</span>
   <button id="chat-toggle" class="icon-btn" aria-label="Открыть чат" data-open-chat="1"><svg viewBox="0 0 20 20" aria-hidden="true"><path class="ico-chat" d="M3 4.5A2.5 2.5 0 0 1 5.5 2h9A2.5 2.5 0 0 1 17 4.5v6a2.5 2.5 0 0 1-2.5 2.5H9l-4 3.5V13a2.5 2.5 0 0 1-2-2.5z"/></svg></button>
-  <details class="menu" id="menu"><summary>Разделы</summary><div class="menu-list">
-    <a href="#dispatcher" data-nav="dispatcher">Диспетчер смены <span id="nav-problems" class="nav-count"></span></a>
-    <a href="#workshop" data-nav="workshop">Схема цеха (2D)</a>
-    <a href="#vehicles" data-nav="vehicles">Автомобили <span id="nav-vehicles" class="nav-count"></span></a>
-    <a href="#orders" data-nav="orders">Производственные задания <span id="nav-orders" class="nav-count"></span></a>
-    <a href="#shift" data-nav="shift">Смена и аналитика</a>
-    <a href="#lab" data-nav="lab">Лаборатория моделей</a>
+  <details class="menu" id="menu"><summary aria-label="Действия со сменой">Смена</summary><div class="menu-list">
+    <p class="menu-caption">Управление временем симуляции</p>
+    <div class="speed mobile-speed" role="group" aria-label="Скорость симуляции"><button data-speed="1" aria-pressed="false">1</button><button data-speed="5" aria-pressed="true">5</button><button data-speed="15" aria-pressed="false">15</button></div>
     <button id="step-menu" class="quiet">+5 модельных минут (шаг)</button>
     <button id="reset" class="quiet">↺ Сбросить смену</button>
   </div></details>
 </header>
+<div class="workspace-bar" aria-label="Навигация текущего раздела">
+  <div class="workspace-context"><span class="workspace-kicker" id="section-label">ЦЕХА</span><span id="section-hint">Выберите участок и автомобиль на карте</span></div>
+  <div id="shop-navigation" class="context-controls">
+    <label class="shop-picker" for="shop-select">Участок <select id="shop-select">
+      <option value="enterprise">Всё предприятие</option><option value="weld">01 · Сварка</option><option value="paint">02 · Окраска</option><option value="assembly" selected>03 · Сборка</option><option value="tests">04 · Контроль качества</option><option value="rework">05 · Ремонт автомобилей</option><option value="ship">06 · Отгрузка</option><option value="diag">Обслуживание оборудования</option>
+    </select></label>
+    <a class="context-link" href="#space/enterprise">Обзор</a>
+    <a class="context-link" href="#workshop" data-nav="workshop">2D-схема</a>
+    <span id="diag-count" class="sr-only" aria-hidden="true" hidden></span>
+  </div>
+  <nav id="manage-navigation" class="context-tabs" aria-label="Управление" hidden><a href="#dispatcher" data-nav="dispatcher">Задачи и решения <span id="nav-problems" class="nav-count"></span></a><a href="#orders" data-nav="orders">Задания <span id="nav-orders" class="nav-count"></span></a></nav>
+  <nav id="analytics-navigation" class="context-tabs" aria-label="Аналитика" hidden><a href="#shift" data-nav="shift">Результаты смены</a><a href="#lab" data-nav="lab">Модели и эксперименты</a></nav>
+</div>
 <div id="error" role="alert" hidden></div>
 <main>
+ <div class="workarea" id="workarea">
   <section id="view-space" class="view space-view" aria-labelledby="space-title">
     <div class="space-stage" id="space-stage">
       <div class="scene-wrap" id="scene-wrap"><svg id="scene" class="scene" role="group" aria-label="Изометрическая сцена цеха «Сборка»: посты, буферы, автомобили и ремонтник"></svg></div>
@@ -53,29 +61,16 @@
       <div class="cam" role="group" aria-label="Камера"><button data-cam="home" aria-label="Общий вид"><svg viewBox="0 0 20 20" aria-hidden="true"><path class="ico-line" d="M3 9.5 10 3l7 6.5M5.5 8v8.5h9V8"/></svg></button><button data-cam="in" aria-label="Приблизить">+</button><button data-cam="out" aria-label="Отдалить">−</button></div>
       <section id="ribbon" class="ribbon" aria-label="Лента событий"></section>
     </div>
-    <aside id="side" class="side" hidden aria-label="Карточка выбранного объекта"></aside>
+    
   </section>
 
   <div id="legacy" class="legacy" hidden>
     <div id="summary" class="summary" aria-live="off"></div>
     <section id="view-dispatcher" class="view" aria-labelledby="h-dispatcher">
-      <h1 id="h-dispatcher" class="view-title">Диспетчер смены <span>отклонение → диагностика → сравнение → решение → результат</span></h1>
-      <div class="dispatch-grid">
-        <div class="dispatch-main">
-          <section class="panel" aria-labelledby="h-threat"><h2 id="h-threat" class="panel-title">Что угрожает плану</h2><div id="threat"></div></section>
-          <section id="problem-card" class="panel" aria-live="polite"></section>
-          <section id="comparison" class="panel" aria-labelledby="h-compare"></section>
-          <section class="panel" aria-labelledby="h-decisions"><h2 id="h-decisions" class="panel-title">Принятые решения: прогноз и факт</h2><div id="decision-log"></div></section>
-        </div>
-        <aside class="panel chat-panel" aria-labelledby="h-chat">
-          <h2 id="h-chat" class="panel-title">Чат диспетчера</h2>
-          <p id="chat-mode" class="fine-print"></p>
-          <div id="chat-context" class="chat-context"></div>
-          <div id="chat-suggest" class="chips small" role="group" aria-label="Предложенные вопросы"></div>
-          <ol id="chat-log" class="chat-log" aria-live="polite"></ol>
-          <form id="chat-form" class="chat-form"><label for="chat-input" class="sr-only">Вопрос диспетчеру</label><textarea id="chat-input" rows="2" maxlength="500" placeholder="Спросите о посте, автомобиле, задании или проблеме"></textarea><div class="chat-send"><span id="chat-count" class="fine-print">0/500</span><button class="primary" type="submit" id="chat-send">Спросить</button></div></form>
-        </aside>
-      </div>
+      <h1 id="h-dispatcher" class="view-title">Задачи смены <span>оборудование, автомобили, блокировки и риски сроков — из одного снимка движка</span></h1>
+      <section class="panel" aria-labelledby="h-threat"><h2 id="h-threat" class="panel-title">Что угрожает плану</h2><div id="threat"></div></section>
+      <section class="panel" aria-labelledby="h-tasks"><h2 id="h-tasks" class="panel-title">Задачи <span id="tasks-count" class="tag"></span></h2><div id="task-filters" class="chips small" role="group" aria-label="Фильтр задач по достоверности"></div><div id="task-list" class="task-list"></div></section>
+      <section class="panel" aria-labelledby="h-decisions"><h2 id="h-decisions" class="panel-title">Принятые решения: прогноз и факт</h2><div id="decision-log"></div></section>
     </section>
 
     <section id="view-workshop" class="view" aria-labelledby="h-workshop" hidden>
@@ -118,7 +113,13 @@
     </section>
 
     <section id="view-shift" class="view" aria-labelledby="h-shift" hidden>
-      <h1 id="h-shift" class="view-title">Смена и аналитика <span>все показатели из того же состояния мастерской</span></h1>
+      <h1 id="h-shift" class="view-title">Результаты смены <span>все показатели из того же состояния мастерской</span></h1>
+      <section class="panel shift-first" aria-labelledby="h-shift-first"><h2 id="h-shift-first" class="sr-only">Главное о смене</h2><div id="shift-first"></div>
+        <div class="ai-header"><div><strong>Объяснение</strong><span id="ai-source">Локальный режим доступен без ключа</span></div><button id="explain" class="primary">Объяснить ↗</button></div>
+        <p class="ai-synthetic">Синтетические данные · объяснение учебного снимка, не диагноз реального оборудования Allur</p>
+        <div id="ai-text" class="ai-text" aria-live="polite">Нажмите «Объяснить», чтобы получить разбор текущего снимка. Поддерживаются OpenAI и NVIDIA. Без ключа работает локальное объяснение.</div>
+        <p id="ai-stale" class="fine-print"></p></section>
+      <details class="more" id="shift-details"><summary>График смены, план, прогноз по сценариям и качество</summary>
       <div class="shift-grid">
         <div class="panel">
           <h2 class="panel-title">Приёмка: план, эталон, прогноз и факт</h2>
@@ -131,12 +132,10 @@
           <h2 class="panel-title">Прогноз и качество</h2>
           <div id="forecast-box"></div>
           <div id="quality-box"></div>
-          <div class="ai-header"><div><strong>Объяснение</strong><span id="ai-source">Локальный режим доступен без ключа</span></div><button id="explain" class="primary">Объяснить ↗</button></div>
-          <p class="ai-synthetic">Синтетические данные · объяснение учебного снимка, не диагноз реального оборудования Allur</p>
-          <div id="ai-text" class="ai-text" aria-live="polite">Нажмите «Объяснить», чтобы получить разбор текущего снимка. Поддерживаются OpenAI и NVIDIA. Без ключа работает локальное объяснение.</div>
-          <p id="ai-stale" class="fine-print"></p>
         </div>
       </div>
+      </details>
+      <details class="more"><summary>OEE по постам, определения метрик, журналы инцидентов и событий</summary>
       <div class="panel">
         <h2 class="panel-title">Посты: доступность, производительность, качество</h2>
         <div class="table-scroll" tabindex="0" role="region" aria-label="Таблица OEE постов"><table id="oee-table"></table></div>
@@ -150,14 +149,37 @@
         <div class="panel"><h2 class="panel-title">Инциденты и работы техника</h2><div id="incident-log" class="incident-list"></div></div>
         <div class="panel"><h2 class="panel-title">Журнал событий <span id="event-count" class="tag"></span></h2><ol id="event-log" class="event-log" reversed></ol></div>
       </div>
+      </details>
     </section>
 
     <section id="view-lab" class="view" aria-labelledby="h-lab" hidden>
       <h1 id="h-lab" class="view-title">Лаборатория моделей <span>синтетическое обучение и проверка, не для реального оборудования Allur</span></h1>
       <div id="lab"></div>
     </section>
-    <footer><span>ALLUR SMART FACTORY · SYNTHETIC DEMO</span><span>Состояние сохраняется локально в data/ · «Сбросить смену» — в меню «Разделы»</span></footer>
+    <footer><span>ALLUR SMART FACTORY · SYNTHETIC DEMO · учебная симуляция, не система Allur</span><span>Состояние сохраняется локально в data/ · «Сбросить смену» — в меню «Смена»</span></footer>
   </div>
+  <aside id="side" class="side" hidden aria-label="Карточка выбранного объекта"></aside>
+    <section id="car3d" class="car3d" hidden aria-labelledby="c3-title">
+      <header class="c3-head">
+        <div class="c3-headtext"><span class="eyebrow">АВТОМОБИЛЬ · 3D-КАРТОЧКА</span><h2 id="c3-title" tabindex="-1">—</h2><p id="c3-sub" class="c3-sub"></p></div>
+        <p class="c3-disclaimer">Синтетическая учебная симуляция. Не является руководством по ремонту.</p>
+        <button class="link c3-back" data-c3close="1" id="c3-back">← Назад</button><button class="icon-btn c3-close" data-c3close="1" aria-label="Закрыть 3D-карточку">✕</button>
+      </header>
+      <div class="c3-body">
+        <div class="c3-view">
+          <div id="c3-stage" class="c3-stage"></div>
+          <div class="c3-tools" role="group" aria-label="Ракурс и капот">
+            <button data-c3view="overview">Общий</button><button data-c3view="hood">Под капотом</button><button data-c3view="wheels">Колёса</button><button data-c3view="cabin">Салон</button>
+            <button id="c3-hood" class="c3-hoodbtn" data-c3hood="1">Открыть капот</button>
+            <button data-c3reset="1" aria-label="Вернуть камеру к общему виду">⟲</button>
+          </div>
+          <p class="c3-badge" id="c3-badge">Kia Sportage — karaman.arman, CC BY 4.0 · не CAD Kia/Allur · узлы под капотом условные</p>
+          <div id="c3-status" class="c3-status" aria-live="polite"></div>
+        </div>
+        <aside id="c3-panel" class="c3-panel" aria-label="Узлы, диагностика и история"></aside>
+      </div>
+    </section>
+ </div>
 </main>
 <dialog id="confirm" aria-labelledby="confirm-title">
   <form method="dialog" class="confirm-form">
