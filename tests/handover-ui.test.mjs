@@ -16,11 +16,11 @@ const report = { schemaVersion: 1, synthetic: true, shiftStart: 480, elapsed: 18
 test('handover preserves zero, unknown quality and honest missing renderer state', async () => {
   const h = setup(), pending = h.run('loadHandover()');
   h.calls[0].resolve({ ok: true, json: async () => report }); await pending;
-  assert.match(h.$('handover-content').innerHTML, /<dd>0<\/dd>/);
+  assert.match(h.$('handover-content').innerHTML, /<dd data-handover-metric="planTarget">0<\/dd>/);
   assert.match(h.$('handover-content').innerHTML, /11:00/);
   assert.match(h.$('handover-content').innerHTML, /Открытых проблем/);
   assert.match(h.$('handover-content').innerHTML, /после подключения/);
-  assert.match(h.$('handover-content').innerHTML, /<dd>—<\/dd>/);
+  assert.match(h.$('handover-content').innerHTML, /<dd data-handover-metric="firstPassYield">—<\/dd>/);
 });
 test('production polling never refetches; leaving aborts and rejects late response', async () => {
   const h = setup(), pending = h.run('loadHandover()');

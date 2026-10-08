@@ -39,15 +39,16 @@ function handoverPaint(report) {
   const cards = [
     ['План смены', metrics.planTarget, 'Обязательство оператора'],
     ['Эталон', metrics.referenceTotal, 'Эталонная мощность смены'],
-    ['Прогноз', metrics.forecast, `Диапазон: ${handoverNumber(metrics.forecastLow)}–${handoverNumber(metrics.forecastHigh)}`],
+    ['Прогноз', metrics.forecast, `Диапазон: <span data-handover-metric="forecastLow">${handoverNumber(metrics.forecastLow)}</span>–<span data-handover-metric="forecastHigh">${handoverNumber(metrics.forecastHigh)}</span>`],
     ['Факт: принято', metrics.accepted, 'Пройден контроль качества'],
     ['Отгружено', metrics.shipped, 'Покинуло производство'],
     ['В работе · WIP', metrics.wip, 'Незавершённое производство'],
     ['Качество · FPY', metrics.firstPassYield, 'Контроль с первого раза', true],
   ];
+  const metricKeys = ['planTarget', 'referenceTotal', 'forecast', 'accepted', 'shipped', 'wip', 'firstPassYield'];
   const empty = ['problems', 'jobs', 'tasks', 'orders'].every(key => Array.isArray(report[key]) && report[key].length === 0);
   $('handover-content').innerHTML = `<div class="handover-meta"><strong>Срез на ${esc(handoverTime(report))}</strong><span>Ревизия ${esc(report.revision ?? '—')}</span><span>${report.finished ? 'Смена завершена' : 'Смена не завершена'}</span></div>
-    <dl class="handover-metrics">${cards.map(([label, value, note, percent]) => `<div class="handover-metric"><dt>${label}</dt><dd>${handoverNumber(value, percent)}</dd><p>${note}</p></div>`).join('')}</dl>
+    <dl class="handover-metrics">${cards.map(([label, value, note, percent], index) => `<div class="handover-metric"><dt>${label}</dt><dd data-handover-metric="${metricKeys[index]}">${handoverNumber(value, percent)}</dd><p>${note}</p></div>`).join('')}</dl>
     ${empty ? '<p class="handover-empty">Открытых проблем, работ, задач и незавершённых заданий в этом срезе нет.</p>' : ''}
     <div id="handover-items">${typeof renderHandoverItems === 'function' ? renderHandoverItems(report) : '<p class="handover-empty">Подробные списки станут доступны после подключения модуля передачи смены.</p>'}</div>`;
 }
