@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 const code = await readFile(new URL('../public/app/45-handover.js', import.meta.url), 'utf8');
 function setup() {
   const elements = new Map();
-  const document = { activeElement: null, body: {} };
+  const document = { activeElement: null, body: { closest: () => null } };
   const $ = id => { if (!elements.has(id)) elements.set(id, { textContent: '', innerHTML: '', dataset: {}, setAttribute() {}, addEventListener() {}, querySelectorAll: () => [], closest() { return null; }, focus() { if (!this.disabled) document.activeElement = this; } }); return elements.get(id); };
   const calls = [];
   const context = vm.createContext({ $, state: { elapsed: 180, revision: 1, seed: 42, csrf: 'test' }, view: 'handover', document, AbortController, setTimeout, clearTimeout, esc: v => String(v ?? '').replaceAll('<', '&lt;'), fmt: String, pct: n => `${n * 100}%`, fetch: (url, options) => new Promise(resolve => calls.push({ url, options, resolve })) });
