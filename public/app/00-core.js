@@ -1,7 +1,7 @@
 // Allur client. The server owns all production state and every number; this file renders snapshots (the isometric
 // scene and the detailed views), asks for confirmation and sends commands with a request id.
-import { AssemblyScene, enterpriseSvg, enterpriseCards, icon as sceneIcon } from './scene.js';
-import { ShopScene, EnterpriseScene, SHOP_LAYOUTS } from './shop-scene.js';
+// Both imports stay on one line: tests strip the client import line before running parts in a VM.
+import { AssemblyScene, enterpriseSvg, enterpriseCards, icon as sceneIcon } from './scene.js'; import { ShopScene, EnterpriseScene, SHOP_LAYOUTS } from './shop-scene.js';
 const $ = id => document.getElementById(id);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = (n, d = 1) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: d }).format(n);
