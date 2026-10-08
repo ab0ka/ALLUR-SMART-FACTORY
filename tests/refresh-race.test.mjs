@@ -57,6 +57,7 @@ test('uncontested polls still accept snapshots, including a restarted server', a
 
 test('stale decision is invalidated immediately and cannot be resent', async () => {
   const h = harness(); h.context.initial = original(); h.run('state = initial');
+  h.run('let pendingAtRender; render = () => { pendingAtRender = productionPending; }');
   let posts = 0;
   h.context.fetch = async () => { posts++; return { ok: false, json: async () => ({ code: 'stale', error: 'server conflict' }) }; };
   await h.run("applyDecision('EXP-1', 'continue', true)");
@@ -64,6 +65,7 @@ test('stale decision is invalidated immediately and cannot be resent', async () 
   assert.equal(h.run('ui.panel.type'), 'compare');
   assert.match(h.elements.get('error').textContent, /Снимок устарел/);
   assert.equal(h.run('productionPending'), false);
+  assert.equal(h.run('pendingAtRender'), false);
   await h.run("applyDecision('EXP-1', 'continue', true)");
   assert.equal(posts, 1);
 });

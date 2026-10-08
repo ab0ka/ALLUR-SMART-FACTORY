@@ -105,11 +105,11 @@ async function applyDecision(experimentId, optionId, confirmed = false) {
   if (!confirmed && !await confirmAction(`Применить: ${o.title}`, `<p>${esc(o.description)}</p>${jobs.length ? `<p>Работы ТЕХ-1: ${jobs.map(k => `${esc(k.title.toLowerCase())} — ${k.duration} мин`).join('; ')}${jobs.some(k => k.type === 'repair' && k.id.startsWith('repair_') && k.id !== 'repair_generic') ? ', затем автоматическая проверка после ремонта' : ''}.</p>` : ''}${stops.length ? `<p><b>Пост ${esc(pc)} будет остановлен</b> на время работ; автомобиль на посту встанет на паузу.</p>` : ''}${parts.length ? `<p>Запчасти: ${parts.map(([id, n]) => `${esc(state.stock.find(s => s.id === id)?.name ?? id)} × ${fmt(n, 2)}`).join(', ')} (на складе: ${parts.map(([id]) => state.stock.find(s => s.id === id)?.available ?? '—').join(', ')}).</p>` : ''}<p>Ожидаемый годный выпуск к 16:00: <b>${fmt(o.expected.accepted)}</b> (диапазон ${o.range.accepted[0]}–${o.range.accepted[1]}); без вмешательства — ${fmt(exp.options[0].expected.accepted)}. Это расчёт на копиях снимка ${clock(exp.minute)}, не гарантия.</p><p>Ресурсы: техник ${fmt(o.expected.techMinutes)} мин, затраты ${fmt(o.expected.cost, 0)} ${esc(state.tariffs.currency)}</p><p class="fine-print">Если смена изменилась после расчёта, сервер отклонит применение. Повторное нажатие не создаст второе решение.</p>`)) return;
   if (updating) return;
   updating = true; setProductionPending(true);
-  try { const r = await api('/api/decision', { experimentId, optionId, requestId: requestId() }); state = r.state; error(''); ui.panel = { type: 'problem', id: exp.problemId }; syncHash(); render(); }
+  try { const r = await api('/api/decision', { experimentId, optionId, requestId: requestId() }); state = r.state; error(''); ui.panel = { type: 'problem', id: exp.problemId }; syncHash(); setProductionPending(false); render(); }
   catch (e) {
     if (e.code === 'stale') {
       rejectedComparisons.add(experimentId);
-      ui.panel = { type: 'compare', id: exp.problemId }; syncHash(); render();
+      ui.panel = { type: 'compare', id: exp.problemId }; syncHash(); setProductionPending(false); render();
       error('Снимок устарел. Пересчитайте варианты.');
     } else error(`Не удалось применить: ${e.message}`);
   }
