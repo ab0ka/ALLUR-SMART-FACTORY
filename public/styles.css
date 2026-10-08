@@ -791,5 +791,7 @@ details.more>summary{cursor:pointer;font-weight:700;color:var(--link);min-height
 .handover-metric dd{margin:12px 0;font-size:32px;font-weight:750;line-height:1.1;font-variant-numeric:tabular-nums;color:#20313b}
 .handover-metric p{margin:0;font-size:12px;line-height:1.5;color:#52646f}
 .handover-empty{padding:20px;background:#eff5f8;border:1px solid #d4dfe5;border-radius:12px;color:#3c5361;line-height:1.6}
+.handover-view .handover-items-link{display:inline-flex;align-items:center;min-height:44px;max-width:100%}
+.handover-view .handover-items-more>summary{min-height:44px}
 @media(max-width:760px){.handover-header{flex-direction:column;gap:14px;padding-top:16px}.handover-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.handover-metric{padding:15px}.handover-metric dd{font-size:27px}.handover-toolbar>*{flex:1 1 auto}.handover-badge{max-width:100%;flex-shrink:1}}
 @media(max-width:360px){.handover-metrics{grid-template-columns:1fr}}

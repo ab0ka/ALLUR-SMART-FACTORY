@@ -5,9 +5,10 @@ import { readFile } from 'node:fs/promises';
 const code = await readFile(new URL('../public/app/45-handover.js', import.meta.url), 'utf8');
 function setup() {
   const elements = new Map();
-  const $ = id => { if (!elements.has(id)) elements.set(id, { textContent: '', innerHTML: '', setAttribute() {}, addEventListener() {}, querySelectorAll: () => [] }); return elements.get(id); };
+  const document = { activeElement: null, body: {} };
+  const $ = id => { if (!elements.has(id)) elements.set(id, { textContent: '', innerHTML: '', dataset: {}, setAttribute() {}, addEventListener() {}, querySelectorAll: () => [], closest() { return null; }, focus() { if (!this.disabled) document.activeElement = this; } }); return elements.get(id); };
   const calls = [];
-  const context = vm.createContext({ $, state: { elapsed: 180, revision: 1, seed: 42, csrf: 'test' }, view: 'handover', document: { activeElement: null }, AbortController, setTimeout, clearTimeout, esc: v => String(v ?? '').replaceAll('<', '&lt;'), fmt: String, pct: n => `${n * 100}%`, fetch: (url, options) => new Promise(resolve => calls.push({ url, options, resolve })) });
+  const context = vm.createContext({ $, state: { elapsed: 180, revision: 1, seed: 42, csrf: 'test' }, view: 'handover', document, AbortController, setTimeout, clearTimeout, esc: v => String(v ?? '').replaceAll('<', '&lt;'), fmt: String, pct: n => `${n * 100}%`, fetch: (url, options) => new Promise(resolve => calls.push({ url, options, resolve })) });
   vm.runInContext(code, context);
   const run = script => vm.runInContext(script, context);
   return { $, calls, run, context };
@@ -47,4 +48,70 @@ test('HTTP errors expose accessible retry without leaking server response', asyn
   assert.equal(h.$('handover-refresh').disabled, false);
   assert.equal(h.$('handover-refresh').textContent, 'Повторить запрос');
   assert.match(h.$('handover-status').textContent, /Не удалось/);
+});
+test('keyboard refresh focus is restored only after enabling button, including error', async () => {
+  for (const ok of [true, false]) {
+    const h = setup(), refresh = h.$('handover-refresh');
+    refresh.dataset.focusKey = 'handover-refresh'; refresh.closest = () => refresh;
+    h.$('view-handover').querySelectorAll = selector => selector === '[data-focus-key]' ? [refresh] : [];
+    h.context.document.activeElement = refresh;
+    const pending = h.run('loadHandover()');
+    assert.equal(refresh.disabled, true);
+    h.context.document.activeElement = h.context.document.body;
+    h.calls[0].resolve({ ok, json: async () => report }); await pending;
+    assert.equal(h.context.document.activeElement, refresh);
+  }
+});
+test('expanded detail and its focused link survive repaint, without selecting a hidden duplicate', async () => {
+  const h = setup(), summary = { dataset: { focusKey: 'more-tasks' }, parentElement: { open: true } };
+  const old = { dataset: { focusKey: 'handover-vehicle' }, closest() { return this; } };
+  const next = { dataset: old.dataset, focus() { assert.equal(summary.parentElement.open, true); h.context.document.activeElement = this; } };
+  h.context.document.activeElement = old;
+  h.$('view-handover').querySelectorAll = selector => selector === '[data-focus-key]' ? [next] : [summary];
+  const pending = h.run('loadHandover()');
+  summary.parentElement.open = false;
+  h.context.document.activeElement = h.context.document.body;
+  h.calls[0].resolve({ ok: true, json: async () => report }); await pending;
+  assert.equal(h.context.document.activeElement, next);
+});
+test('successful reset at unchanged minute invalidates report and cancels pending request', async () => {
+  const h = setup();
+  const core = await readFile(new URL('../public/app/00-core.js', import.meta.url), 'utf8');
+  const action = core.slice(core.indexOf('async function action('), core.indexOf('function resetAi('));
+  h.run('updating = false; api = async () => state; error = () => {}; resetAi = () => {}; render = () => renderHandover();');
+  h.run(action);
+  const pending = h.run('loadHandover()');
+  assert.equal(await h.run("action({ action: 'reset' })"), true);
+  assert.equal(h.calls[0].options.signal.aborted, true);
+  assert.match(h.$('handover-status').textContent, /Смена изменилась/);
+  h.calls[0].resolve({ ok: true, json: async () => report }); await pending;
+  assert.equal(h.$('handover-content').innerHTML, '');
+});
+test('refresh never steals focus moved outside the report during request', async () => {
+  const h = setup(), old = { dataset: { focusKey: 'gone-link' }, closest() { return this; } };
+  h.context.document.activeElement = old;
+  const pending = h.run('loadHandover()'), outside = {};
+  h.context.document.activeElement = outside;
+  h.calls[0].resolve({ ok: true, json: async () => report }); await pending;
+  assert.equal(h.context.document.activeElement, outside);
+});
+test('reset during refresh returns lost report focus to refresh control', async () => {
+  const h = setup(), old = { dataset: { focusKey: 'old-link' }, closest() { return this; } };
+  h.context.document.activeElement = old;
+  const pending = h.run('loadHandover()');
+  h.context.document.activeElement = h.context.document.body;
+  h.run('invalidateHandover()');
+  assert.equal(h.context.document.activeElement, h.$('handover-refresh'));
+  h.calls[0].resolve({ ok: true, json: async () => report }); await pending;
+});
+test('focused record moved into collapsed overflow is revealed before focus', async () => {
+  const h = setup(), details = { open: false };
+  const old = { dataset: { focusKey: 'moved-link' }, closest() { return this; } };
+  const next = { dataset: old.dataset, closest: () => details, focus() { assert.equal(details.open, true); h.context.document.activeElement = this; } };
+  h.context.document.activeElement = old;
+  h.$('view-handover').querySelectorAll = selector => selector === '[data-focus-key]' ? [next] : [];
+  const pending = h.run('loadHandover()');
+  h.context.document.activeElement = h.context.document.body;
+  h.calls[0].resolve({ ok: true, json: async () => report }); await pending;
+  assert.equal(h.context.document.activeElement, next);
 });
