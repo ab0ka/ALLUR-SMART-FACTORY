@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { webcrypto } from 'node:crypto';
 import vm from 'node:vm';
-const core = (await readFile(new URL('../public/app/00-core.js', import.meta.url), 'utf8')).replace(/^import .*;\r?\n/m, '');
+const core = (await readFile(new URL('../public/app/00-core.js', import.meta.url), 'utf8')).replace(/^import .*;\r?\n/gm, '');
 const dispatcher = await readFile(new URL('../public/app/10-dispatcher-chat.js', import.meta.url), 'utf8');
 const routing = await readFile(new URL('../public/app/90-routing-startup.js', import.meta.url), 'utf8');
 const refresh = routing.slice(routing.indexOf('async function refresh()'), routing.indexOf('await refresh();'));

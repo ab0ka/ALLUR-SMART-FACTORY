@@ -5,7 +5,7 @@ import vm from 'node:vm';
 
 // Exercise the real shared client functions without a browser or a paid AI call.
 const source = (await readFile(new URL('../public/app/00-core.js', import.meta.url), 'utf8'))
-  .replace(/^import .*;\r?\n/m, '');
+  .replace(/^import .*;\r?\n/gm, '');
 function harness() {
   const nodes = new Map();
   class Element extends EventTarget {
