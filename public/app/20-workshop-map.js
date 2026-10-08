@@ -54,8 +54,6 @@ function renderPostDetail() {
   const p = post(selectedPost), v = p.vehicleId ? vehicle(p.vehicleId) : null;
   const stage = p.stage === 'rework' ? { name: 'Доработка', buffer: state.rework.buffer } : state.stages.find(s => s.id === p.stage);
   const incident = p.incidentId ? state.incidents.find(i => i.id === p.incidentId) : null;
-  const siblings = state.posts.filter(q => q.stage === p.stage && q.id !== p.id);
-  const free = siblings.filter(q => !q.vehicleId && !['fault', 'maintenance', 'shift_over'].includes(q.state) && !q.problemId && !q.hold);
   const queue = stage.buffer.vehicleIds;
   let html = `<div class="detail-head"><div><span class="eyebrow">ПОСТ · ${esc(stage.name.toUpperCase())}</span><h2>${esc(p.code)}</h2></div><span class="status-pill ${esc(p.state)}">${esc(POST_STATES[p.state])}</span></div>`;
   if (p.reason) html += `<p class="reason">${esc(p.reason)}</p>`;
@@ -67,13 +65,10 @@ function renderPostDetail() {
   } else html += '<p class="muted">Автомобиля на посту нет.</p>';
   if (!state.finished) {
     const actions = [];
-    if (incident?.kind === 'breakdown') actions.push(`<button class="primary" data-job="repair_generic" data-post-id="${esc(p.id)}">Аварийный ремонт · 30 мин, техник</button>`);
-    else if (incident?.kind === 'slowdown') actions.push(`<button class="primary" data-job="adjust" data-post-id="${esc(p.id)}">Наладка · 10 мин, техник</button>`);
     if (!incident) actions.push(`<button data-fault="${esc(p.id)}" data-kind="breakdown">Ручной сценарий: неисправность</button>`, `<button data-fault="${esc(p.id)}" data-kind="slowdown">Ручной сценарий: снижение темпа</button>`);
-    if (['fault', 'maintenance', 'slow'].includes(p.state) && v?.currentOperation && v.currentOperation.completedAt === null) for (const q of free) actions.push(`<button data-transfer="${esc(v.id)}" data-to="${esc(q.id)}">Перевести ${esc(v.id)} на ${esc(q.code)}</button>`);
-    if (siblings.length) actions.push(`<button data-hold="${esc(p.id)}" data-on="${p.hold ? '0' : '1'}">${p.hold ? 'Вернуть пост в загрузку' : 'Не загружать пост новыми автомобилями'}</button>`);
     html += `<h3>Действия</h3><div class="actions">${actions.join('')}</div><p class="fine-print">Ремонт занимает модельное время и единственного техника; без ремонта неисправность не исчезает.</p>`;
   }
+  html += `<h3>Действия поста</h3><div class="actions-col">${postActionButtons(p, 'workshop')}</div>${postResources(p)}`;
   let queueHtml = `<h3>Очередь · ${esc(stage.buffer.name)} ${queue.length}${stage.buffer.capacity !== null ? `/${stage.buffer.capacity}` : ''}</h3>`;
   queueHtml += queue.length ? `<ol class="queue">${queue.slice(0, 8).map(id => { const q = vehicle(id); return `<li>${vehicleLink(id)} <span>${esc(q.modelName)} · ${esc(q.orderId)} · ${PRIORITY[q.priority].toLowerCase()}${q.reworked ? ' · после доработки' : ''}</span></li>`; }).join('')}${queue.length > 8 ? `<li class="muted">и ещё ${queue.length - 8}</li>` : ''}</ol><p class="fine-print">Порядок: приоритет задания → время прихода в буфер. Начатые операции не прерываются.</p>` : '<p class="muted">Очередь пуста.</p>';
   html += `</div><div class="dcol">${queueHtml}</div>`;
