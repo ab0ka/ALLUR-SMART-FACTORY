@@ -1,8 +1,9 @@
 // ---------- Selection and navigation inside spaces ----------
-function openPanel(panel, selected, ctx) {
+function openPanel(panel, selected, ctx, routeChanged = false) {
   ui.panel = panel; if (selected !== undefined) ui.selected = selected; if (ctx) chatContext = ctx;
   if (view !== 'space') { location.hash = `space/${['assembly', 'diag'].includes(space) ? space : 'assembly'}`; return; }
-  syncHash(); render();
+  syncHash();
+  if (routeChanged) setView(location.hash.slice(1)); else render();
   if (narrow() && scene && ui.selected) { if (ui.selected.type === 'vehicle') scene.focusVehicle(ui.selected.id, 1.6); else if (ui.selected.type === 'post') scene.focusPost(ui.selected.id, 1.6); }
   requestAnimationFrame(() => $('side').querySelector('h2')?.focus?.());
 }
@@ -33,24 +34,23 @@ function openVehicleEvent(e) {
   const p = e.postId ? post(e.postId) : null, v = e.vehicleId ? vehicle(e.vehicleId) : null;
   const currentPost = v?.location.type === 'post' ? post(v.location.id) : null;
   const stage = p?.stage ?? currentPost?.stage ?? ({ BACKLOG: 'weld', B1: 'paint', B2: 'assembly', B3: 'assembly', RWQ: 'rework', FG: 'shipping', SHIPPED: 'shipping' }[v?.location.id]);
-  const nextSpace = { weld: 'weld', paint: 'paint', assembly: 'assembly', quality: 'tests', rework: 'rework', shipping: 'ship' }[stage] ?? 'enterprise';
+  const nextSpace = stage === 'assembly' && space === 'diag' ? 'diag' : { weld: 'weld', paint: 'paint', assembly: 'assembly', quality: 'tests', rework: 'rework', shipping: 'ship' }[stage] ?? 'enterprise';
   const target = p ? { type: 'post', id: p.id } : v ? { type: 'vehicle', id: v.id } : null;
   if (!target) return;
   if (space !== nextSpace || ui.panel?.type !== target.type || ui.panel?.id !== target.id) history.pushState(null, '', location.hash);
   space = nextSpace;
   // Use the same URL, context and focus handling as every other card.
-  openPanel(target, target, target);
-  setView(location.hash.slice(1));
+  openPanel(target, target, target, true);
 }
 // Returns true when the click was handled by the space UI.
 async function spaceClick(t, d) {
   if (d.closePanel) { closePanel(); return true; }
-  if (d.vehicleEvent) { const e = state.events.find(x => String(x.seq) === d.vehicleEvent); if (e) openVehicleEvent(e); return true; }
   if (d.mode) { ui.table = d.mode === 'table'; render(); return true; }
   if (d.cam) { if (scene) { if (d.cam === 'home') scene.home(); else scene.zoom(d.cam === 'in' ? 1.2 : 1 / 1.2); } return true; }
   if (d.space) { goSpace(d.space); return true; }
   if (d.ribbon) { if (d.ribbon === 'open') ui.ribbonOpen = true; else if (d.ribbon === 'close') ui.ribbonOpen = false; else ui.ribbonOnlySelected = !ui.ribbonOnlySelected; renderRibbon(); return true; }
   if (d.event) { const e = state.events.find(x => String(x.seq) === d.event); if (e) openEvent(e); return true; }
+  if (d.vehicleEvent) { const e = state.events.find(x => String(x.seq) === d.vehicleEvent); if (e) openVehicleEvent(e); return true; }
   if (d.vehicle || d.vehicleSelect) { selectVehicle(d.vehicle || d.vehicleSelect); return true; }
   if (d.post || d.postLink) { selectPost(d.post || d.postLink); return true; }
   if (d.problem) { selectProblem(d.problem); return true; }

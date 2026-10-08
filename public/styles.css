@@ -157,7 +157,7 @@ h3{font-size:14px;margin:16px 0 8px;color:#14222E}
 .vehicle-history button{display:grid;grid-template-columns:44px minmax(0,1fr);gap:8px;width:100%;text-align:left;border:0;border-radius:6px;background:transparent;padding:9px 4px;font-weight:400;line-height:1.45}
 .vehicle-history button:hover{background:var(--panel-2)}
 .vehicle-history small{display:block;color:var(--muted);margin-top:3px}
-.stage-inner tr.selected,.stage-inner li.selected{background:#E8F2FF;outline:2px solid var(--blue);outline-offset:-2px}
+.stage-inner tr.selected{background:#E8F2FF;outline:2px solid var(--blue);outline-offset:-2px}
 .history em,.event-log em{font-style:normal;font-size:11px;color:var(--amber-ink)}
 .event-log li.incident_started span{color:var(--red)}.event-log li.vehicle_accepted span{color:var(--link)}
 
