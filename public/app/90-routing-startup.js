@@ -22,9 +22,20 @@ function setView(hash) {
   render();
 }
 function focusKey(el) {
-  if (!el || el === document.body || !el.closest('main')) return null;
+  if (!el || el === document.body) return null;
+  // Stable scene keys survive changing actions; scope older controls to their own panel.
+  const root = el.closest('#scene, #enterprise, #side, #ribbon, main') ?? document.body;
   const attrs = [...el.attributes].filter(a => a.name.startsWith('data-')).map(a => `[${a.name}="${CSS.escape(a.value)}"]`).join('');
-  return attrs ? el.tagName.toLowerCase() + attrs : null;
+  const selector = el.id ? `#${CSS.escape(el.id)}` : el.dataset.focusKey ? `[data-focus-key="${CSS.escape(el.dataset.focusKey)}"]` : attrs ? el.tagName.toLowerCase() + attrs + ':not([data-focus-key])' : null;
+  if (!selector) return null;
+  return { root: root.id ? `#${CSS.escape(root.id)}` : root.tagName.toLowerCase(), selector, index: [...root.querySelectorAll(selector)].indexOf(el) };
+}
+function restoreFocus(key) {
+  if (!key) return false;
+  const root = document.querySelector(key.root), el = root?.querySelectorAll(key.selector)[key.index];
+  if (!el || el.closest('[hidden]') || el.disabled) return false;
+  el.focus({ preventScroll: true });
+  return document.activeElement === el;
 }
 function render() {
   if (!state) return;
@@ -37,7 +48,7 @@ function render() {
   else if (view === 'orders') renderOrders();
   else if (view === 'shift') renderShift();
   else renderLab();
-  if (key && !document.activeElement?.closest('main')) document.querySelector(key)?.focus({ preventScroll: true });
+  if (key && !document.activeElement?.closest('main')) restoreFocus(key);
 }
 function openVehicle(id) { selectedVehicle = id; chatContext = { type: 'vehicle', id }; if (!filterOf[vehicleFilter](vehicle(id))) vehicleFilter = 'all'; if (location.hash !== '#vehicles') location.hash = 'vehicles'; else render(); requestAnimationFrame(() => $('vehicle-passport').scrollIntoView({ block: 'nearest' })); }
 function openPost(id) { selectedPost = id; chatContext = { type: 'post', id }; if (location.hash !== '#workshop') location.hash = 'workshop'; else render(); requestAnimationFrame(() => { if (matchMedia('(max-width: 1499px)').matches) $('post-detail').scrollIntoView({ block: 'nearest' }); }); }
