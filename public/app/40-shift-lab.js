@@ -20,7 +20,17 @@ function renderShiftFirst() {
     <h3>${gap < 0 ? 'Главная причина отклонения' : 'Главный риск для плана'}</h3><p>${esc(main.text)} <span class="fine-print">· ${esc(main.basis)}</span>${main.ref ? ` <button class="link" data-ref-type="${main.ref[0]}" data-ref-id="${esc(main.ref[1])}">открыть</button>` : ''}</p>
     <h3>Задачи</h3><p>${state.tasks.length ? `${state.tasks.length}: ${TASK_GROUPS.map(([n, cats]) => [n, state.tasks.filter(x => cats.includes(x.category)).length]).filter(([, n]) => n).map(([n, k]) => `${n.toLowerCase()} — ${k}`).join('; ')}` : 'активных задач нет'} · <a href="#dispatcher">к списку задач</a></p>
     <h3>Результат решений</h3><p>${d ? `${esc(d.id)} «${esc(d.title)}»: ожидали ${fmt(d.expected.accepted)} принятых к 16:00, сейчас наблюдается ${d.report.observed.accepted}${d.report.observed.final ? '' : ' (смена идёт)'}.` : 'Решений в этой смене ещё не принималось.'}${state.decisions.length > 1 ? ` Всего решений: ${state.decisions.length}.` : ''}</p>
+    ${renderCaseTargets()}
     <h3>Риск отказа подъёмников</h3><p>${riskItem ? `Наибольший: ${esc(post(riskItem.postId)?.code ?? riskItem.postId)} — ${pct(riskItem.probability)} на ${state.risk.horizon} мин (модель ${esc(state.risk.modelVersion)}, синтетическое обучение; рабочий вариант — ${state.risk.selected === 'model' ? 'модель' : 'правило'}). <a href="#lab">как обучена</a>` : esc(state.risk?.reason ?? 'Модель риска не подключена; прогноз выпуска рассчитывается симуляцией.')}</p>`;
+}
+// Case targets (OEE, defects, critical downtime) per stage, in the shape of the organiser's test data.
+function renderCaseTargets() {
+  const k = state.kpi; if (!k) return '';
+  const t = k.targets, cell = (ok, text) => `<td class="${ok === null ? '' : ok ? 'good' : 'bad'}">${text}</td>`;
+  return `<h3>Цели кейса по участкам</h3><div class="table-scroll"><table class="measure-table case-targets"><caption class="sr-only">Показатели участков и цели кейса</caption><thead><tr><th scope="col">Участок</th><th scope="col">Загрузка</th><th scope="col">OEE (цель ≥ ${pct(t.oee)})</th><th scope="col">Брак (цель ≤ ${pct(t.defectRate)})</th><th scope="col">Простой, мин</th></tr></thead><tbody>
+    ${k.stages.map(s => `<tr><th scope="row">${esc(s.name)}</th><td>${pct(s.load)}</td>${cell(s.completed ? !s.flags.oee : null, s.completed ? pct(s.oee) : '—')}${cell(s.defectRate === null ? null : !s.flags.defects, s.defectRate === null ? '—' : `${pct(s.defectRate)} <small>(${s.defects} из ${s.completed})</small>`)}<td>${s.downtime}</td></tr>`).join('')}</tbody></table></div>
+    <p class="${k.criticalDowntime.over ? 'bad-text' : 'fine-print'}">Простой критического оборудования (${esc(k.criticalDowntime.equipment)}): <b>${k.criticalDowntime.minutes} мин</b> за смену при лимите кейса ${t.criticalDowntimePerDay} мин в сутки (≈ ${k.criticalDowntime.perShiftBudget} мин на смену из ${t.shiftsPerDay}).</p>
+    <p class="fine-print">${esc(t.source)} Показатели — синтетическая смена симуляции; брак считается по участку-источнику дефекта, найденного контролем; до 5 операций участка флажок брака не ставится.</p>`;
 }
 function renderShift() {
   renderShiftFirst();

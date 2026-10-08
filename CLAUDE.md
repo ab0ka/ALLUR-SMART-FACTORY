@@ -17,7 +17,7 @@
 - Скачанные файлы и сторонние модели — только через пользователя (вход на сайты, авторизация — не обходить). Исходники моделей лежат в `assets-src/` (в `.gitignore`); лицензию и атрибуцию фиксировать в `docs/ASSETS.md`.
 
 ## Проверки
-- `npm.cmd test` и `npm.cmd run build` (на Windows — `npm.cmd`, не `npm`). На 8 октября 2026: **122/122**, сборка OK. `npm.cmd run train` — обучение модели риска (артефакт `models/lift-risk-v1.json`); `npm.cmd run policies` — стратегии на 200 сменах (`reports/policy-comparison.*`). CI (`.github/workflows/ci.yml`) запускает то же самое на каждый PR.
+- `npm.cmd test` и `npm.cmd run build` (на Windows — `npm.cmd`, не `npm`). На 8 октября 2026: **127/127**, сборка OK. `npm.cmd run train` — обучение модели риска (артефакт `models/lift-risk-v1.json`); `npm.cmd run policies` — стратегии на 200 сменах (`reports/policy-comparison.*`). CI (`.github/workflows/ci.yml`) запускает то же самое на каждый PR.
 - Сервер отдаёт файлы из `dist/` — после любых правок в `public/` запускай сборку.
 - Интерфейс проверяй в браузере на :3027: консоль без ошибок, узкий экран 390 px, клавиатура.
 
@@ -26,6 +26,7 @@
 |---|---|
 | `server/simulation.mjs` | движок `Workshop`: `snapshot`, `command`, `tick`, `serialize/restore`, `checkIntegrity` |
 | `server/components.mjs` | узлы машины, синтетические замеры (`measure`), проверка запуска, сценарная неисправность DEMO-005, зазор двери |
+| `server/kpi.mjs` | показатели участков в форме тестовых данных кейса и цели кейса (OEE ≥ 85 %, брак ≤ 2 %, простой ≤ 60 мин/сутки) |
 | `server/workflow.mjs` | процедура доработки по дефекту, `opAvailability`, `nextAction`, единый список задач `tasks()` |
 | `public/app/55-vehicle-card.js` | единая карточка автомобиля и навигация с возвратом (`navPush`/`navBack`) |
 | `scripts/train-lift-risk.mjs` | `npm.cmd run train`: обучение модели риска на синтетических сменах |
@@ -33,6 +34,7 @@
 | `server/index.mjs`, `server/store.mjs` | HTTP, защита, белый список статики, хранение состояния в `data/` |
 | `server/ai*.mjs`, `server/chat.mjs` | AI-провайдеры (local / OpenAI), чат диспетчера |
 | `public/scene.js` | изометрическая SVG-сцена: маршруты, `depthOrder`, камера, карта предприятия; машины — картинки Kia `public/car-kia-*.webp` (`npm.cmd run sprites`) |
+| `public/shop-scene.js` | сцены остальных цехов (`ShopScene`, раскладки `SHOP_LAYOUTS`) и живая карта предприятия (`EnterpriseScene`) |
 | `public/viewer3d.js` | 3D-просмотр (Three.js r170): кузов Kia Sportage из `assets-src/` (свой glTF-загрузчик), капот вырезан плоскостями отсечения и на шарнире, узлы, ракурсы |
 | `public/app/NN-*.js` | части клиента; сборка склеивает их по порядку имён в `dist/app.js` (одна область видимости). Отдельного `public/app.js` нет |
 | `public/three.module.js`, `public/three-orbit-controls.js` | вендоренные библиотеки — **не править** |
