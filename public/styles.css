@@ -338,6 +338,13 @@ code{background:#F7F9FB;padding:1px 5px;border-radius:4px}
 @media(max-width:800px){.threat-row{grid-template-columns:repeat(2,minmax(0,1fr))}.sparks{grid-template-columns:1fr}.option-metrics div{grid-template-columns:1fr;gap:0}}
 
 
+/* Readable legacy annotations and graphics on the light panels. */
+#legacy{--amber:var(--amber-ink);--grey:#5A6B7A}
+#legacy .hypotheses li.rejected,#legacy .option.unavailable{opacity:1}
+#legacy .chart-now,#legacy .flow{stroke:#5A6B7A}
+#legacy .arrow-head{fill:#5A6B7A}
+#legacy .flow.rework-flow{stroke:#6D5BD0}
+
 /* ===== Light game-style shell: top bar, spaces, isometric scene, side panel, ribbon ===== */
 .topbar{position:sticky;top:0;z-index:30;height:64px;display:flex;align-items:center;gap:12px;padding:0 14px;background:#fff;border-bottom:1px solid var(--line)}
 .brand{display:flex;gap:9px;align-items:center;text-decoration:none;color:var(--text);flex:none}
