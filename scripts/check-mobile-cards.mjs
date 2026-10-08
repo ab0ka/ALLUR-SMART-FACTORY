@@ -37,7 +37,14 @@ try {
         await reachable('#side .side-foot [data-open-chat]');
         await page.locator('#side .side-foot [data-open-chat]').click();
         await page.locator('#side-chat-input').waitFor();
-        assert((await page.url()).endsWith('/chat'));
+        // T2 alone uses /chat; T1 persists the exact entity in the route.
+        const chatHash = '#space/assembly/chat';
+        const contextHash = `${chatHash}/problem/${encodeURIComponent(problem.id)}`;
+        await page.waitForURL(url => [chatHash, contextHash].includes(url.hash));
+        await page.waitForFunction(expected =>
+          document.querySelector('#side-chat-context .tagchip')?.textContent.trim() === expected,
+        `Контекст: проблема ${problem.id}`);
+        assert.equal(await sheet.locator('h2').innerText(), 'Чат');
       }
       if (route === 'chat' || route.startsWith('problem/')) {
         await page.locator('#side-chat-input').fill('Синтетический вопрос для проверки геометрии');
