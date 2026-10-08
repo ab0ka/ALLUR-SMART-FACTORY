@@ -25,19 +25,25 @@ function runningJob(postId) {
   return { ...j, type: j.kind === 'verify' ? 'check' : k?.type, stopsPost: j.kind === 'verify' ? true : k?.stopsPost };
 }
 
+// One scene per space: the assembly shop (scene.js), the other shops (shop-scene.js) and the live enterprise map.
+const SHOP_OF_SPACE = { weld: 'weld', paint: 'paint', tests: 'quality', rework: 'rework', ship: 'shipping' };
+const sceneKind = id => id === 'enterprise' ? 'enterprise' : SPACES[id]?.scene ? 'assembly' : SHOP_OF_SPACE[id] ? `shop:${id}` : null;
 function ensureScene() {
-  if (scene || sceneFailed) return;
+  const want = sceneKind(space);
+  if (sceneFailed || !want || scene?.kind === want) return;
+  destroyScene();
   try {
-    scene = new AssemblyScene($('scene'));
-    const wrap = $('scene-wrap'), eff = Math.min(wrap.clientWidth / 1000, wrap.clientHeight / 660);
-    if (eff > 0 && eff < .8) { scene.home(Math.min(2.4, .85 / eff)); scene.focusPost('A2', Math.min(2.4, .85 / eff)); }
+    scene = want === 'assembly' ? new AssemblyScene($('scene')) : want === 'enterprise' ? new EnterpriseScene($('scene'), { cards: st => enterpriseSvg(st) + enterpriseCardsSvg() }) : new ShopScene($('scene'), SHOP_LAYOUTS[SHOP_OF_SPACE[space]]);
+    scene.kind = want;
+    const wrap = $('scene-wrap'), eff = Math.min(wrap.clientWidth / (scene.viewW ?? 1000), wrap.clientHeight / (scene.viewH ?? 660));
+    if (want === 'assembly' && eff > 0 && eff < .8) { scene.home(Math.min(2.4, .85 / eff)); scene.focusPost('A2', Math.min(2.4, .85 / eff)); }
     else scene.home();
   } catch { sceneFailed = true; scene = null; }
 }
 function destroyScene() { scene?.destroy(); scene = null; }
 
 function renderSpace() {
-  const meta = SPACES[space] ?? SPACES.assembly, sceneSpace = Boolean(meta.scene), table = ui.table || (sceneSpace && sceneFailed);
+  const meta = SPACES[space] ?? SPACES.assembly, sceneSpace = Boolean(sceneKind(space)), table = ui.table || (sceneSpace && sceneFailed);
   if (enteredSpace !== space) {
     enteredSpace = space; $('space-stage').classList.remove('enter'); void $('space-stage').offsetWidth; $('space-stage').classList.add('enter');
     if (space === 'diag' && !ui.panel) { const p = state.problems.find(x => x.status === 'open') ?? state.problems.at(-1); if (p) { ui.panel = { type: 'problem', id: p.id }; ui.selected = { type: 'post', id: p.postId }; chatContext = { type: 'problem', id: p.id }; } }
@@ -53,20 +59,19 @@ function renderSpace() {
     : space === 'enterprise' ? ico(state.forecast.projected >= state.plan.target ? 'ok' : 'warn', `прогноз ${state.forecast.projected} при плане ${state.plan.target}`) + ico(state.tasks.length ? 'warn' : 'ok', `задач смены: ${state.tasks.length}`)
     : ico(shopTasks.length ? 'warn' : 'ok', shopTasks.length ? `задач цеха: ${shopTasks.length}` : 'задач по цеху нет'));
   for (const b of document.querySelectorAll('[data-mode]')) b.setAttribute('aria-pressed', String((b.dataset.mode === 'table') === table));
-  document.querySelector('.hud-row .seg').hidden = Boolean(meta.stage);
-  $('diag-toggle-wrap').hidden = !sceneSpace || table; $('diag-toggle').checked = ui.diag || space === 'diag'; $('diag-toggle').disabled = space === 'diag';
+  document.querySelector('.hud-row .seg').hidden = false;
+  $('diag-toggle-wrap').hidden = !meta.scene || table; $('diag-toggle').checked = ui.diag || space === 'diag'; $('diag-toggle').disabled = space === 'diag';
   // Table and shop cards are regular content: the header card sits above them instead of floating over them.
-  $('space-stage').classList.toggle('flat', table || Boolean(meta.stage));
+  $('space-stage').classList.toggle('flat', table);
   $('scene-wrap').hidden = !(sceneSpace && !table);
-  $('enterprise-wrap').hidden = !(space === 'enterprise' && !table);
-  $('stage-card').hidden = !meta.stage;
+  $('enterprise-wrap').hidden = true;
+  $('stage-card').hidden = !(meta.stage && table);
   $('table-view').hidden = !(table && !meta.stage);
   document.querySelector('.cam').hidden = !(sceneSpace && !table);
   $('scene-hint').hidden = !(sceneSpace && !table) || Boolean(ui.panel);
   if (sceneSpace && !table) { ensureScene(); scene?.update(state, { selected: ui.selected, diag: ui.diag || space === 'diag' }); if (!scene) return renderSpace(); }
   else destroyScene();
-  if (space === 'enterprise' && !table) $('enterprise').innerHTML = enterpriseSvg(state) + enterpriseCardsSvg();
-  if (meta.stage) $('stage-card').innerHTML = stageCard(meta);
+  if (meta.stage && table) $('stage-card').innerHTML = stageCard(meta);
   if (table && !meta.stage) $('table-view').innerHTML = objectsTable();
   renderRibbon();
   $('view-space').classList.toggle('with-side', Boolean(ui.panel));
@@ -76,6 +81,7 @@ function enterpriseCardsSvg() {
   return enterpriseCards(state).map(c => {
     const lines = [...c.lines, ...c.problems.map(p => `${p.id}: ${p.title}`)];
     const h = 34 + lines.length * 18;
+    c.live = c.live || Boolean(SHOP_OF_SPACE[c.space]); c.later = false;
     return `<g class="em-card${c.live ? ' live' : ''}" role="button" tabindex="0" data-space="${c.space}" aria-label="${esc(`${c.title}. ${lines.join('. ')}${c.later ? '. Открыть цех: посты, очередь, задачи' : '. Открыть сцену'}`)}" transform="translate(${c.left} ${c.top})">
       <rect width="280" height="${h}" rx="12" class="em-cardbox"/><text x="12" y="22" class="em-card-title">${esc(c.title)}</text>
       <text x="268" y="22" text-anchor="end" class="em-card-tag${c.live ? ' live' : ''}">${c.live ? 'Открыть сцену →' : 'Открыть цех →'}</text>

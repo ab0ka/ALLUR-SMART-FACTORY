@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Allur Smart Factory — MVP</title>
+<style>
+  body { margin:0; background:#ddd; font-family:Arial, sans-serif; color:#111; }
+  .s { width:1280px; height:720px; margin:20px auto; background:#fff; padding:60px 80px; box-sizing:border-box; position:relative; }
+  h1 { font-size:54px; margin:0 0 30px; }
+  h2 { font-size:44px; margin:0 0 30px; }
+  p, li { font-size:30px; line-height:1.4; }
+  ul { padding-left:34px; margin:0; } li { margin-bottom:10px; }
+  .n { position:absolute; right:40px; bottom:24px; font-size:18px; color:#777; }
+  .shots { display:grid; grid-template-columns:1.25fr 1fr; grid-template-rows:1fr 1fr; gap:14px; height:520px; }
+  .shots img { width:100%; height:100%; object-fit:cover; object-position:top left; border:1px solid #ccc; }
+  .shots img.big { grid-row:1 / span 2; }
+  .note { font-size:20px; color:#555; position:absolute; left:80px; bottom:24px; right:120px; }
+  @media print { @page { size:1280px 720px; margin:0; } body { background:#fff; } .s { margin:0; break-after:page; } }
+</style>
+</head>
+<body>
+
+<section class="s">
+  <h1>Allur Smart Factory</h1>
+  <p>Цифровой двойник сборочного цеха — MVP<br>Кейс №2 «Цифровой двойник автомобильного завода»</p>
+  <p>Команда: Абзал, Диас, Тони</p>
+  <p class="note">Все производственные данные в MVP синтетические. Это не данные и не система Allur.</p>
+  <span class="n">1</span>
+</section>
+
+<section class="s">
+  <h2>Цель</h2>
+  <p>Чтобы начальник смены видел отклонение раньше поломки, понимал, что мешает плану, и выбирал действие по прогнозу, а не на глаз.</p>
+  <span class="n">2</span>
+</section>
+
+<section class="s">
+  <h2>Задача (по кейсу)</h2>
+  <ul>
+    <li>Показать участки и оборудование завода</li>
+    <li>Следить за выпуском, загрузкой, простоями и браком</li>
+    <li>Показывать инциденты и отклонения</li>
+    <li>Дать руководителю панель с итогами смены</li>
+    <li>Прогнозировать простои и узкие места, с ИИ</li>
+  </ul>
+  <span class="n">3</span>
+</section>
+
+<section class="s">
+  <h2>Решение — что работает в MVP</h2>
+  <ul>
+    <li>Карта завода: сварка → окраска → сборка → контроль → отгрузка, машины на постах</li>
+    <li>План, факт и прогноз смены; OEE и простои по постам</li>
+    <li>Задачи смены: поломки оборудования, дефекты машин, риски сроков</li>
+    <li>ИИ: модель риска отказа подъёмника и сравнение решений на копиях смены</li>
+    <li>Карточка машины, 3D-осмотр, ремонт по найденному дефекту</li>
+  </ul>
+  <p class="note">На 200 синтетических сменах: отказов подъёмника 0,52 → 0,03 за смену, выпуск +0,2 машины. Только симуляция, не данные завода.</p>
+  <span class="n">4</span>
+</section>
+
+<section class="s">
+  <h2>Как это выглядит</h2>
+  <div class="shots"><img class="big" src="img/1-shop.png" alt="Цех «Сборка»: машины на постах, отклонение на СБ-2"><img src="img/2-tasks.png" alt="Задачи смены"><img src="img/3-car3d.png" alt="3D-осмотр машины"></div>
+  <span class="n">5</span>
+</section>
+
+<section class="s">
+  <h2>Риски</h2>
+  <ul>
+    <li>Данные синтетические: на реальных данных завода не проверено</li>
+    <li>Модель обучена на синтетических сменах</li>
+    <li>3D-кузов условный, не Chevrolet и не JAC</li>
+    <li>Одна смена вместо двух, без конвейера сборки</li>
+    <li>Интеграция с системами Allur и эффект в деньгах — не измерены</li>
+  </ul>
+  <span class="n">6</span>
+</section>
+
+<section class="s">
+  <h2>Планы</h2>
+  <ul>
+    <li>Загрузить данные завода: линии, простои, план, качество</li>
+    <li>Две смены, конвейер, масштаб 5 500 машин в месяц</li>
+    <li>Объёмные сцены всех цехов</li>
+    <li>Посчитать эффект в деньгах</li>
+    <li>Пилот на одном участке</li>
+  </ul>
+  <span class="n">7</span>
+</section>
+
+<section class="s">
+  <h2>О нас честно</h2>
+  <ul>
+    <li>Зарегистрировались вчера</li>
+    <li>MVP сделали за один день, полдня были на учёбе в университете</li>
+    <li>Презентацию собрали сами сегодня</li>
+  </ul>
+  <p style="margin-top:40px"><b>Если дадите нам шанс — покажем намного больше.</b></p>
+  <p>Спасибо!</p>
+  <span class="n">8</span>
+</section>
+
+</body>
+</html>
