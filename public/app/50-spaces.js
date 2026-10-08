@@ -77,7 +77,7 @@ function enterpriseCardsSvg() {
 
 function stageCard(meta) {
   const sid = meta.stage, stage = sid === 'rework' ? { id: 'rework', name: 'Доработка', postIds: ['R1'], buffer: state.rework.buffer } : state.stages.find(s => s.id === sid);
-  const rows = stage.postIds.map(id => { const p = post(id), v = p.vehicleId; return `<tr><th scope="row"><button class="link" data-post="${esc(id)}">${esc(p.code)}</button></th><td>${ico(POST_KIND(p), POST_SHORT[p.state])}</td><td>${v ? `<button class="link mono" data-vehicle="${esc(v)}">${esc(v)}</button>` : '—'}</td><td>${p.operation ? esc(p.operation) : '—'}</td><td>${p.progress !== null ? `${bar(p.progress)} ${Math.round(p.progress * 100)}%` : '—'}</td><td class="wrap">${esc(p.reason ?? '')}</td></tr>`; }).join('');
+  const rows = stage.postIds.map(id => { const p = post(id), v = p.vehicleId; return `<tr class="${ui.selected?.type === 'post' && ui.selected.id === id ? 'selected' : ''}"><th scope="row"><button class="link" data-post="${esc(id)}">${esc(p.code)}</button></th><td>${ico(POST_KIND(p), POST_SHORT[p.state])}</td><td>${v ? `<button class="link mono" data-vehicle="${esc(v)}">${esc(v)}</button>` : '—'}</td><td>${p.operation ? esc(p.operation) : '—'}</td><td>${p.progress !== null ? `${bar(p.progress)} ${Math.round(p.progress * 100)}%` : '—'}</td><td class="wrap">${esc(p.reason ?? '')}</td></tr>`; }).join('');
   const q = stage.buffer.vehicleIds;
   let extra = '';
   if (sid === 'quality') {

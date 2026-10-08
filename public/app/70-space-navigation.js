@@ -29,9 +29,20 @@ function openEvent(e) {
   if (e.problemId) return selectProblem(e.problemId);
   if (e.postId) return selectPost(e.postId);
 }
+function openVehicleEvent(e) {
+  const p = e.postId ? post(e.postId) : null, v = e.vehicleId ? vehicle(e.vehicleId) : null;
+  const currentPost = v?.location.type === 'post' ? post(v.location.id) : null;
+  const stage = p?.stage ?? currentPost?.stage ?? ({ BACKLOG: 'weld', B1: 'paint', B2: 'assembly', B3: 'assembly', RWQ: 'rework', FG: 'shipping', SHIPPED: 'shipping' }[v?.location.id]);
+  const nextSpace = { weld: 'weld', paint: 'paint', assembly: 'assembly', quality: 'tests', rework: 'rework', shipping: 'ship' }[stage] ?? 'enterprise';
+  const target = p ? { type: 'post', id: p.id } : v ? { type: 'vehicle', id: v.id } : null;
+  if (!target) return;
+  const hash = `#space/${nextSpace}/${target.type}/${encodeURIComponent(target.id)}`;
+  if (location.hash === hash) setView(hash.slice(1)); else location.hash = hash;
+}
 // Returns true when the click was handled by the space UI.
 async function spaceClick(t, d) {
   if (d.closePanel) { closePanel(); return true; }
+  if (d.vehicleEvent) { const e = state.events.find(x => String(x.seq) === d.vehicleEvent); if (e) openVehicleEvent(e); return true; }
   if (d.mode) { ui.table = d.mode === 'table'; render(); return true; }
   if (d.cam) { if (scene) { if (d.cam === 'home') scene.home(); else scene.zoom(d.cam === 'in' ? 1.2 : 1 / 1.2); } return true; }
   if (d.space) { goSpace(d.space); return true; }
@@ -83,4 +94,3 @@ document.addEventListener('keydown', e => {
   if (e.key === '-') { scene?.zoom(1 / 1.2); return; }
   if (e.key.toLowerCase() === 't' || e.key.toLowerCase() === 'е') { ui.table = !ui.table; render(); }
 });
-
