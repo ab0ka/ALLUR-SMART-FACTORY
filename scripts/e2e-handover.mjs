@@ -44,6 +44,8 @@ export function checkReport(report, snapshot) {
     assert.deepEqual(ids(report[key]), ids(expected), key); assert.equal(report.counts[key], expected.length, `counts.${key}`);
   }
   for (const key of ['technicians', 'stock']) assert.deepEqual(ids(report.resources[key]), ids(snapshot[key]), key);
+  assert.deepEqual(ids(report.resources.heldPosts), [...snapshot.holds].sort(), 'held posts');
+  for (const technician of report.resources.technicians) assert.equal(technician.jobId, snapshot.technicians.find(t => t.id === technician.id).jobId);
   for (const stock of report.resources.stock) {
     const expected = snapshot.stock.find(s => s.id === stock.id);
     for (const key of ['onHand', 'reserved', 'available']) assert.equal(stock[key], expected[key], `stock.${stock.id}.${key}`);
@@ -109,6 +111,7 @@ export async function main() {
     const before = sim.snapshot();
     const response = await get('/api/handover'); assert.equal(response.status, 200, 'handover endpoint must be integrated');
     const report = await response.json(); checkReport(report, before);
+    assert.ok(report.problems.length > 0 && report.jobs.length > 0, 'fixture exercises both problems and active jobs');
     checkReport(report, await (await get('/api/state')).json());
     assert.deepEqual(report, await (await get('/api/handover')).json(), 'deterministic report');
     const json = await get('/api/handover?format=json');
@@ -118,6 +121,10 @@ export async function main() {
     assert.equal(csv.status, 200); assert.match(csv.headers.get('content-type'), /text\/csv.*charset=utf-8/i);
     assert.match(csv.headers.get('content-disposition'), /attachment;.*\.csv/i);
     const csvText = await csv.text(); const rows = parseCsv(csvText); assert.ok(rows.length > 5, 'CSV contains sections');
+    assert.deepEqual(rows[0], ['section', 'row', 'field', 'value']);
+    for (const [key, value] of Object.entries(report.metrics)) {
+      assert.equal(rows.find(row => row[0] === 'metrics' && row[2] === key)?.[3], value === null ? '' : String(value), `CSV metric ${key}`);
+    }
     for (const item of [...report.problems, ...report.jobs, ...report.resources.stock]) assert.ok(rows.some(row => row.includes(item.id)), `CSV includes ${item.id}`);
     for (const row of rows) for (const cell of row) assert.ok(!/^[=+@\t\r]/.test(cell), 'unsafe formula cell');
     for (const format of ['xml', 'JSON', '%00']) assert.equal((await get(`/api/handover?format=${format}`)).status, 400, format);

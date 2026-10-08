@@ -17,11 +17,11 @@ test('report checks preserve zero values and reject forecast/shipped mixups', ()
   const s = { revision: 0, elapsed: 0, shift: 480, shiftStart: 480, finished: false,
     plan: { target: 0, reference: { total: 0 } }, forecast: { projected: 4, low: 0, high: 7 },
     totals: { accepted: 0, shipped: 0, wip: 0 }, quality: { firstPassYield: null },
-    problems: [{ id: 'P1', status: 'unresolved' }], jobs: [], tasks: [], orders: [], technicians: [], stock: [], events: [{ seq: 1, type: 'test' }] };
+    problems: [{ id: 'P1', status: 'unresolved' }], jobs: [], tasks: [], orders: [], technicians: [], stock: [], holds: [], events: [{ seq: 1, type: 'test' }] };
   const r = { schemaVersion: 1, synthetic: true, revision: 0, elapsed: 0, shift: 480, shiftStart: 480, finished: false,
     metrics: { planTarget: 0, referenceTotal: 0, forecast: 4, forecastLow: 0, forecastHigh: 7, accepted: 0, shipped: 0, wip: 0, firstPassYield: null },
     counts: { problems: 1, jobs: 0, tasks: 0, orders: 0 }, problems: [{ id: 'P1' }], jobs: [], tasks: [], orders: [],
-    resources: { technicians: [], stock: [] }, events: [{ id: 1, kind: 'test' }] };
+    resources: { technicians: [], stock: [], heldPosts: [] }, events: [{ id: 1, kind: 'test' }] };
   checkReport(r, s);
   assert.throws(() => checkReport({ ...r, metrics: { ...r.metrics, forecast: 0 } }, s), /metrics.forecast/);
   assert.throws(() => checkReport({ ...r, csrf: 'unexpected' }, s), /private field/);
