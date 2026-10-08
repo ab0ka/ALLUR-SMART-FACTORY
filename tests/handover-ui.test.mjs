@@ -166,3 +166,30 @@ test('matching epoch preserves snapshot across polling and legacy missing epoch 
     assert.equal(h.calls.length, 1);
   }
 });
+test('route return token is captured once and restored after success or error after controls are enabled', async () => {
+  for (const ok of [true, false]) {
+    const h = setup(), token = { selector: '#view-handover [data-focus-key="source"]' };
+    let captures = 0, restores = 0;
+    h.context.captureNavigationReturnFocus = root => { assert.equal(root, h.$('view-handover')); captures++; return token; };
+    h.context.restoreNavigationReturnFocus = (actual, fallback) => {
+      assert.equal(actual, token); assert.equal(fallback, h.$('handover-refresh'));
+      assert.equal(fallback.disabled, false); restores++;
+    };
+    h.run('handoverRoute()');
+    h.calls[0].resolve({ ok, json: async () => report });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(captures, 1); assert.equal(restores, 1);
+    const manual = h.run('loadHandover()');
+    h.calls[1].resolve({ ok: true, json: async () => report }); await manual;
+    assert.equal(captures, 1); assert.equal(restores, 1, 'manual refresh cannot reuse a navigation return token');
+  }
+});
+test('a late route return response never invokes focus restoration after leaving handover', async () => {
+  const h = setup();
+  h.context.captureNavigationReturnFocus = () => ({});
+  h.context.restoreNavigationReturnFocus = () => assert.fail('late request restored another route focus');
+  h.run('handoverRoute()');
+  h.run("view = 'orders'; handoverRoute()");
+  h.calls[0].resolve({ ok: true, json: async () => report });
+  await new Promise(resolve => setImmediate(resolve));
+});
