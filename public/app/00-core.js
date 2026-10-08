@@ -35,7 +35,12 @@ async function action(body) {
   updating = true;
   const production = !['play', 'pause', 'step', 'speed'].includes(body.action);
   if (production) setProductionPending(true);
-  try { state = await api('/api/action', body); error(''); if (body.action === 'reset') resetAi(); render(); return true; }
+  try {
+    state = await api('/api/action', body); error(''); if (body.action === 'reset') resetAi();
+    // Restore the temporary lock before the new snapshot calculates availability.
+    if (production) setProductionPending(false);
+    render(); return true;
+  }
   catch (e) { error(e.message); return false; }
   finally { updating = false; if (production) setProductionPending(false); }
 }

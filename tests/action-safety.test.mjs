@@ -126,3 +126,41 @@ test('busy controls restore their own labels and availability after replacement 
   assert.equal(unavailable.disabled, true); assert.equal(unavailable.textContent, 'Недоступно');
   assert.equal(replacement.disabled, false); assert.equal(replacement.textContent, 'Перевести');
 });
+
+// Keep the real orders renderer: the release button persists across snapshots.
+const ordersSource = await readFile(new URL('../public/app/30-vehicles-orders.js', import.meta.url), 'utf8');
+const dispatcherSource = await readFile(new URL('../public/app/10-dispatcher-chat.js', import.meta.url), 'utf8');
+function releaseHarness({ finished, created }) {
+  const h = harness(), button = { disabled: false, textContent: 'Выпустить' };
+  h.element('release-form').querySelector = () => button;
+  h.context.document.querySelectorAll = () => [button];
+  h.run(`${ordersSource}\n${dispatcherSource}\nconst ui = {}; function syncHash() {}\nrender = renderOrders;`);
+  const snapshot = (finished, created) => ({ csrf: 'synthetic-test-token', finished, maxVehicles: 10, maxOrderQuantity: 5, totals: { created }, orders: [], posts: [], problems: [], jobKinds: [], experiments: [{ id: 'EXP-1', problemId: 'PR-1', options: [{ id: 'continue', commands: [], expected: {} }] }] });
+  h.context.initial = snapshot(finished, created);
+  h.run('state = initial; render()');
+  return { ...h, button, snapshot };
+}
+
+for (const scenario of [
+  { name: 'reset of a finished shift enables release from the new snapshot', action: 'reset', before: { finished: true, created: 5 }, after: { finished: false, created: 0 }, disabled: false },
+  { name: 'release of the last permitted vehicle keeps release disabled', action: 'release', before: { finished: false, created: 9 }, after: { finished: false, created: 10 }, disabled: true },
+]) test(scenario.name, async () => {
+  const h = releaseHarness(scenario.before);
+  const next = h.snapshot(scenario.after.finished, scenario.after.created);
+  h.context.fetch = async () => ({ ok: true, json: async () => next });
+  assert.equal(await h.run(`action({ action: '${scenario.action}' })`), true);
+  assert.equal(h.button.disabled, scenario.disabled);
+  assert.equal(h.button.textContent, 'Выпустить');
+  assert.equal(h.run('productionPending'), false);
+});
+
+test('decision cleanup preserves availability calculated by the final renderer', async () => {
+  const h = releaseHarness({ finished: false, created: 9 });
+  const next = h.snapshot(true, 9);
+  h.context.crypto = { randomUUID: () => 'synthetic-decision-id' };
+  h.context.fetch = async () => ({ ok: true, json: async () => ({ state: next }) });
+  await h.run("applyDecision('EXP-1', 'continue', true)");
+  assert.equal(h.button.disabled, true);
+  assert.equal(h.button.textContent, 'Выпустить');
+  assert.equal(h.run('productionPending'), false);
+});
