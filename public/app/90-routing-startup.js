@@ -5,7 +5,10 @@ function setView(hash) {
   ui.panel = null; ui.selected = null; ui.car3d = null; ui.ribbonOnlySelected = false; ui.routeRef = null;
   let tail;
   if (VIEWS.includes(parts[0])) { view = parts[0]; tail = parts.slice(1); }
+  else if (parts[0] === 'report') { view = typeof dataSource !== 'undefined' && dataSource === 'case' ? 'case' : 'handover'; tail = []; }
   else { view = 'space'; space = Object.hasOwn(SPACES, parts[1]) ? parts[1] : 'assembly'; tail = parts.slice(2); }
+  // The screen decides the data source; a change of source drops the other source's selection and explanation.
+  if (typeof setSource === 'function') { if (view === 'case') setSource('case'); else if (!['overview', 'video'].includes(view)) setSource('sim'); }
   // Keep published ID-only order links readable; new links follow the screen/type/id convention.
   if (view === 'orders' && tail.length === 1 && tail[0] && tail[0] !== 'chat') tail = ['order', tail[0]];
   const [type, rawId] = tail, objId = decodeRoutePart(rawId);
@@ -27,6 +30,8 @@ function setView(hash) {
     } else if (type === 'decision' && view === 'dispatcher') {
       const item = state.decisions.find(x => x.id === objId);
       if (item) { ui.routeRef = { type, id: item.id }; ctx = recordChatContext(item); }
+    } else if (type === 'casedev' && ['overview', 'case'].includes(view) && objId) {
+      ui.panel = { type, id: objId };
     } else if (type === 'event' && view === 'space') {
       const item = state.events.find(x => String(x.seq) === objId);
       if (item) { ui.routeRef = { type, id: String(item.seq) }; ui.ribbonOpen = true; ctx = recordChatContext(item); }
@@ -41,7 +46,8 @@ function setView(hash) {
   renderNavigation();
   if (view !== 'space') destroyScene();
   if (view === 'lab' && !lab) loadLab();
-  $('summary').hidden = view === 'handover';
+  if (typeof sourceChrome === 'function') sourceChrome(view);
+  if (['handover', 'overview', 'effect'].includes(view)) $('summary').hidden = true;
   if (typeof handoverRoute === 'function') handoverRoute();
   render(); revealRouteReference();
 }
@@ -56,18 +62,19 @@ function revealRouteReference() {
   });
 }
 function renderNavigation() {
-  const section = view === 'space' || view === 'workshop' ? 'shops' : view === 'vehicles' ? 'vehicles' : ['dispatcher', 'orders'].includes(view) ? 'manage' : 'analytics';
-  const labels = { shops: ['ЦЕХА', 'Выберите участок и автомобиль на карте'], vehicles: ['АВТОМОБИЛИ', 'Все машины смены · следующее действие, маршрут, ремонт и 3D-осмотр'], manage: ['УПРАВЛЕНИЕ', 'Задачи смены: оборудование, автомобили, задержки и риски сроков'], analytics: ['АНАЛИТИКА', 'Результаты смены, прогноз и эксперименты'] };
+  const section = view === 'overview' ? 'overview' : view === 'space' || view === 'workshop' ? 'shops' : ['case', 'handover', 'shift', 'effect'].includes(view) ? 'report' : 'more';
+  const labels = { overview: ['ОБЗОР', 'Где проблема, чем подтверждается, что делать'], shops: ['ЦЕХА', 'Выберите участок и автомобиль на карте'], report: ['ОТЧЁТ', 'Данные кейса, передача смены, результаты и эффект'], more: ['ЕЩЁ', 'Задачи, автомобили, задания, модели и видеоэксперимент'] };
   text('section-label', labels[section][0]); text('section-hint', labels[section][1]);
   for (const a of document.querySelectorAll('[data-section]')) {
     if (a.dataset.section === section) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     if (a.dataset.section === 'shops') a.href = `#space/${space}`;
+    if (a.dataset.section === 'report') a.href = typeof dataSource !== 'undefined' && dataSource === 'case' ? '#case' : '#handover';
   }
   $('shop-navigation').hidden = section !== 'shops';
-  $('manage-navigation').hidden = section !== 'manage';
-  $('analytics-navigation').hidden = section !== 'analytics';
+  $('report-navigation').hidden = section !== 'report';
+  $('more-navigation').hidden = section !== 'more';
   $('shop-select').value = space;
-  document.title = `${view === 'space' ? SPACES[space].short : { workshop: '2D-схема', vehicles: 'Автомобили', dispatcher: 'Задачи и решения', orders: 'Задания', shift: 'Результаты смены', handover: 'Передача смены', lab: 'Модели и эксперименты' }[view]} · Allur`;
+  document.title = `${view === 'space' ? SPACES[space].short : { overview: 'Обзор', workshop: '2D-схема', vehicles: 'Автомобили', dispatcher: 'Задачи и решения', orders: 'Задания', shift: 'Результаты смены', handover: 'Передача смены', effect: 'Эффект', lab: 'Модели и эксперименты', video: 'Видеоэксперимент', case: 'Данные кейса' }[view]} · Allur`;
 }
 function focusKey(el) {
   if (!el || el === document.body || !el.closest('main')) return null;
@@ -87,6 +94,8 @@ function render() {
   else if (view === 'handover') renderHandover();
   else if (view === 'video') renderVideo();
   else if (view === 'case') renderCase();
+  else if (view === 'overview') renderOverview();
+  else if (view === 'effect') renderEffect();
   else renderLab();
   renderSide(); renderCar3d();
   if (key && !document.activeElement?.closest('main')) visibleNavigationTarget(key)?.focus({ preventScroll: true });
@@ -149,4 +158,4 @@ async function refresh() {
   } catch { if (stillCurrent()) error('Нет связи с локальным сервером. Проверьте, что npm start продолжает работать. Повторяем подключение…'); }
   finally { fetching = false; }
 }
-await refresh(); setView(location.hash.slice(1)); setInterval(refresh, 1200);
+await refresh(); if (!location.hash.slice(1)) history.replaceState(history.state, '', '#overview'); setView(location.hash.slice(1)); setInterval(refresh, 1200);

@@ -17,7 +17,7 @@ function vehicleWhere(v) {
 }
 
 // ---------- Navigation that remembers where the user came from ----------
-const VIEW_RETURN = { vehicles: 'К списку автомобилей', dispatcher: 'К задачам смены', orders: 'К заданиям', shift: 'К результатам смены', lab: 'К моделям', workshop: 'К 2D-схеме', handover: 'К передаче смены' };
+const VIEW_RETURN = { overview: 'К обзору', case: 'К данным кейса', effect: 'К эффекту', video: 'К видеоэксперименту', vehicles: 'К списку автомобилей', dispatcher: 'К задачам смены', orders: 'К заданиям', shift: 'К результатам смены', lab: 'К моделям', workshop: 'К 2D-схеме', handover: 'К передаче смены' };
 function labelForHash(h) {
   const parts = (h || '').split('/'), [n, a] = parts, [type, id] = n === 'space' ? parts.slice(2) : parts.slice(1);
   let oid = ''; try { oid = id ? decodeURIComponent(id) : ''; } catch { /* A malformed origin still has a safe return label. */ }

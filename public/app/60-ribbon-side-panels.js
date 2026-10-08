@@ -39,6 +39,7 @@ function renderSide() {
   else if (p.type === 'post') html = post(p.id) ? panelPost(post(p.id)) : '';
   else if (p.type === 'problem') html = problem(p.id) ? panelProblem(problem(p.id)) : '';
   else if (p.type === 'compare') html = problem(p.id) ? panelCompare(problem(p.id)) : '';
+  else if (p.type === 'casedev') html = caseDevPanel(p.id);
   if (!html) { ui.panel = null; side.hidden = true; lastPanelKey = null; resetSheet(); return; }
   side.innerHTML = html; lastPanelKey = key;
   if (scroll) side.querySelector('.side-body').scrollTop = scroll;

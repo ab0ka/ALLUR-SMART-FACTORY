@@ -55,18 +55,21 @@ test('leaving 3D renders the destination in the same cycle', () => {
   assert.deepEqual(calls, ['renderVehicles', 'renderSide', 'dispose3d']);
   assert.equal(c.ui.car3d, null);
   assert.equal(elements.get('shop-navigation').hidden, true);
-  assert.equal(elements.get('manage-navigation').hidden, true);
-  assert.equal(elements.get('analytics-navigation').hidden, true);
+  assert.equal(elements.get('report-navigation').hidden, true);
+  assert.equal(elements.get('more-navigation').hidden, false, 'the vehicle list is a secondary screen under «Ещё»');
 });
 
-test('secondary navigation is scoped to management or analytics', () => {
+test('secondary navigation is scoped to the report or the secondary screens', () => {
   const { c, elements } = harness();
   c.setView('orders');
-  assert.equal(elements.get('manage-navigation').hidden, false);
-  assert.equal(elements.get('analytics-navigation').hidden, true);
+  assert.equal(elements.get('report-navigation').hidden, true);
+  assert.equal(elements.get('more-navigation').hidden, false);
+  c.setView('shift');
+  assert.equal(elements.get('report-navigation').hidden, false);
+  assert.equal(elements.get('more-navigation').hidden, true);
   c.setView('lab');
-  assert.equal(elements.get('manage-navigation').hidden, true);
-  assert.equal(elements.get('analytics-navigation').hidden, false);
+  assert.equal(elements.get('report-navigation').hidden, true);
+  assert.equal(elements.get('more-navigation').hidden, false);
 });
 
 test('cards, 3D and chat deep links work on every screen, not only in shops', () => {

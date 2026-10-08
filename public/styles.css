@@ -1027,3 +1027,32 @@ button.case-stage{display:flex;flex-direction:column;align-items:flex-start;gap:
   .case-report button.case-rec{border:0;background:none;padding:0}
 }
 .topbar .case-off{display:none}
+
+/* ---------- «Обзор» and «Эффект»: one screen per data source ---------- */
+.ov-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+.ov-head .view-title{margin-bottom:8px}
+.ov-switch{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--panel)}
+.ov-switch button{min-height:40px;padding:0 14px;border:0;background:none;font:inherit;font-weight:700;color:var(--muted);cursor:pointer}
+.ov-switch button[aria-pressed="true"]{background:var(--text);color:#fff}
+.ov-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+.ov-kpi{display:flex;flex-direction:column;gap:3px;padding:12px;border:1px solid var(--line);border-left:4px solid var(--grey);border-radius:8px;background:var(--panel-2);min-width:0}
+.ov-kpi b{font-size:21px;font-weight:700;line-height:1.15}.ov-kpi span{font-size:13px;font-weight:600}.ov-kpi small{font-size:12px;color:var(--muted)}
+.ov-kpi.ok{border-left-color:var(--ok)}.ov-kpi.warn{border-left-color:var(--amber)}.ov-kpi.bad{border-left-color:var(--red)}.ov-kpi.bad b{color:var(--red)}
+.ov-kpi.muted b{font-size:16px;color:var(--muted)}
+.ov-problems{margin:0;padding:0;list-style:none;display:grid;gap:8px;counter-reset:ovp}
+.ov-problem{width:100%;display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:10px 12px 10px 40px;position:relative;text-align:left;border:1px solid var(--line);border-radius:8px;background:var(--panel);font:inherit;color:inherit;cursor:pointer}
+.ov-problems li{counter-increment:ovp}
+.ov-problem::before{content:counter(ovp);position:absolute;left:12px;top:10px;width:20px;height:20px;border-radius:50%;background:var(--text);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.ov-problem:hover{border-color:var(--blue)}.ov-problem b{font-size:14.5px}.ov-problem span{font-size:12.5px;color:var(--muted)}.ov-problem .ov-why{color:var(--text)}
+.ov-next{border-left:4px solid var(--blue)}.ov-next p{margin:0 0 10px}
+.ov-next .primary{white-space:normal;text-align:left}
+.ov-stages{display:flex;flex-wrap:wrap;align-items:stretch;gap:8px}
+.ov-stage{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:150px;flex:1 1 150px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);font:inherit;color:inherit;text-align:left;cursor:pointer}
+.ov-stage b{font-size:14px}.ov-stage span{font-size:12px;color:var(--muted)}
+.ov-stage.ok{border-color:#7CC4BB;background:#F0FAF8}.ov-stage.warn{border-color:#EBCB7E;background:#FFFBF0}
+.ov-arrow{align-self:center;color:var(--muted)}
+.effect-form{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;margin-bottom:8px}
+.effect-form label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600;min-width:0;flex:1 1 220px}
+.effect-form input{min-height:38px;padding:0 8px;border:1px solid var(--line);border-radius:6px;font:inherit}
+@media(max-width:760px){.ov-arrow{display:none}.ov-stage{flex-basis:100%}.ov-kpis{grid-template-columns:1fr 1fr}.ov-kpi b{font-size:17px}.ov-switch{width:100%}.ov-switch button{flex:1}}
+@media(max-width:420px){.ov-kpis{grid-template-columns:1fr}}

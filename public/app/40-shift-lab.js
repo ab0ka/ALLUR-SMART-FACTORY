@@ -101,7 +101,7 @@ function renderShift() {
   text('ai-stale', aiRevision === null ? '' : aiRevision !== state.revision ? 'Состояние изменилось после объяснения. Обновите его для текущего снимка.' : 'Объяснение относится к текущему снимку синтетических данных.');
 }
 // ---------- Lab ----------
-async function loadLab() { try { lab = await api('/api/lab'); } catch (e) { lab = { available: false, reason: e.message }; } if (view === 'lab') renderLab(); }
+async function loadLab() { try { lab = await api('/api/lab'); } catch (e) { lab = { available: false, reason: e.message }; } if (view === 'lab') renderLab(); else if (view === 'effect') renderEffect(); }
 function metricRow(name, m) { return `<tr><th scope="row">${esc(name)}</th><td>${fmt(m.precision * 100)}%</td><td>${fmt(m.recall * 100)}%</td><td>${fmt(m.f1 * 100)}%</td><td>${fmt(m.prAuc, 3)}</td><td>${fmt(m.falseAlarmsPerShift, 2)}</td><td>${m.leadTime.median === null ? '—' : `${fmt(m.leadTime.median, 0)} мин`} <small>(${m.leadTime.warned}/${m.leadTime.failures})</small></td><td>${m.brier === null ? '—' : fmt(m.brier, 4)}</td></tr>`; }
 // "A shift without the system vs with it" on many synthetic shifts (scripts/compare-policies.mjs).
 function renderPolicies(r) {

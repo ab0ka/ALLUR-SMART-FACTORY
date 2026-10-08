@@ -3,12 +3,12 @@
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#F5F7FA"><title>Allur Smart Factory — синтетическое демо</title><meta name="description" content="Учебная производственная сцена: цех сборки, диагностика подъёмников, сравнение решений и чат диспетчера. Только синтетические данные."><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/styles.css"><script type="module" src="/app.js"></script></head>
 <body>
 <header class="topbar">
-  <a class="brand" href="#space/assembly" aria-label="Allur Smart Factory — к цеху «Сборка»"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 22 22"><path d="M2.5 19 11 2.5 19.5 19h-4.4L11 10.6 6.9 19z"/><rect x="8.2" y="14.2" width="5.6" height="2.2"/></svg></span><span class="brand-text"><b>ALLUR</b><span>Smart Factory</span></span></a>
+  <a class="brand" href="#overview" aria-label="Allur Smart Factory — к обзору"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 22 22"><path d="M2.5 19 11 2.5 19.5 19h-4.4L11 10.6 6.9 19z"/><rect x="8.2" y="14.2" width="5.6" height="2.2"/></svg></span><span class="brand-text"><b>ALLUR</b><span>Smart Factory</span></span></a>
   <nav class="spaces primary-nav" aria-label="Основные разделы">
-    <a href="#space/assembly" data-section="shops">Цеха</a>
-    <a href="#vehicles" data-section="vehicles">Автомобили <span id="nav-vehicles" class="nav-count"></span></a>
-    <a href="#dispatcher" data-section="manage">Управление</a>
-    <a href="#shift" data-section="analytics">Аналитика</a>
+    <a href="#overview" data-section="overview">Обзор</a>
+    <a href="#space/enterprise" data-section="shops">Цеха</a>
+    <a href="#handover" data-section="report">Отчёт</a>
+    <a href="#dispatcher" data-section="more">Ещё <span id="nav-problems" class="nav-count"></span></a>
   </nav>
   <div class="timebox">
     <div class="clockbox"><strong id="clock">--:--</strong><span id="run-status">Загрузка…</span></div>
@@ -19,7 +19,7 @@
   <span class="grow"></span>
   <a class="planfact" href="#shift" id="planfact" aria-label="План-факт смены"><span class="pf-row"><span>Принято <b id="pf-accepted">—</b> / <span id="pf-plan">—</span></span><span id="pf-forecast">прогноз —</span></span><svg class="pf-bar" viewBox="0 0 100 5" preserveAspectRatio="none" aria-hidden="true"><rect class="pf-bg" width="100" height="5" rx="2.5"/><rect id="pf-fill" class="pf-fill" width="0" height="5" rx="2.5"/><rect id="pf-mark" class="pf-mark" x="0" width="1.5" height="5"/></svg></a>
   <a class="alerts" id="alerts" href="#space/diag" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path class="ic-warn" d="M8 1.2 15.3 14.3H.7z"/><rect class="ic-dark" x="7.1" y="5.6" width="1.8" height="4.6" rx=".6"/><circle class="ic-dark" cx="8" cy="12" r="1"/></svg><span id="alerts-count">0</span></a>
-  <span class="synthetic">Синтетические данные</span>
+  <span class="synthetic">Синтетическая симуляция</span>
   <button id="chat-toggle" class="icon-btn" aria-label="Открыть чат" data-open-chat="1"><svg viewBox="0 0 20 20" aria-hidden="true"><path class="ico-chat" d="M3 4.5A2.5 2.5 0 0 1 5.5 2h9A2.5 2.5 0 0 1 17 4.5v6a2.5 2.5 0 0 1-2.5 2.5H9l-4 3.5V13a2.5 2.5 0 0 1-2-2.5z"/></svg></button>
   <details class="menu" id="menu"><summary aria-label="Действия со сменой">Смена</summary><div class="menu-list">
     <p class="menu-caption">Управление временем симуляции</p>
@@ -38,8 +38,8 @@
     <a class="context-link" href="#workshop" data-nav="workshop">2D-схема</a>
     <span id="diag-count" class="sr-only" aria-hidden="true" hidden></span>
   </div>
-  <nav id="manage-navigation" class="context-tabs" aria-label="Управление" hidden><a href="#dispatcher" data-nav="dispatcher">Задачи и решения <span id="nav-problems" class="nav-count"></span></a><a href="#orders" data-nav="orders">Задания <span id="nav-orders" class="nav-count"></span></a></nav>
-  <nav id="analytics-navigation" class="context-tabs" aria-label="Аналитика" hidden><a href="#shift" data-nav="shift">Результаты смены</a><a href="#handover" data-nav="handover">Передача смены</a><a href="#lab" data-nav="lab">Модели и эксперименты</a></nav>
+  <nav id="report-navigation" class="context-tabs" aria-label="Отчёт" hidden><a href="#case" data-nav="case">Данные кейса</a><a href="#handover" data-nav="handover">Передача смены</a><a href="#shift" data-nav="shift">Результаты смены</a><a href="#effect" data-nav="effect">Эффект</a></nav>
+  <nav id="more-navigation" class="context-tabs" aria-label="Дополнительные разделы" hidden><a href="#dispatcher" data-nav="dispatcher">Задачи и решения</a><a href="#vehicles" data-nav="vehicles">Автомобили <span id="nav-vehicles" class="nav-count"></span></a><a href="#orders" data-nav="orders">Задания <span id="nav-orders" class="nav-count"></span></a><a href="#lab" data-nav="lab">Модели</a><a href="#video" data-nav="video">Видеоэксперимент</a></nav>
 </div>
 <div id="error" role="alert" hidden></div>
 <main>
@@ -154,6 +154,17 @@
         <div class="panel"><h2 class="panel-title">Журнал событий <span id="event-count" class="tag"></span></h2><ol id="event-log" class="event-log" reversed></ol></div>
       </div>
       </details>
+    </section>
+
+    <section id="view-overview" class="view" aria-labelledby="h-overview" hidden>
+      <div class="ov-head"><h1 id="h-overview" class="view-title">Обзор <span id="ov-period"></span></h1><div class="ov-switch" id="ov-switch" role="group" aria-label="Источник данных"></div></div>
+      <p class="case-mode" role="note" id="ov-label"></p>
+      <div id="ov-body"></div>
+    </section>
+    <section id="view-effect" class="view" aria-labelledby="h-effect" hidden>
+      <p class="case-mode" role="note">Синтетическая симуляция. Измеренный результат и потенциальный эффект показаны раздельно</p>
+      <h1 id="h-effect" class="view-title">Эффект <span>что измерено в симуляции и что можно оценить для предприятия</span></h1>
+      <div id="effect-body"></div>
     </section>
 
     <section id="view-handover" class="view handover-view" aria-labelledby="h-handover" hidden>

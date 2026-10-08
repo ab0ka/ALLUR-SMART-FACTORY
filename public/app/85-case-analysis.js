@@ -18,14 +18,7 @@ async function caseLoad() {
 }
 // Simulation figures and the «Синтетические данные» badge describe another source: hidden on the case and video screens.
 // Uses the address, not `view`: on hashchange this runs before the router has switched the view.
-function caseChrome() {
-  const page = location.hash.slice(1).split('/')[0];
-  $('summary').hidden = page === 'case' || page === 'video';
-  for (const el of document.querySelectorAll('.topbar .timebox, .topbar #planfact, .topbar #alerts')) if (page === 'case') el.classList.add('case-off'); else el.classList.remove('case-off');
-  const badge = document.querySelector('.topbar .synthetic');
-  if (badge && page === 'case') badge.hidden = true;
-  else if (badge && page !== 'video') badge.hidden = false;
-}
+function caseChrome() { sourceChrome(viewOfHash()); }
 window.addEventListener('hashchange', caseChrome);
 
 function renderCase() {
