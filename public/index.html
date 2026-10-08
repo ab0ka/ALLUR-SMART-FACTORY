@@ -5,6 +5,7 @@
 <header class="topbar">
   <a class="brand" href="#space/assembly" aria-label="Allur Smart Factory — к цеху «Сборка»"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 22 22"><path d="M2.5 19 11 2.5 19.5 19h-4.4L11 10.6 6.9 19z"/><rect x="8.2" y="14.2" width="5.6" height="2.2"/></svg></span><span class="brand-text"><b>ALLUR</b><span>Smart Factory</span></span></a>
   <nav class="spaces" aria-label="Пространства">
+    <a href="#case" data-nav="case">Данные кейса</a>
     <a href="#space/enterprise" data-space-link="enterprise">Предприятие</a>
     <a href="#space/assembly" data-space-link="assembly">Сборка</a>
     <a href="#space/tests" data-space-link="tests">Испытания<i class="later" title="Подробная сцена в разработке" aria-hidden="true"></i></a>
@@ -32,6 +33,7 @@
     <a href="#shift" data-nav="shift">Смена и аналитика</a>
     <a href="#lab" data-nav="lab">Лаборатория моделей</a>
     <a href="#video" data-nav="video">Видеоанализ записи</a>
+    <a href="#case" data-nav="case">Данные кейса: отклонения по участкам</a>
     <button id="step-menu" class="quiet">+5 модельных минут (шаг)</button>
     <button id="reset" class="quiet">↺ Сбросить смену</button>
   </div></details>
@@ -158,6 +160,22 @@
       <h1 id="h-lab" class="view-title">Лаборатория моделей <span>синтетическое обучение и проверка, не для реального оборудования Allur</span></h1>
       <div id="lab"></div>
     </section>
+    <section id="view-case" class="view" aria-labelledby="h-case" hidden>
+      <p class="case-mode" role="note">Тестовые данные задания. Не подтверждённые реальные показатели Allur</p>
+      <h1 id="h-case" class="view-title">Данные кейса <span>отклонения по участкам → подтверждающие записи → проверки</span></h1>
+      <form id="case-filters" class="panel case-filters no-print">
+        <div class="case-source" id="case-source">Загрузка набора данных…</div>
+        <label>С даты <select id="case-from"></select></label>
+        <label>По дату <select id="case-to"></select></label>
+        <label>Участок <select id="case-stage"></select></label>
+        <button type="button" id="case-reset" class="quiet">Сбросить фильтр</button>
+        <span class="grow"></span>
+        <button type="button" id="case-csv">Экспорт CSV</button>
+        <button type="button" id="case-print" class="primary">Отчёт / PDF</button>
+      </form>
+      <div id="case-body"></div>
+    </section>
+
     <section id="view-video" class="view" aria-labelledby="h-video" hidden>
       <h1 id="h-video" class="view-title">Видеоанализ <span>воспроизведение результатов анализа записи — не прямой эфир</span></h1>
       <div class="panel va-load no-print">

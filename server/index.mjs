@@ -12,7 +12,7 @@ import { answerChat, CHAT_LIMITS } from './chat.mjs';
 import { loadRiskModel, assessRisk, labSummary, loadPolicyReport } from './risk-model.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const assets = { '/': ['index.html', 'text/html; charset=utf-8'], '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/scene.js': ['scene.js', 'text/javascript; charset=utf-8'], '/styles.css': ['styles.css', 'text/css; charset=utf-8'], '/favicon.svg': ['favicon.svg', 'image/svg+xml'], '/video-analytics.js': ['video-analytics.js', 'text/javascript; charset=utf-8'], '/video-fixture.json': ['video-fixture.json', 'application/json; charset=utf-8'] };
+const assets = { '/': ['index.html', 'text/html; charset=utf-8'], '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/scene.js': ['scene.js', 'text/javascript; charset=utf-8'], '/styles.css': ['styles.css', 'text/css; charset=utf-8'], '/favicon.svg': ['favicon.svg', 'image/svg+xml'], '/video-analytics.js': ['video-analytics.js', 'text/javascript; charset=utf-8'], '/video-fixture.json': ['video-fixture.json', 'application/json; charset=utf-8'], '/case-analysis.js': ['case-analysis.js', 'text/javascript; charset=utf-8'], '/case-dataset.json': ['case-dataset.json', 'application/json; charset=utf-8'] };
 const safeEqual = (a, b) => typeof a === 'string' && Buffer.byteLength(a) === Buffer.byteLength(b) && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 // Expected client errors carry `expose`; anything else is an unexpected server error (500, generic message).
 const clientError = (message, status = 400) => Object.assign(new Error(message), { status, expose: true });

@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-export const PUBLIC_ASSETS = ['index.html', 'styles.css', 'app.js', 'scene.js', 'favicon.svg', 'video-analytics.js', 'video-fixture.json'];
+export const PUBLIC_ASSETS = ['index.html', 'styles.css', 'app.js', 'scene.js', 'favicon.svg', 'video-analytics.js', 'video-fixture.json', 'case-analysis.js', 'case-dataset.json'];
 // The client script is kept as ordered parts in public/app/ (NN-name.js) so several people can work on different
 // screens without editing one large file. The build joins them in name order into a single dist/app.js.
 export const APP_PART = /^\d{2}-[a-z0-9-]+\.js$/;
@@ -34,8 +34,8 @@ export async function buildDist({ publicDir = path.join(root, 'public'), distDir
   return { files: result, strays, quarantineDir };
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  JSON.parse(await readFile(path.join(root, 'public', 'video-fixture.json'), 'utf8'));
-  for (const file of ['public/scene.js', 'public/video-analytics.js', 'server/index.mjs', 'server/simulation.mjs', 'server/ai.mjs', 'server/ai-config.mjs', 'scripts/build.mjs']) execFileSync(process.execPath, ['--check', path.join(root, file)], { stdio: 'inherit' });
+  for (const json of ['video-fixture.json', 'case-dataset.json']) JSON.parse(await readFile(path.join(root, 'public', json), 'utf8'));
+  for (const file of ['public/scene.js', 'public/video-analytics.js', 'public/case-analysis.js', 'server/index.mjs', 'server/simulation.mjs', 'server/ai.mjs', 'server/ai-config.mjs', 'scripts/build.mjs']) execFileSync(process.execPath, ['--check', path.join(root, file)], { stdio: 'inherit' });
   const { files, strays, quarantineDir } = await buildDist();
   execFileSync(process.execPath, ['--check', path.join(root, 'dist', 'app.js')], { stdio: 'inherit' });
   const { parts } = await assembleApp(path.join(root, 'public'));

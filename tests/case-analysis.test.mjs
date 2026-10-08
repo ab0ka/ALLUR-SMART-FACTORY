@@ -30,7 +30,8 @@ test('painting over two days: 10 defects out of 231, about 4.329 %, computed fro
   assert.notEqual(Math.round(k.ratePct * 100) / 100, meanOfSource, 'not the average of rounded percentages');
   const card = deviations(data, all)[0];
   assert.equal(card.id, 'quality-Окраска');
-  assert.deepEqual(card.evidence.filter(id => id.startsWith('К')), ['К2', 'К5']);
+  assert.deepEqual(card.evidence, ['К2', 'К5'], 'only quality records confirm the finding');
+  assert.deepEqual(card.context, ['П2'], 'the painting downtime is a related record for a hypothesis, not evidence');
   assert.ok(card.hypotheses.every(h => /не установлена/.test(h)), 'downtime on the same stage is a hypothesis, not the cause');
   assert.match(card.next, /^Проверить параметры процесса участка «Окраска» и журнал дефектов/);
 });

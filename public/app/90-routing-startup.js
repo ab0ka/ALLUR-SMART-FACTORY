@@ -37,6 +37,7 @@ function render() {
   else if (view === 'orders') renderOrders();
   else if (view === 'shift') renderShift();
   else if (view === 'video') renderVideo();
+  else if (view === 'case') renderCase();
   else renderLab();
   if (key && !document.activeElement?.closest('main')) document.querySelector(key)?.focus({ preventScroll: true });
 }

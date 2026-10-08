@@ -129,7 +129,7 @@ export function deviations(data, view) {
       id: `quality-${k.stage}`, type: 'quality', rank: 0, magnitude: k.ratePct / max,
       title: `Брак на участке «${k.stage}» выше допустимого`, stage: k.stage, period: periodOf(k.rows),
       value: `${fmtPct(k.ratePct, 2)} (${k.defects} из ${k.produced} ${u})`, threshold: `допустимо ≤ ${fmtPct(max, 0)}`,
-      evidence: [...k.rows.map(r => r.id), ...dt.map(r => r.id)],
+      evidence: k.rows.map(r => r.id), context: dt.map(r => r.id),
       facts: k.rows.map(r => `${fmtDate(r.date)}: выпущено ${r.produced} ${u}, брак ${r.defects} ${u}${r.sourceDefectPct != null ? ` (в источнике ${fmtPct(r.sourceDefectPct)})` : ''} — запись ${r.id}`),
       calc: [`Брак за период = ${k.defects} / ${k.produced} × 100 % = ${fmtPct(k.ratePct, 3)}; это в ${fmtNum(k.ratePct / max, 2)} раза выше порога.`,
         days.length ? `Дни выше порога: ${days.map(r => `${fmtDate(r.date)} — ${fmtPct(r.ratePct, 2)}`).join('; ')}.` : 'По отдельным дням порог не превышен, превышение — по сумме за период.'],
@@ -146,7 +146,7 @@ export function deviations(data, view) {
       id: `production-${p.stage}`, type: 'production', rank: 1, magnitude: 1 - p.completionPct / 100,
       title: `Выпуск участка «${p.stage}» ниже плана`, stage: p.stage, period: periodOf(p.rows),
       value: `${p.fact} из ${p.plan} ${u} (${fmtPct(p.completionPct, 2)}, отклонение ${fmtSigned(p.deviation)} ${u})`, threshold: `план ${p.plan} ${u}`,
-      evidence: [...p.rows.map(r => r.id), ...dt.map(r => r.id)],
+      evidence: p.rows.map(r => r.id), context: dt.map(r => r.id),
       facts: p.rows.map(r => `${fmtDate(r.date)}, ${r.line}: план ${r.plan} ${u}, факт ${r.fact} ${u}${isNum(r.hours) ? `, время работы ${fmtNum(r.hours)} ч` : ''}${isNum(r.loadPct) ? `, загрузка ${fmtNum(r.loadPct, 0)} %` : ''} — запись ${r.id}`),
       calc: [`Выполнение плана = ${p.fact} / ${p.plan} × 100 % = ${fmtPct(p.completionPct, 2)}; отклонение = ${p.fact} − ${p.plan} = ${fmtSigned(p.deviation)} ${u}.`,
         `Наибольшее отставание: ${fmtDate(worst.date)} — ${worst.fact} из ${worst.plan} ${u} (${fmtPct(worst.completionPct, 2)}, ${fmtSigned(worst.deviation)} ${u}).`],
@@ -163,7 +163,7 @@ export function deviations(data, view) {
       id: `downtime-${g.date}-${g.equipment}`, type: 'downtime', rank: 2, magnitude: g.minutes / crit,
       title: `Простой ${g.equipment} больше ${crit} мин за сутки`, stage: g.stage, period: fmtDate(g.date),
       value: `${g.minutes} мин`, threshold: `${crit} мин в сутки — только для критического оборудования`,
-      evidence: g.records.map(r => r.id),
+      evidence: g.records.map(r => r.id), context: [],
       facts: g.records.map(r => `${fmtDate(r.date)}, ${r.stage}, ${r.equipment}: ${r.reason}, ${r.minutes} мин — запись ${r.id}`),
       calc: [`Сумма записей за сутки = ${g.minutes} мин.`], hypotheses: ['Порог применим, только если оборудование критическое — это в источнике не указано.'],
       known: ['длительность и зарегистрированная причина'], unknown: ['является ли оборудование критическим', 'время начала и окончания, пересечения записей'],
@@ -175,7 +175,7 @@ export function deviations(data, view) {
     id: 'plan-mismatch', type: 'plan', rank: 3, magnitude: Math.abs(plan.gap) / plan.target,
     title: 'Сумма месячных планов моделей не совпадает с общим ориентиром', stage: 'Предприятие', period: 'месяц (фильтр по дате не применяется)',
     value: `${fmtNum(plan.models, 0)} ${u}`, threshold: `ориентир ≥ ${fmtNum(plan.target, 0)} ${u} в месяц`,
-    evidence: data.modelPlan.map(r => r.id),
+    evidence: data.modelPlan.map(r => r.id), context: [],
     facts: [...data.modelPlan.map(r => `${r.model}: ${fmtNum(r.plan, 0)} ${u} — запись ${r.id}`), `Условие задания: план выпуска ≥ ${fmtNum(plan.target, 0)} автомобилей в месяц.`],
     calc: [`Сумма планов моделей = ${data.modelPlan.map(r => fmtNum(r.plan, 0)).join(' + ')} = ${fmtNum(plan.models, 0)} ${u}; расхождение с ориентиром = ${fmtNum(plan.target, 0)} − ${fmtNum(plan.models, 0)} = ${fmtNum(plan.gap, 0)} ${u}.`],
     hypotheses: ['Ориентир может включать модели или резерв, которых нет в таблице моделей.'],
@@ -241,7 +241,7 @@ export function toCsv(data, view) {
   for (const r of view.downtime) row([t(''), t(r.id), t(r.date), t(r.stage), t(r.equipment), t(r.reason), csvNum(r.minutes)]);
   row([t(DOWNTIME_TOTAL_NAME), t(''), t(''), t(''), t(''), t(''), csvNum(downtimeTotal(view))]);
   out.push('');
-  row([t('Отклонения'), t('Тип'), t('Участок'), t('Период'), t('Значение'), t('Порог / план'), t('Исходные записи'), t('Следующий шаг проверки')]);
-  for (const d of deviations(data, view)) row([t(d.title), t(d.type), t(d.stage), t(d.period), t(d.value), t(d.threshold), t(d.evidence.join(', ')), t(d.next)]);
+  row([t('Отклонения'), t('Тип'), t('Участок'), t('Период'), t('Значение'), t('Порог / план'), t('Исходные записи'), t('Связанные записи (гипотеза)'), t('Следующий шаг проверки')]);
+  for (const d of deviations(data, view)) row([t(d.title), t(d.type), t(d.stage), t(d.period), t(d.value), t(d.threshold), t(d.evidence.join(', ')), t(d.context.join(', ')), t(d.next)]);
   return '\uFEFF' + out.join('\r\n') + '\r\n';
 }
