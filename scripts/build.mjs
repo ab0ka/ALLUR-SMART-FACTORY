@@ -11,7 +11,8 @@ export async function assembleApp(publicDir) {
   const dir = path.join(publicDir, 'app');
   const parts = (await readdir(dir)).filter(name => APP_PART.test(name)).sort();
   if (!parts.length) throw new Error('No client parts in public/app');
-  return { parts, code: (await Promise.all(parts.map(name => readFile(path.join(dir, name), 'utf8')))).join('') };
+  // A newline ends trailing // comments; a semicolon prevents expressions from spanning files.
+  return { parts, code: (await Promise.all(parts.map(name => readFile(path.join(dir, name), 'utf8')))).join('\n;\n') };
 }
 // dist is built from an allowlist. Unknown entries are moved (not deleted) to a timestamped quarantine folder.
 export async function buildDist({ publicDir = path.join(root, 'public'), distDir = path.join(root, 'dist'), quarantineRoot = path.join(root, 'build-quarantine'), now = new Date() } = {}) {

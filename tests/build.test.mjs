@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, writeFile, readFile, readdir, copyFile, cp, rm } from '
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runInNewContext } from 'node:vm';
 import { buildDist, assembleApp, PUBLIC_ASSETS } from '../scripts/build.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // Copies the real client sources (static assets plus the app.js parts) into a temporary public folder.
@@ -50,5 +51,21 @@ for (const prefix of ['nvapi-', 'sk-proj-']) test(`build refuses client assets t
     await copyPublic(publicDir);
     await writeFile(path.join(publicDir, 'app', '99-leak.js'), `const k = '${prefix}${'x'.repeat(24)}';`);
     await assert.rejects(buildDist({ publicDir, distDir: path.join(dir, 'dist'), quarantineRoot: path.join(dir, 'q') }), /Possible secret/);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+for (const [name, first, second] of [
+  ['a trailing line comment without a final newline', 'const steps = ["setup"]; // trailing comment', 'steps.push("startup");'],
+  ['an expression without a semicolon before an IIFE', 'const steps = ["setup"]', '(function () { steps.push("startup"); })();'],
+]) test(`client parts keep their boundaries with ${name}`, async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'allur-build-boundary-'));
+  try {
+    const appDir = path.join(dir, 'app');
+    await mkdir(appDir);
+    await writeFile(path.join(appDir, '00-setup.js'), first);
+    await writeFile(path.join(appDir, '10-startup.js'), second + '\nglobalThis.result = steps;');
+    const { code } = await assembleApp(dir), context = {};
+    runInNewContext(code, context, { timeout: 1000 });
+    assert.deepEqual(Array.from(context.result), ['setup', 'startup']);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
