@@ -5,9 +5,10 @@ import { readFileSync } from 'node:fs';
 
 function client() {
   const navigation = readFileSync(new URL('../public/app/70-space-navigation.js', import.meta.url), 'utf8').split('// Camera:')[0];
-  const routing = readFileSync(new URL('../public/app/90-routing-startup.js', import.meta.url), 'utf8').split('function focusKey')[0];
+  const routingSource = readFileSync(new URL('../public/app/90-routing-startup.js', import.meta.url), 'utf8');
+  const routing = routingSource.split('function focusKey')[0] + routingSource.slice(routingSource.indexOf('function openOrder('), routingSource.indexOf('function openRef('));
   const state = { vehicles: [{ id: 'DEMO-008' }], posts: [{ id: 'A2' }], problems: [{ id: 'PR-1' }], orders: [{ id: 'ORD-101' }], experiments: [{ id: 'EXP-1', problemId: 'PR-1' }, { id: 'EXP-2', problemId: 'PR-1' }], decisions: [{ id: 'DEC-1', problemId: 'PR-1' }], jobs: [{ id: 'JOB-1', problemId: 'PR-1' }], events: [{ seq: 7, vehicleId: 'DEMO-008' }] };
-  const c = vm.createContext({ state, ui: { panel: null, selected: null }, chatContext: null, view: 'space', space: 'assembly', SPACES: { assembly: {} }, VIEWS: ['dispatcher'], location: { hash: '' }, history: { pushState(_a, _b, hash) { c.location.hash = hash; } }, document: { querySelectorAll: () => [] }, $: () => ({ querySelector: () => null }), render() {}, renderRibbon() {}, updateSideChat() {}, narrow: () => false, requestAnimationFrame() {}, destroyScene() {}, problem: id => state.problems.find(p => p.id === id) });
+  const c = vm.createContext({ state, ui: { panel: null, selected: null }, chatContext: null, view: 'space', space: 'assembly', SPACES: { assembly: {} }, VIEWS: ['dispatcher', 'orders'], location: { hash: '' }, history: { pushState(_a, _b, hash) { c.location.hash = hash; } }, document: { querySelectorAll: () => [] }, $: () => ({ querySelector: () => null }), render() {}, renderRibbon() {}, updateSideChat() {}, narrow: () => false, requestAnimationFrame() {}, destroyScene() {}, problem: id => state.problems.find(p => p.id === id) });
   vm.runInContext(navigation + routing, c);
   return c;
 }
@@ -113,4 +114,36 @@ test('a delayed chat reply preserves a different object draft and its context', 
   assert.equal(secondInput.value, 'New vehicle question');
   const next = c.ask(secondInput.value); finish({ state: {} }); await next;
   assert.equal(secondInput.value, '');
+});
+
+
+test('order reply links restore the exact order on Back/Forward and a fresh page', () => {
+  const c = client();
+  const original = 'space/assembly/chat/vehicle/DEMO-008';
+  c.setView(original);
+  c.openRefSpace('order', 'ORD-101');
+  assert.equal(c.location.hash, 'orders/ORD-101');
+  c.setView(c.location.hash);
+  assert.equal(c.chatContext.type, 'order');
+  assert.equal(c.chatContext.id, 'ORD-101');
+  c.setView(original);
+  assert.equal(c.chatContext.id, 'DEMO-008');
+  c.setView('orders/ORD-101');
+  assert.equal(c.chatContext.id, 'ORD-101');
+  const fresh = client(); fresh.setView('orders/ORD-101');
+  assert.equal(fresh.chatContext.id, 'ORD-101');
+  fresh.openPanel({ type: 'chat' }, null, fresh.chatContext);
+  assert.equal(fresh.location.hash, 'space/assembly/chat/order/ORD-101');
+  fresh.setView(fresh.location.hash);
+  assert.equal(fresh.chatContext.id, 'ORD-101');
+});
+
+test('bare and invalid order routes clear earlier vehicle and order chat contexts', () => {
+  const c = client();
+  for (const route of ['orders', 'orders/', 'orders/MISSING', 'orders/%ZZ', 'orders/ORD-101/extra']) {
+    for (const prior of ['space/assembly/chat/vehicle/DEMO-008', 'orders/ORD-101']) {
+      c.setView(prior); c.setView(route);
+      assert.equal(c.chatContext, null);
+    }
+  }
 });

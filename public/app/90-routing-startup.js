@@ -1,7 +1,14 @@
 // ---------- Routing and render ----------
 function setView(hash) {
   const [name, arg, type, id, contextId, ...extra] = hash.split('/');
-  if (VIEWS.includes(name)) view = name;
+  if (VIEWS.includes(name)) {
+    view = name;
+    if (name === 'orders') {
+      let orderId;
+      try { orderId = arg ? decodeURIComponent(arg) : undefined; } catch { orderId = undefined; }
+      chatContext = type === undefined ? validChatContext('order', orderId) : null;
+    }
+  }
   else {
     view = 'space'; space = SPACES[arg] ? arg : 'assembly';
     ui.panel = null; ui.selected = null; chatContext = null;
@@ -30,6 +37,10 @@ function setView(hash) {
   if (view !== 'space') destroyScene();
   if (view === 'lab' && !lab) loadLab();
   render();
+  if (view === 'orders' && chatContext?.type === 'order') {
+    const orderId = chatContext.id;
+    requestAnimationFrame(() => { if (view === 'orders' && chatContext?.id === orderId) document.getElementById(`order-${orderId}`)?.scrollIntoView({ block: 'start' }); });
+  }
 }
 function focusKey(el) {
   if (!el || el === document.body || !el.closest('main')) return null;
@@ -52,7 +63,7 @@ function render() {
 function openVehicle(id) { selectedVehicle = id; chatContext = { type: 'vehicle', id }; if (!filterOf[vehicleFilter](vehicle(id))) vehicleFilter = 'all'; if (location.hash !== '#vehicles') location.hash = 'vehicles'; else render(); requestAnimationFrame(() => $('vehicle-passport').scrollIntoView({ block: 'nearest' })); }
 function openPost(id) { selectedPost = id; chatContext = { type: 'post', id }; if (location.hash !== '#workshop') location.hash = 'workshop'; else render(); requestAnimationFrame(() => { if (matchMedia('(max-width: 1499px)').matches) $('post-detail').scrollIntoView({ block: 'nearest' }); }); }
 function openProblem(id) { selectedProblem = id; chatContext = { type: 'problem', id }; if (location.hash !== '#dispatcher') location.hash = 'dispatcher'; else render(); requestAnimationFrame(() => $('problem-card').scrollIntoView({ block: 'start' })); }
-function openOrder(id) { chatContext = { type: 'order', id }; if (location.hash !== '#orders') location.hash = 'orders'; else render(); requestAnimationFrame(() => document.getElementById(`order-${id}`)?.scrollIntoView({ block: 'start' })); }
+function openOrder(id) { const hash = `orders/${encodeURIComponent(id)}`; if (location.hash !== `#${hash}`) location.hash = hash; else setView(hash); }
 function openRef(type, id) {
   if (type === 'vehicle') return openVehicle(id);
   if (type === 'post') return openPost(id);
@@ -81,6 +92,7 @@ document.addEventListener('click', async e => {
   const d = t.dataset;
   if (d.speed) { action({ action: 'speed', value: Number(d.speed) }); return; }
   if (view === 'space' && await spaceClick(t, d)) return;
+  if (d.openChat && view === 'orders') { openPanel({ type: 'chat' }, null, chatContext && validChatContext(chatContext.type, chatContext.id)); return; }
   if (d.openChat) { location.hash = 'dispatcher'; requestAnimationFrame(() => $('chat-input').focus()); return; }
   if (d.post) { selectedPost = d.post; chatContext = { type: 'post', id: d.post }; render(); return; }
   if (d.postLink) return openPost(d.postLink);
