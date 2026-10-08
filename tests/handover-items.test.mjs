@@ -80,3 +80,23 @@ test('handover items: duplicate, missing and special IDs have distinct escaped f
   assert.equal(new Set(keys).size, keys.length);
   assert.doesNotMatch(html, /data-focus-key="[^"]*</);
 });
+
+test('handover items: focus stays on the same typed task when equal IDs are reordered', () => {
+  const tasks = ['post', 'order', 'problem', 'vehicle'].map(type => ({ id: 'Одинаковый', title: type, object: { type, id: 'Объект / 1' } }));
+  const targets = html => Object.fromEntries([...html.matchAll(/data-focus-key="([^"]*)" href="([^"]*)"/g)].map(([, key, href]) => [href, key]));
+  assert.deepEqual(targets(render({ tasks })), targets(render({ tasks: [...tasks].reverse() })));
+  const single = targets(render({ tasks: [tasks[1]] }));
+  const original = targets(render({ tasks }));
+  for (const [href, key] of Object.entries(single)) assert.equal(key, original[href]);
+});
+
+test('handover items: vehicle focus keys survive reordering and removal of neighbours', () => {
+  const renderVehicles = ids => render({ problems: [{ id: 'ПР-1', status: 'open', vehicleIds: ids }] });
+  const targets = html => Object.fromEntries([...html.matchAll(/data-focus-key="([^"]*)" href="(#vehicles\/vehicle\/[^"]*)"/g)].map(([, key, href]) => [href, key]));
+  const original = targets(renderVehicles(['ДЕМО-1', 'ДЕМО-2', 'ДЕМО-3']));
+  assert.deepEqual(original, targets(renderVehicles(['ДЕМО-3', 'ДЕМО-2', 'ДЕМО-1'])));
+  for (const [href, key] of Object.entries(targets(renderVehicles(['ДЕМО-2'])))) assert.equal(key, original[href]);
+  const duplicates = renderVehicles(['ДЕМО-1', 'ДЕМО-1']);
+  const keys = [...duplicates.matchAll(/data-focus-key="([^"]*)"/g)].map(m => m[1]);
+  assert.equal(new Set(keys).size, keys.length);
+});
