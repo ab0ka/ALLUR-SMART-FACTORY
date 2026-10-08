@@ -1,7 +1,7 @@
 // ---------- Selection and navigation inside spaces ----------
 function openPanel(panel, selected, ctx) {
-  ui.panel = panel; if (selected !== undefined) ui.selected = selected; if (ctx) chatContext = ctx;
-  if (view !== 'space') { location.hash = `space/${['assembly', 'diag'].includes(space) ? space : 'assembly'}`; return; }
+  ui.panel = panel; if (selected !== undefined) ui.selected = selected; if (ctx !== undefined) chatContext = ctx;
+  if (view !== 'space') { location.hash = panelHash(); return; }
   syncHash(); render();
   if (narrow() && scene && ui.selected) { if (ui.selected.type === 'vehicle') scene.focusVehicle(ui.selected.id, 1.6); else if (ui.selected.type === 'post') scene.focusPost(ui.selected.id, 1.6); }
   requestAnimationFrame(() => $('side').querySelector('h2')?.focus?.());
@@ -11,17 +11,27 @@ const selectPost = id => openPanel({ type: 'post', id }, { type: 'post', id }, {
 const selectProblem = id => { const p = problem(id); openPanel({ type: 'problem', id }, p ? { type: 'post', id: p.postId } : null, { type: 'problem', id }); };
 function closePanel() { ui.panel = null; ui.selected = null; ui.ribbonOnlySelected = false; syncHash(); render(); }
 // The address bar follows the open card, so a link can be shared or opened again; replaceState does not fire hashchange.
-function syncHash() { if (view !== 'space') return; const p = ui.panel; history.replaceState(null, '', `#space/${space}${p ? `/${p.type}${p.id ? `/${encodeURIComponent(p.id)}` : ''}` : ''}`); }
+function panelHash() {
+  const p = ui.panel;
+  const suffix = p?.type === 'chat' && chatContext ? `/${chatContext.type}/${encodeURIComponent(chatContext.id)}` : p?.id ? `/${encodeURIComponent(p.id)}` : '';
+  return `space/${space}${p ? `/${p.type}${suffix}` : ''}`;
+}
+function syncHash() { if (view === 'space') history.replaceState(null, '', `#${panelHash()}`); }
 function goSpace(id) { location.hash = `space/${id}`; }
 function openRefSpace(type, id) {
   if (type === 'vehicle') return selectVehicle(id);
   if (type === 'post') return selectPost(id);
   if (type === 'problem') return selectProblem(id);
   if (type === 'order') return openOrder(id);
-  if (type === 'experiment') { const e = state.experiments.find(x => x.id === id); if (e) return openPanel({ type: 'compare', id: e.problemId }); return; }
-  if (type === 'decision') { const d = state.decisions.find(x => x.id === id); if (d) return selectProblem(d.problemId); return; }
-  if (type === 'job') { const j = state.jobs.find(x => x.id === id); if (j?.problemId) return selectProblem(j.problemId); if (j) return selectPost(j.postId); return; }
-  if (type === 'event') { const e = state.events.find(x => String(x.seq) === String(id)); if (e) return openEvent(e); }
+  if (['experiment', 'decision', 'job', 'event'].includes(type)) {
+    const collection = { experiment: state.experiments, decision: state.decisions, job: state.jobs, event: state.events }[type];
+    const item = collection.find(x => String(type === 'event' ? x.seq : x.id) === String(id));
+    if (item) openPanel({ type, id }, null, referenceContext(item));
+  }
+}
+function referenceContext(item) {
+  for (const type of ['problem', 'vehicle', 'post']) if (item?.[`${type}Id`]) return { type, id: item[`${type}Id`] };
+  return null;
 }
 function openEvent(e) {
   if (e.problemId && ['problem_detected', 'problem_resolved', 'decision_applied', 'check_completed', 'verify_completed'].includes(e.type)) return selectProblem(e.problemId);
@@ -44,7 +54,7 @@ async function spaceClick(t, d) {
   if (d.openChat) { if (d.ctxType) chatContext = { type: d.ctxType, id: d.ctxId }; else if (ui.selected) chatContext = ui.selected.type === 'vehicle' ? { type: 'vehicle', id: ui.selected.id } : ui.panel?.type === 'problem' ? { type: 'problem', id: ui.panel.id } : { type: 'post', id: ui.selected.id }; ui.panel = { type: 'chat' }; syncHash(); render(); requestAnimationFrame(() => $('side-chat-input')?.focus()); return true; }
   if (d.refType) { openRefSpace(d.refType, d.refId); return true; }
   if (d.ask) { const input = $('side-chat-input'); if (input) input.value = d.ask; ask(d.ask, SIDE_CHAT); return true; }
-  if (d.chatClear) { chatContext = null; updateSideChat(); return true; }
+  if (d.chatClear) { chatContext = null; ui.selected = null; syncHash(); updateSideChat(); return true; }
   if (d.applyChoice) { const id = ui.choice[d.applyChoice]; if (id) await applyDecision(d.applyChoice, id); return true; }
   if (d.legacy) { if (d.legacy === 'vehicles') openVehicle(d.legacyId); else if (d.legacy === 'dispatcher') openProblem(d.legacyId); return true; }
   return false;

@@ -36,6 +36,8 @@ function renderSide() {
   else if (p.type === 'post') html = post(p.id) ? panelPost(post(p.id)) : '';
   else if (p.type === 'problem') html = problem(p.id) ? panelProblem(problem(p.id)) : '';
   else if (p.type === 'compare') html = problem(p.id) ? panelCompare(problem(p.id)) : '';
+  else if (p.type === 'experiment') { const exp = state.experiments.find(e => e.id === p.id); if (exp && problem(exp.problemId)) html = panelCompare(problem(exp.problemId), exp); }
+  else if (['event', 'job', 'decision'].includes(p.type)) html = panelReference(p.type, p.id);
   if (!html) { ui.panel = null; side.hidden = true; lastPanelKey = null; return; }
   side.innerHTML = html; lastPanelKey = key;
   if (scroll) side.querySelector('.side-body').scrollTop = scroll;
@@ -128,8 +130,7 @@ function panelProblem(pr) {
     + `<div class="side-body">${body}${lockNote}<p><button class="link" data-legacy="dispatcher" data-legacy-id="${esc(pr.id)}">Журнал решений в диспетчере →</button></p></div>${foot ? `<div class="side-foot">${foot}<button class="secondary" data-open-chat="1" data-ctx-type="problem" data-ctx-id="${esc(pr.id)}">Обсудить в чате</button></div>` : ''}`;
 }
 
-function panelCompare(pr) {
-  const exp = [...state.experiments].reverse().find(e => e.problemId === pr.id);
+function panelCompare(pr, exp = [...state.experiments].reverse().find(e => e.problemId === pr.id)) {
   const head = sideHead(`РЕШЕНИЯ · ${esc(pr.id)} · ${esc(pr.postCode)}`, 'Сравнение решений', '', `<button class="link small-link" data-problem="${esc(pr.id)}">← к диагностике</button>`);
   if (!exp) return head + `<div class="side-body"><p class="muted">Сравнение ещё не рассчитано. Модель будет поставлена на паузу, каждый вариант прогоняется на отдельной копии текущего снимка до 16:00.</p></div><div class="side-foot"><button class="primary" data-compare="${esc(pr.id)}">Рассчитать варианты</button></div>`;
   const stale = exp.baseRevision !== state.revision, decided = state.decisions.some(d => d.experimentId === exp.id);
@@ -166,4 +167,17 @@ function updateSideChat() {
     ${m.refs?.length ? `<div class="refs">${m.refs.map(r => `<button class="ref" data-ref-type="${esc(r.type)}" data-ref-id="${esc(r.id)}">${esc(r.label)}</button>`).join('')}</div>` : ''}
     ${m.proposal ? `<div class="proposal"><span>Предложение: ${esc(m.proposal.title)}</span><button class="primary" data-proposal="${esc(m.id)}" ${state.finished ? 'disabled' : ''}>Подтвердить…</button></div>` : ''}</li>`).join('') || '<li class="muted">Спросите о выбранном объекте. Ссылки в ответах ведут к автомобилю, посту, событию или сравнению.</li>';
   if (atBottom) host.scrollTop = host.scrollHeight;
+}
+
+// Read-only cards preserve the identity of references from older chat replies.
+function panelReference(type, id) {
+  const rows = { event: state.events, job: state.jobs, decision: state.decisions };
+  const item = rows[type].find(x => String(type === 'event' ? x.seq : x.id) === String(id));
+  if (!item) return '';
+  const label = { event: 'СОБЫТИЕ', job: 'РАБОТА', decision: 'РЕШЕНИЕ' }[type];
+  const title = type === 'event' ? `${clock(item.minute)} · событие ${item.seq}` : `${item.id} · ${item.title}`;
+  let body = type === 'event' ? `<p>${esc(item.text)}</p>` : type === 'job' ? `<p>${esc(JOB_STATUS[item.status])}${item.status === 'running' ? ` · осталось ${item.remaining} мин` : ''}</p>${item.result ? `<p>${esc(item.result.text)}</p>` : ''}` : `<p>Применено ${clock(item.appliedAt)}. Ожидалось: ${fmt(item.expected.accepted)} принятых автомобилей. Наблюдаемый факт: ${item.report.observed.accepted}.</p>`;
+  const refs = [['vehicle', item.vehicleId], ['post', item.postId], ['problem', item.problemId], ['experiment', item.experimentId], ['decision', item.decisionId]];
+  body += `<div class="refs">${refs.filter(([, target]) => target).map(([kind, target]) => `<button class="ref" data-ref-type="${kind}" data-ref-id="${esc(target)}">${esc(target)}</button>`).join('')}</div>`;
+  return sideHead(label, esc(title)) + `<div class="side-body">${body}</div>`;
 }

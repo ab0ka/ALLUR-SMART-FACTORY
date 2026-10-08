@@ -1,15 +1,28 @@
 // ---------- Routing and render ----------
 function setView(hash) {
-  const [name, arg, type, id] = hash.split('/');
+  const [name, arg, type, id, contextId] = hash.split('/');
   if (VIEWS.includes(name)) view = name;
   else {
     view = 'space'; space = SPACES[arg] ? arg : 'assembly';
-    // Deep links: #space/<space>/<vehicle|post|problem|compare|chat>/<id> open the same card as a click.
-    if (['vehicle', 'post', 'problem', 'compare', 'chat'].includes(type)) {
-      const objId = id ? decodeURIComponent(id) : undefined;
+    // Chat links include /chat/<context type>/<id>; entity links open the exact referenced record.
+    if (['vehicle', 'post', 'problem', 'compare', 'chat', 'experiment', 'decision', 'job', 'event'].includes(type)) {
+      let objId;
+      try { objId = id ? decodeURIComponent(id) : undefined; } catch { objId = undefined; }
       ui.panel = { type, id: objId };
-      if (type === 'vehicle' || type === 'post') ui.selected = { type, id: objId };
-      if (type !== 'chat' && objId) chatContext = { type: type === 'compare' ? 'problem' : type, id: objId };
+      ui.selected = ['vehicle', 'post'].includes(type) && objId ? { type, id: objId } : null;
+      if (type === 'chat') {
+        let decoded;
+        try { decoded = contextId ? decodeURIComponent(contextId) : undefined; } catch { decoded = undefined; }
+        const collections = { vehicle: state.vehicles, post: state.posts, problem: state.problems, order: state.orders };
+        chatContext = decoded && Object.hasOwn(collections, id) && collections[id].some(x => x.id === decoded) ? { type: id, id: decoded } : null;
+        ui.panel = { type: 'chat' };
+        ui.selected = chatContext && ['vehicle', 'post'].includes(chatContext.type) ? { ...chatContext } : null;
+      }
+      if (['experiment', 'decision', 'job', 'event'].includes(type)) {
+        const rows = { experiment: state.experiments, decision: state.decisions, job: state.jobs, event: state.events }[type];
+        chatContext = referenceContext(rows.find(x => String(type === 'event' ? x.seq : x.id) === objId));
+      }
+      if (['vehicle', 'post', 'problem', 'compare'].includes(type) && objId) chatContext = { type: type === 'compare' ? 'problem' : type, id: objId };
     }
   }
   $('view-space').hidden = view !== 'space'; $('legacy').hidden = view === 'space';
@@ -48,10 +61,7 @@ function openRef(type, id) {
   if (type === 'post') return openPost(id);
   if (type === 'order') return openOrder(id);
   if (type === 'problem') return openProblem(id);
-  if (type === 'experiment') { const e = state.experiments.find(x => x.id === id); if (e) selectedProblem = e.problemId; if (location.hash !== '#dispatcher') location.hash = 'dispatcher'; else render(); return requestAnimationFrame(() => $('comparison').scrollIntoView({ block: 'start' })); }
-  if (type === 'decision') { if (location.hash !== '#dispatcher') location.hash = 'dispatcher'; return requestAnimationFrame(() => $('decision-log').scrollIntoView({ block: 'start' })); }
-  if (type === 'job') { const j = state.jobs.find(x => x.id === id); if (j?.problemId) return openProblem(j.problemId); return openPost(j?.postId ?? selectedPost); }
-  if (type === 'event') { location.hash = 'shift'; requestAnimationFrame(() => { const el = document.getElementById(`ev-${id}`); if (el) { el.classList.add('highlight'); el.scrollIntoView({ block: 'center' }); } }); }
+  if (['experiment', 'decision', 'job', 'event'].includes(type)) return openRefSpace(type, id);
 }
 
 window.addEventListener('hashchange', () => setView(location.hash.slice(1)));
