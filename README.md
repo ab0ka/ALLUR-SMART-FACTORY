@@ -154,3 +154,7 @@ claude 'Прочитай WORKSHOP_SPEC.md, README.md и VALIDATION.md. Прод�
 ```
 
 Команда приведена по [официальной CLI-справке Claude Code](https://code.claude.com/docs/en/cli-reference); доступность именно вашей установки не подтверждена.
+
+## Командная работа
+
+Ветки, pull request, зоны ответственности, свой порт и файл смены для каждого участника — в [CONTRIBUTING.md](CONTRIBUTING.md). Тесты и сборка автоматически запускаются на GitHub для каждого pull request.

@@ -1,0 +1,31 @@
+name: CI
+
+# Runs on every pull request and on main: the same checks as locally (tests and build).
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # No npm dependencies: tests and build use only Node built-ins. AI_PROVIDER=local keeps CI offline.
+      - name: Tests
+        run: npm test
+        env:
+          AI_PROVIDER: local
+      - name: Build
+        run: npm run build

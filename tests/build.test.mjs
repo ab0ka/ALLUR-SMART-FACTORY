@@ -1,18 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, readFile, readdir, copyFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, readdir, copyFile, cp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildDist, PUBLIC_ASSETS } from '../scripts/build.mjs';
+import { buildDist, assembleApp, PUBLIC_ASSETS } from '../scripts/build.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+// Copies the real client sources (static assets plus the app.js parts) into a temporary public folder.
+async function copyPublic(publicDir) {
+  await mkdir(publicDir, { recursive: true });
+  for (const file of PUBLIC_ASSETS.filter(f => f !== 'app.js')) await copyFile(path.join(root, 'public', file), path.join(publicDir, file));
+  await cp(path.join(root, 'public', 'app'), path.join(publicDir, 'app'), { recursive: true });
+}
 
 test('build keeps only allowlisted public assets and moves unexpected dist entries to quarantine without deleting them', async () => {
   const dir = await mkdtemp(path.join(tmpdir(), 'allur-build-'));
   try {
     const publicDir = path.join(dir, 'public'), distDir = path.join(dir, 'dist'), quarantineRoot = path.join(dir, 'quarantine');
-    await mkdir(publicDir); await mkdir(path.join(distDir, 'old'), { recursive: true });
-    for (const file of PUBLIC_ASSETS) await copyFile(path.join(root, 'public', file), path.join(publicDir, file));
+    await copyPublic(publicDir); await mkdir(path.join(distDir, 'old'), { recursive: true });
     await writeFile(path.join(distDir, '.env'), 'NVIDIA_API_KEY=placeholder-not-a-secret');
     await writeFile(path.join(distDir, 'old', 'server.mjs'), 'stale');
     const result = await buildDist({ publicDir, distDir, quarantineRoot, now: new Date('2026-10-08T12:00:00Z') });
@@ -23,13 +28,27 @@ test('build keeps only allowlisted public assets and moves unexpected dist entri
     const clean = await buildDist({ publicDir, distDir, quarantineRoot }); assert.deepEqual(clean.strays, []); assert.equal(clean.quarantineDir, null);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+test('client script is assembled from the numbered parts in public/app in name order', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'allur-build-'));
+  try {
+    const publicDir = path.join(dir, 'public');
+    await copyPublic(publicDir);
+    await writeFile(path.join(publicDir, 'app', 'notes.txt'), 'not a part');
+    const { parts, code } = await assembleApp(publicDir);
+    assert.equal(parts[0], '00-core.js'); assert.deepEqual(parts, [...parts].sort()); assert.ok(!parts.includes('notes.txt'));
+    await buildDist({ publicDir, distDir: path.join(dir, 'dist'), quarantineRoot: path.join(dir, 'q') });
+    assert.equal(await readFile(path.join(dir, 'dist', 'app.js'), 'utf8'), code);
+    assert.match(code, /^\/\/ Allur client\./); assert.match(code, /await refresh\(\)/);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
 for (const prefix of ['nvapi-', 'sk-proj-']) test(`build refuses client assets that look like a ${prefix} key`, async () => {
   const dir = await mkdtemp(path.join(tmpdir(), 'allur-build-'));
   try {
     const publicDir = path.join(dir, 'public');
-    await mkdir(publicDir);
-    for (const file of PUBLIC_ASSETS) await copyFile(path.join(root, 'public', file), path.join(publicDir, file));
-    await writeFile(path.join(publicDir, 'app.js'), `const k = '${prefix}${'x'.repeat(24)}';`);
+    await copyPublic(publicDir);
+    await writeFile(path.join(publicDir, 'app', '99-leak.js'), `const k = '${prefix}${'x'.repeat(24)}';`);
     await assert.rejects(buildDist({ publicDir, distDir: path.join(dir, 'dist'), quarantineRoot: path.join(dir, 'q') }), /Possible secret/);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
