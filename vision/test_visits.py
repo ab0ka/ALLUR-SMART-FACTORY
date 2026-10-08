@@ -1,0 +1,58 @@
+"""Unit tests for the visit log (no model, no video): python -m unittest vision/test_visits.py"""
+import sys
+import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from visits import VisitLog, point_in_polygon  # noqa: E402
+
+ZONE = {"id": "zone-1", "name": "test", "polygon": [[0.2, 0.2], [0.8, 0.2], [0.8, 0.8], [0.2, 0.8]], "thresholdSec": 5, "thresholdSource": "test"}
+
+
+def feed(log, tid, pattern, dt=0.2, t0=0.0):
+    t = t0
+    for inside in pattern:
+        log.observe(tid, t, inside); t += dt
+    return t
+
+
+class Visits(unittest.TestCase):
+    def test_polygon(self):
+        self.assertTrue(point_in_polygon(0.5, 0.5, ZONE["polygon"]))
+        self.assertFalse(point_in_polygon(0.9, 0.5, ZONE["polygon"]))
+
+    def test_completed_visit_ignores_border_jitter(self):
+        log = VisitLog(ZONE, enter_sec=0.4, exit_sec=0.8)
+        # outside, then inside 6 s with two short dips (jitter), then outside for good
+        t = feed(log, "car-1", [False] * 3 + [True] * 10 + [False] + [True] * 10 + [False, False] + [True] * 10 + [False] * 8)
+        v = log.finish(t)
+        self.assertEqual(len(v), 1, "jitter must not split the visit")
+        self.assertEqual(v[0]["status"], "completed")
+        self.assertAlmostEqual(v[0]["startSec"], 0.6, places=2)
+        self.assertGreater(v[0]["observedSec"], 6)
+        self.assertTrue(v[0]["overThreshold"])
+
+    def test_short_touch_is_not_a_visit(self):
+        log = VisitLog(ZONE, enter_sec=0.4)
+        t = feed(log, "car-2", [False, True, False, True, False] * 3)
+        self.assertEqual(log.finish(t), [])
+
+    def test_lost_track_is_not_an_exit(self):
+        log = VisitLog(ZONE)
+        feed(log, "car-3", [True] * 10)
+        log.track_lost("car-3")
+        v = log.finish(10)
+        self.assertEqual(v[0]["status"], "lost")
+        self.assertIsNone(v[0]["endSec"])
+
+    def test_open_at_end(self):
+        log = VisitLog(ZONE)
+        t = feed(log, "car-4", [True] * 10)
+        v = log.finish(t)
+        self.assertEqual(v[0]["status"], "open_at_end")
+        self.assertIsNone(v[0]["endSec"])
+        self.assertAlmostEqual(v[0]["observedSec"], t, places=1)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -122,7 +122,7 @@ $('scene-wrap').addEventListener('pointermove', e => {
   const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
   if (!drag.moved && Math.hypot(dx, dy) < 6) return;
   if (!drag.moved) { drag.moved = true; $('scene-wrap').setPointerCapture(drag.id); $('scene-wrap').classList.add('dragging'); }
-  const k = 1000 / Math.max(1, $('scene').clientWidth);
+  const k = (scene.viewW ?? 1000) / Math.max(1, $('scene').clientWidth);
   scene.pan(dx * k, dy * k); drag.x = e.clientX; drag.y = e.clientY;
 });
 const endDrag = () => { if (drag?.moved) suppressClick = true; drag = null; $('scene-wrap').classList.remove('dragging'); };

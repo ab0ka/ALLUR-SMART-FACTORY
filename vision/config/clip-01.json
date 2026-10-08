@@ -1,0 +1,25 @@
+{
+  "videoPath": "F:/allur-vision/video/pexels-5675618-cars-traffic-light.mp4",
+  "modelPath": "F:/allur-vision/models/yolox_s.onnx",
+  "modelName": "YOLOX-S (Megvii, Apache-2.0), ONNX opset 11, COCO; onnxruntime 1.30 CPU",
+  "source": {
+    "id": "clip-01",
+    "title": "Машины ждут сигнала светофора: съёмка из машины, стоящей на перекрёстке (камера почти неподвижна). Иллюстрация метода — не производство и не Allur",
+    "url": "https://www.pexels.com/video/cars-waiting-in-a-traffic-light-5675618/",
+    "license": "Pexels License (https://www.pexels.com/license/): бесплатно, атрибуция не обязательна",
+    "synthetic": false
+  },
+  "sampleFps": 5,
+  "highThr": 0.5,
+  "lowThr": 0.1,
+  "maxLostSec": 1.5,
+  "enterSec": 0.4,
+  "exitSec": 0.8,
+  "zone": {
+    "id": "zone-1",
+    "name": "Зона ожидания перед перекрёстком",
+    "polygon": [[0.0, 0.66], [0.97, 0.66], [1.0, 1.0], [0.0, 1.0]],
+    "thresholdSec": 10,
+    "thresholdSource": "demo_assumption"
+  }
+}
