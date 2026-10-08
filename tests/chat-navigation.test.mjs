@@ -15,15 +15,15 @@ const asking = chatSource.slice(chatSource.indexOf('const SIDE_CHAT'), chatSourc
 
 function client() {
   const state = { vehicles: [{ id: 'DEMO-008' }, { id: 'DEMO-007' }], posts: [{ id: 'A2', code: 'СБ-2' }, { id: 'Q2', code: 'КК-2' }], problems: [{ id: 'PR-1', postId: 'A2' }], orders: [{ id: 'ORD-101' }], experiments: [{ id: 'EXP-1', problemId: 'PR-1' }], decisions: [{ id: 'DEC-1', problemId: 'PR-1' }], jobs: [{ id: 'JOB-1', problemId: 'PR-1', postId: 'A2' }, { id: 'JOB-2', postId: 'Q2' }], events: [{ seq: 7, vehicleId: 'DEMO-008' }], tasks: [], chat: [] };
-  const elements = new Map();
+  const elements = new Map(), listeners = new Map();
   const el = id => { if (!elements.has(id)) elements.set(id, { value: '', scrollTop: 0, querySelector: () => null, focus() {}, scrollIntoView() {} }); return elements.get(id); };
   const entries = [{ hash: 'space/assembly', state: null }]; let at = 0;
   const c = vm.createContext({ state, ui: {}, chatContext: null, chatBusy: false, view: 'space', space: 'assembly', selectedVehicle: null, currentTask: null, vehicleFilter: 'all', SPACES: { assembly: { short: 'Сборка' } }, VIEWS: ['vehicles', 'orders', 'dispatcher'], scrollY: 0, CSS: { escape: x => x },
     location: { get hash() { return '#' + entries[at].hash; } },
     history: { get state() { return entries[at].state; }, replaceState(state, _, hash) { entries[at] = { state, hash: hash ? hash.slice(1) : entries[at].hash }; }, pushState(state, _, hash) { entries.splice(at + 1); entries.push({ state, hash: hash.slice(1) }); at++; }, back() { if (at) { at--; c.setView(entries[at].hash); } }, forward() { if (at + 1 < entries.length) { at++; c.setView(entries[at].hash); } } },
-    document: { addEventListener() {}, activeElement: null, body: {}, querySelectorAll: () => [], querySelector: () => null, getElementById: el }, $: el, text: (id, value) => { el(id).textContent = value; }, requestAnimationFrame: f => f(), scrollTo() {}, render() {}, renderNavigation() {}, renderRibbon() {}, updateSideChat() {}, renderVehicles() {}, destroyScene() {}, narrow: () => false, matchMedia: () => ({ matches: false }), filterOf: { all: () => true }, error() {}, post: id => state.posts.find(x => x.id === id), vehicle: id => state.vehicles.find(x => x.id === id), problem: id => state.problems.find(x => x.id === id), car3dClick: () => false });
+    document: { addEventListener(type, fn) { if (!listeners.has(type)) listeners.set(type, []); listeners.get(type).push(fn); }, activeElement: null, body: {}, querySelectorAll: () => [], querySelector: () => null, getElementById: el }, $: el, text: (id, value) => { el(id).textContent = value; }, requestAnimationFrame: f => f(), scrollTo() {}, render() {}, renderNavigation() {}, renderRibbon() {}, updateSideChat() {}, renderVehicles() {}, destroyScene() {}, narrow: () => false, matchMedia: () => ({ matches: false }), filterOf: { all: () => true }, error() {}, post: id => state.posts.find(x => x.id === id), vehicle: id => state.vehicles.find(x => x.id === id), problem: id => state.problems.find(x => x.id === id), car3dClick: () => false });
   vm.runInContext(navigation + contexts + contextState + cards + routing + asking, c);
-  return { c, entries, elements };
+  return { c, entries, elements, listeners };
 }
 
 test('T1 direct links resolve ID, post code, colon and slash formats from the snapshot', () => {
@@ -102,3 +102,57 @@ test('return focus selects the visible initiating link, including a new handover
   assert.equal(c.location.hash, '#handover'); assert.equal(focused, true);
 });
 
+
+
+test('handover links preserve href semantics and store the actual initiating link in history', () => {
+  const { c, entries } = client(); c.VIEWS.push('handover', 'workshop');
+  const root = { id: 'view-handover' };
+  const link = { dataset: { focusKey: 'problem:PR-1:post' }, target: '', hasAttribute: () => false, getAttribute: () => '#workshop/post/A2', closest: selector => selector === '.view[id]' ? root : link };
+  const event = overrides => ({ button: 0, target: link, preventDefault() { this.defaultPrevented = true; }, ...overrides });
+  c.navPush('handover');
+  for (const overrides of [{ctrlKey:true}, {metaKey:true}, {shiftKey:true}, {altKey:true}, {button:1}, {defaultPrevented:true}]) {
+    c.referenceLinkClick(event(overrides)); assert.equal(c.location.hash, '#handover');
+  }
+  for (const attr of ['download', 'target']) {
+    link.hasAttribute = name => attr === 'download' && name === attr; link.target = attr === 'target' ? '_blank' : '';
+    c.referenceLinkClick(event()); assert.equal(c.location.hash, '#handover');
+  }
+  link.hasAttribute = () => false; link.target = '';
+  for (const route of ['workshop/post/A2', 'dispatcher/problem/PR-1', 'vehicles/vehicle/DEMO-008', 'orders/order/ORD-101']) {
+    link.getAttribute = () => '#' + route; c.referenceLinkClick(event());
+    assert.equal(c.location.hash, '#' + route); assert.equal(c.history.state.ret.from, 'handover');
+    assert.equal(c.history.state.ret.label, 'К передаче смены');
+    assert.equal(entries.at(-2).state.focus, '#view-handover [data-focus-key="problem:PR-1:post"]');
+    assert.equal(c.backFromReference(), true); assert.equal(c.location.hash, '#handover');
+  }
+});
+
+test('async return restores the stable link inside details, but does not steal new focus or cross routes', () => {
+  const { c, listeners } = client(); c.VIEWS.push('handover'); c.navPush('handover');
+  const selector = '#view-handover [data-focus-key="task:7:vehicle"]';
+  c.history.replaceState({ focus: selector, scroll: { win: 70, list: 0 } }, '');
+  const details = { open: false, parentElement: { closest: () => null } }; let focused = 0;
+  const hidden = { disabled: false, closest: () => ({}), getClientRects: () => [] };
+  const link = { disabled: false, closest: value => value === 'details' ? details : null, getClientRects: () => details.open ? [{}] : [], focus() { focused++; } };
+  const root = { id: 'view-handover', closest: () => null, querySelectorAll: () => [hidden, link] };
+  c.getComputedStyle = () => ({ visibility: 'visible' });
+  const token = c.captureNavigationReturnFocus(root);
+  c.restoreNavigationFocus(); assert.equal(focused, 0, 'global restoration waits while async target is absent');
+  assert.equal(c.restoreNavigationReturnFocus(token), true); assert.equal(focused, 1); assert.equal(details.open, true);
+  assert.equal(c.restoreNavigationReturnFocus(token), false, 'a return token is consumed once');
+  const moved = c.captureNavigationReturnFocus(root); for (const fn of listeners.get('focusin')) fn();
+  assert.equal(c.restoreNavigationReturnFocus(moved), false); assert.equal(focused, 1);
+  const left = c.captureNavigationReturnFocus(root); c.navPush('orders');
+  assert.equal(c.restoreNavigationReturnFocus(left), false); assert.equal(focused, 1);
+});
+
+
+test('queued focus restoration cannot steal a new focus or use another route', () => {
+  const { c, listeners } = client(); let queued, focused = 0;
+  c.requestAnimationFrame = fn => { queued = fn; };
+  c.history.replaceState({ focus: '#opener' }, '');
+  c.document.querySelectorAll = selector => selector === '#opener' ? [{ getClientRects: () => [{}], closest: () => null, focus() { focused++; } }] : [];
+  c.getComputedStyle = () => ({ visibility: 'visible' });
+  c.restoreNavigationFocus(); for (const fn of listeners.get('focusin')) fn(); queued(); assert.equal(focused, 0);
+  c.restoreNavigationFocus(); const beforeRoute = queued; c.navPush('orders'); beforeRoute(); assert.equal(focused, 0);
+});
