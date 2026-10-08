@@ -1,0 +1,90 @@
+{
+  "status": "passed",
+  "results": [
+    {
+      "operation": "pump_check",
+      "width": 390,
+      "height": 844,
+      "cancel": true,
+      "escapeLeavesSheet": true,
+      "injected409Recovery": true,
+      "networkRecovery": true,
+      "delayedRealPost": true,
+      "requestId": true,
+      "onePostAndEffect": true,
+      "collapsedDuringPost": true,
+      "replacedButtonsRemainBusy": true,
+      "sheetExpansionAndScrollPreserved": true,
+      "noHorizontalOverflow": true,
+      "unavailable": [
+        {
+          "label": "Замер тока и температуры насоса · 10 мин…",
+          "reason": "Замер тока и температуры насоса на СБ-2 уже запланирована"
+        },
+        {
+          "label": "Перевести DEMO-008 на СБ-1…",
+          "reason": "СБ-1 занят: DEMO-007 (46%)"
+        },
+        {
+          "label": "Перевести DEMO-008 на СБ-3…",
+          "reason": "СБ-3 занят: DEMO-005 (96%)"
+        }
+      ],
+      "pageErrors": []
+    },
+    {
+      "operation": "hold",
+      "width": 390,
+      "height": 844,
+      "cancel": true,
+      "escapeLeavesSheet": true,
+      "injected409Recovery": true,
+      "networkRecovery": true,
+      "delayedRealPost": true,
+      "requestId": true,
+      "onePostAndEffect": true,
+      "collapsedDuringPost": true,
+      "replacedButtonsRemainBusy": true,
+      "sheetExpansionAndScrollPreserved": true,
+      "noHorizontalOverflow": true,
+      "unavailable": [
+        {
+          "label": "Перевести DEMO-008 на СБ-1…",
+          "reason": "СБ-1 занят: DEMO-007 (46%)"
+        },
+        {
+          "label": "Перевести DEMO-008 на СБ-3…",
+          "reason": "СБ-3 занят: DEMO-005 (96%)"
+        }
+      ],
+      "pageErrors": []
+    },
+    {
+      "operation": "resume",
+      "width": 390,
+      "height": 844,
+      "cancel": true,
+      "escapeLeavesSheet": true,
+      "injected409Recovery": true,
+      "networkRecovery": true,
+      "delayedRealPost": true,
+      "requestId": true,
+      "onePostAndEffect": true,
+      "collapsedDuringPost": true,
+      "replacedButtonsRemainBusy": true,
+      "sheetExpansionAndScrollPreserved": true,
+      "noHorizontalOverflow": true,
+      "unavailable": [
+        {
+          "label": "Перевести DEMO-008 на СБ-1…",
+          "reason": "СБ-1 занят: DEMO-007 (46%)"
+        },
+        {
+          "label": "Перевести DEMO-008 на СБ-3…",
+          "reason": "СБ-3 занят: DEMO-005 (96%)"
+        }
+      ],
+      "pageErrors": []
+    }
+  ]
+}

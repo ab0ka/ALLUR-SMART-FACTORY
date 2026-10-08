@@ -63,6 +63,7 @@ try {
       await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); });
       await page.goto(`http://127.0.0.1:${port}/#${view}`);
       if (view === 'workshop') await page.locator(`#workshop-map [data-post="${selectPost}"]`).click();
+      if (name === 'fault' || name === 'slowdown') await page.locator('#side details.demo > summary').click();
       if (name === 'plan') { await page.locator('#shift-details > summary').click(); await page.locator('#plan-target').fill('17'); }
       if (name === 'decision') await page.locator('[data-choice][value=diagnose_repair]').check();
       await page.evaluate(() => {
@@ -70,7 +71,7 @@ try {
         const el = document.getElementById('error');
         new MutationObserver(() => { if (!el.hidden && el.textContent) window.t5ObservedErrors.push(el.textContent); }).observe(el, { childList: true, subtree: true, attributes: true });
       });
-      const button = page.locator(selector).first();
+      const button = page.locator(view === 'workshop' ? '#side ' + selector : selector).first();
       await button.waitFor();
       const original = JSON.stringify(w.serialize());
       const requests = [];
