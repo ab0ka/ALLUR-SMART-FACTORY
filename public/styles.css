@@ -571,6 +571,13 @@ button.secondary{background:#F4F8FD;border-color:#B9CDE6;color:var(--link);font-
   .menu-list{max-height:60vh;max-height:60dvh;overflow-y:auto;overscroll-behavior:contain}
   .space-view{height:calc(100vh - 112px)}
   .side{position:absolute;left:0;right:0;bottom:0;margin:0;max-height:62%;border-radius:20px 20px 0 0;flex:none}
+  /* A tall header or chat composer must not trap actions outside the sheet. */
+  .side{display:block;overflow:auto;overscroll-behavior:contain;overflow-wrap:anywhere}
+  .side-body{overflow:visible}
+  .side .tagchip{max-width:100%;flex-wrap:wrap}
+  .side .st,.side .mini-table th,.side .mini-table td{white-space:normal}
+  .side-top>.eyebrow{min-width:0}
+  .side-tools{flex:none}
   .hud{max-width:240px}.hud-card .space-sub{display:none}.hint{display:none}
 }
 @media(max-width:760px){
