@@ -10,7 +10,9 @@ function eventMatches(e, sel) {
 function renderRibbon() {
   const box = $('ribbon'), sel = ui.selected, only = ui.ribbonOnlySelected && sel;
   const events = state.events.filter(e => !only || eventMatches(e, sel)).slice(-16).reverse();
-  const card = e => { const k = EVENT_KIND[e.type] ?? 'idle'; const where = e.postId ? post(e.postId)?.code ?? '' : e.problemId ?? ''; return `<li><button class="ev ${k}${e.type === 'problem_detected' ? ' strong' : ''}" data-event="${e.seq}"><span class="ev-meta"><span class="mono">${clock(e.minute)}</span>${where ? `<span class="ev-where">${esc(where)}</span>` : ''}${e.actor === 'operator' ? '<span class="ev-op">оператор</span>' : ''}</span><span class="ev-text">${ico(k, '')}<span>${esc(e.text)}</span></span></button></li>`; };
+  const highlighted = ui.routeRef?.type === 'event' ? state.events.find(e => String(e.seq) === ui.routeRef.id) : null;
+  if (highlighted && !events.includes(highlighted)) events.push(highlighted);
+  const card = e => { const k = EVENT_KIND[e.type] ?? 'idle'; const where = e.postId ? post(e.postId)?.code ?? '' : e.problemId ?? ''; return `<li><button id="ribbon-event-${e.seq}" class="ev ${k}${highlighted === e ? ' ref-highlight' : ''}${e.type === 'problem_detected' ? ' strong' : ''}" data-event="${e.seq}"${highlighted === e ? ' aria-current="true"' : ''}><span class="ev-meta">${highlighted === e ? '<span>Выбранное событие</span>' : ''}<span class="mono">${clock(e.minute)}</span>${where ? `<span class="ev-where">${esc(where)}</span>` : ''}${e.actor === 'operator' ? '<span class="ev-op">оператор</span>' : ''}</span><span class="ev-text">${ico(k, '')}<span>${esc(e.text)}</span></span></button></li>`; };
   if (!ui.ribbonOpen) {
     const e = events[0];
     box.className = 'ribbon collapsed';
@@ -26,19 +28,21 @@ function renderRibbon() {
 // ---------- Side panel ----------
 function renderSide() {
   const side = $('side'), p = ui.panel;
-  if (!p) { side.hidden = true; side.innerHTML = ''; lastPanelKey = null; return; }
+  if (!p) { side.hidden = true; side.innerHTML = ''; lastPanelKey = null; resetSheet(); return; }
   side.hidden = false;
   const key = `${p.type}:${p.id ?? ''}`;
-  if (p.type === 'chat') { if (lastPanelKey !== key) side.innerHTML = chatPanelShell(); lastPanelKey = key; updateSideChat(); return; }
+  if (p.type === 'chat') { if (lastPanelKey !== key) side.innerHTML = chatPanelShell(); lastPanelKey = key; updateSideChat(); finishSheet(key); return; }
   const body = side.querySelector('.side-body'), scroll = body && lastPanelKey === key ? body.scrollTop : 0;
+  const sheetScroll = lastPanelKey === key ? side.querySelector('.sheet-content')?.scrollTop ?? 0 : 0;
   let html = '';
   if (p.type === 'vehicle') html = vehicle(p.id) ? vehiclePanel(vehicle(p.id)) : '';
   else if (p.type === 'post') html = post(p.id) ? panelPost(post(p.id)) : '';
   else if (p.type === 'problem') html = problem(p.id) ? panelProblem(problem(p.id)) : '';
   else if (p.type === 'compare') html = problem(p.id) ? panelCompare(problem(p.id)) : '';
-  if (!html) { ui.panel = null; side.hidden = true; lastPanelKey = null; return; }
+  if (!html) { ui.panel = null; side.hidden = true; lastPanelKey = null; resetSheet(); return; }
   side.innerHTML = html; lastPanelKey = key;
   if (scroll) side.querySelector('.side-body').scrollTop = scroll;
+  finishSheet(key, sheetScroll);
 }
 const sideHead = (eyebrow, title, chips = '', extra = '') => `<div class="side-head"><div class="side-top"><span class="eyebrow">${eyebrow}</span><span class="side-tools">${extra}<button class="icon-btn small" data-close-panel="1" aria-label="Закрыть карточку">✕</button></span></div><h2>${title}</h2>${chips ? `<div class="chipline">${chips}</div>` : ''}</div>`;
 const tag = (t, cls = '') => `<span class="tagchip ${cls}">${t}</span>`;
@@ -51,6 +55,25 @@ function postTasks(p) {
   const rel = p.stage === 'rework' ? '<p class="fine-print">Пост ремонта автомобилей. Обслуживание подъёмников сборки — отдельный раздел «Обслуживание оборудования».</p>' : p.equipmentId ? '<p class="fine-print">Неисправность подъёмника — задача обслуживания оборудования, а не дефект автомобиля на посту.</p>' : '';
   return (list.length ? `<h3>Задачи поста · ${list.length}</h3><ul class="plain">${list.map(t => `<li>${ico(TASK_ICON[t.category] ?? 'warn', '')} <button class="link" data-task="${esc(t.id)}">${esc(t.title)}</button> <span class="fine-print">${esc(t.certaintyText)}</span></li>`).join('')}</ul>` : '') + rel;
 }
+// Stable action attributes are shared with the production confirmation/busy handlers.
+function postActionButtons(p, context, kind = null) {
+  return (p.actions ?? []).filter(a => !kind || a.kind === kind).map((a, i) => {
+    const payload = a.payload, reasonId = `${context}-action-${p.id}-${i}`;
+    const attrs = a.kind === 'job' ? `data-job="${esc(payload.kind)}" data-post-id="${esc(payload.postId)}"`
+      : a.kind === 'transfer' ? `data-transfer="${esc(payload.vehicleId)}" data-to="${esc(payload.postId)}"`
+      : `data-hold="${esc(payload.postId)}" data-on="${payload.on ? '1' : '0'}"`;
+    return `<div class="post-action"><button class="wide" ${a.ok ? attrs : `disabled aria-describedby="${esc(reasonId)}"`}>${esc(a.label)}</button>${a.ok ? '' : `<p id="${esc(reasonId)}" class="why">Недоступно: ${esc(a.reason)}</p>`}</div>`;
+  }).join('');
+}
+function postResources(p) {
+  const technicians = state.technicians.map(t => {
+    const job = state.jobs.find(j => j.id === t.jobId);
+    return `<li>${esc(t.name)} — ${job ? `занят: ${esc(job.id)} · ${esc(job.title)} на ${esc(post(job.postId)?.code ?? job.postId)}, осталось ${fmt(job.remaining)} мин` : 'свободен'}</li>`;
+  }).join('');
+  const queue = state.jobs.filter(j => j.postId === p.id && j.status === 'queued');
+  return `<h3>Техник</h3><ul class="plain">${technicians}</ul><h3>Очередь работ на ${esc(p.code)}</h3>${queue.length ? `<ol class="queue">${queue.map(j => `<li>${esc(j.id)} · ${esc(j.title)} · ${fmt(j.remaining)} мин</li>`).join('')}</ol>` : '<p class="muted">Очередь работ пуста.</p>'}${p.equipmentId ? `<h3>Склад</h3><ul class="plain">${state.stock.filter(s => ['seal_kit', 'pump'].includes(s.id)).map(s => `<li>${esc(s.name)}: доступно ${s.available}, резерв ${s.reserved}, на складе ${s.onHand}</li>`).join('')}</ul>` : ''}`;
+}
+
 function panelPost(p) {
   const kind = POST_KIND(p), v = p.vehicleId ? vehicle(p.vehicleId) : null, job = runningJob(p.id);
   const stage = p.stage === 'rework' ? { name: 'Доработка', buffer: state.rework.buffer } : state.stages.find(s => s.id === p.stage);
@@ -60,13 +83,11 @@ function panelPost(p) {
   if (p.problemId) body += `<p><button class="primary wide" data-problem="${esc(p.problemId)}">Открыть ${esc(p.problemId)}: диагностика и решения</button></p>`;
   const q = stage.buffer.vehicleIds;
   body += `<h3>Очередь · ${esc(stage.buffer.name)} ${q.length}${stage.buffer.capacity !== null ? ` из ${stage.buffer.capacity}` : ''}</h3>${q.length ? `<ol class="queue">${q.slice(0, 6).map(id => `<li><button class="link mono" data-vehicle="${esc(id)}">${esc(id)}</button> <span>${esc(vehicle(id).modelName)} · ${esc(vehicle(id).orderId)}</span></li>`).join('')}</ol>` : '<p class="muted">Очередь пуста.</p>'}`;
-  const actions = [];
+  const actions = [postActionButtons(p, 'post')];
   if (!state.finished) {
-    if (incident?.kind === 'breakdown') actions.push(`<button class="primary wide" data-job="repair_generic" data-post-id="${esc(p.id)}">Аварийный ремонт · 30 мин…</button>`);
-    else if (incident?.kind === 'slowdown') actions.push(`<button class="primary wide" data-job="adjust" data-post-id="${esc(p.id)}">Наладка · 10 мин…</button>`);
-    if (state.posts.some(x => x.stage === p.stage && x.id !== p.id)) actions.push(`<button class="wide" data-hold="${esc(p.id)}" data-on="${p.hold ? '0' : '1'}">${p.hold ? 'Вернуть пост в загрузку…' : 'Не загружать пост новыми автомобилями…'}</button>`);
     if (!incident && !p.problemId) actions.push(`<details class="demo"><summary>Учебный сценарий неисправности</summary><button class="wide" data-fault="${esc(p.id)}" data-kind="breakdown">Создать неисправность…</button><button class="wide" data-fault="${esc(p.id)}" data-kind="slowdown">Создать снижение темпа…</button></details>`);
   }
+  body += postResources(p);
   const m = p.metrics;
   body += `<h3>Действия</h3><div class="actions-col">${actions.join('') || '<p class="muted">Действий нет.</p>'}</div>${lockNote}<p class="fine-print">A ${pct(m.availability)} · P ${pct(m.performance)} · Q ${pct(m.quality)} · OEE ${pct(m.oee)} · работа ${p.stats.run} мин · простой без входа ${p.stats.starved} мин</p>`;
   return sideHead(`ПОСТ · ${esc(p.stageName.toUpperCase())}`, esc(p.code), p.equipmentId ? tag(esc(state.equipment.find(e => e.id === p.equipmentId)?.name ?? '')) : '', chatBtn('post', p.id)) + `<div class="side-body">${history.state?.ret ? backLink() : ''}${postTasks(p)}${body}</div>`;
@@ -109,13 +130,13 @@ function panelCompare(pr) {
   const exp = [...state.experiments].reverse().find(e => e.problemId === pr.id);
   const head = sideHead(`РЕШЕНИЯ · ${esc(pr.id)} · ${esc(pr.postCode)}`, 'Сравнение решений', '', `<button class="link small-link" data-problem="${esc(pr.id)}">← к диагностике</button>`);
   if (!exp) return head + `<div class="side-body"><p class="muted">Сравнение ещё не рассчитано. Модель будет поставлена на паузу, каждый вариант прогоняется на отдельной копии текущего снимка до 16:00.</p></div><div class="side-foot"><button class="primary" data-compare="${esc(pr.id)}">Рассчитать варианты</button></div>`;
-  const stale = exp.baseRevision !== state.revision, decided = state.decisions.some(d => d.experimentId === exp.id);
+  const stale = rejectedComparisons.has(exp.id) || exp.baseRevision !== state.revision, decided = state.decisions.some(d => d.experimentId === exp.id);
   const choice = ui.choice[exp.id] ?? exp.options.filter(o => o.available).sort((a, b) => (b.expected?.accepted ?? 0) - (a.expected?.accepted ?? 0))[0]?.id;
   ui.choice[exp.id] = choice;
   const check = pr.checks?.at(-1);
   let body = check ? `<section class="result"><div class="eyebrow">${esc(check.jobId)} · ${esc(check.title.toUpperCase())} · ${clock(check.minute)}</div><div class="result-value mono">${fmt(check.value)} ${esc(check.unit)}</div><p><b>${esc(check.text)}</b></p></section>` : '';
   body += `<p class="fine-print">${esc(exp.id)} · снимок ${clock(exp.minute)}. Ожидаемые значения — расчёт на копиях модели до 16:00, а не факт. План — ${state.plan.target} принятых.</p>`;
-  if (stale && !decided) body += `<p class="stale">Смена изменилась после расчёта — пересчитайте варианты перед применением.</p>`;
+  if (stale && !decided) body += `<p class="stale">Снимок устарел — пересчитайте варианты перед применением.</p>`;
   if (decided) body += `<p class="ok-text">По этому сравнению решение уже принято — ход работ в карточке проблемы.</p>`;
   body += `<fieldset class="options-list"><legend class="sr-only">Варианты решения</legend>${exp.options.map(o => {
     if (!o.available) return `<div class="opt off"><b>${esc(o.title)} — недоступно</b><p>${esc(o.reason)}</p></div>`;
@@ -128,9 +149,12 @@ function panelCompare(pr) {
 }
 
 // One chat: the visible context can be reset; a change of object is announced, the unsent draft is kept.
-let chatDraft = '', chatPrevContext = null;
+let chatDraft = '', chatPrevContext = null, chatDraftVersion = 0;
 const sameCtx = (a, b) => (a?.type ?? null) === (b?.type ?? null) && (a?.id ?? null) === (b?.id ?? null);
 function setChatContext(ctx) {
+  const resolved = ctx ? validChatContext(ctx.type, ctx.id) : null;
+  ui.chatMissing = Boolean(ctx && !resolved);
+  ctx = resolved;
   if (sameCtx(ctx, chatContext)) return;
   if (chatContext && (chatDraft.trim() || state?.chat.length)) chatPrevContext = chatContext;
   chatContext = ctx;
@@ -143,9 +167,11 @@ function chatPanelShell() {
 }
 function updateSideChat() {
   const ai = state.ai, input = $('side-chat-input');
+  $('side-chat-send').disabled = chatBusy;
+  text('side-chat-send', chatBusy ? 'Думаю…' : 'Спросить');
   if (input && input.value !== chatDraft && document.activeElement !== input) { input.value = chatDraft; text('side-chat-count', `${chatDraft.length}/500`); }
   $('side-chat-mode').textContent = ai.configured ? 'Модель формулирует ответ только из фактов движка; числа проверяет сервер. Чат ничего не меняет сам.' : 'Модель не подключена: работают локальные ответы на типовые вопросы. Чат ничего не меняет сам.';
-  $('side-chat-context').innerHTML = chatContext ? `${tag(`Контекст: ${esc(contextLabel(chatContext))}`, 'blue')}<button class="link small-link" data-chat-clear="1">сбросить</button>` : tag('без контекста — вопросы о смене в целом');
+  $('side-chat-context').innerHTML = chatContext ? `${tag(`Контекст: ${esc(contextLabel(chatContext))}`, 'blue')}<button class="link small-link" data-chat-clear="1">сбросить</button>` : tag(ui.chatMissing ? 'Объект не найден · без контекста' : 'без контекста — вопросы о смене в целом');
   $('side-chat-switch').innerHTML = chatPrevContext && !sameCtx(chatPrevContext, chatContext) ? `<p class="chat-switch">${ico('warn', '')} Контекст сменился: было «${esc(contextLabel(chatPrevContext))}», теперь «${esc(contextLabel(chatContext))}». Новые вопросы — о новом объекте.<button class="link small-link" data-chat-restore="1">Вернуть прежний</button><button class="link small-link" data-chat-ok="1">Понятно</button></p>` : '';
   $('side-chat-suggest').innerHTML = (chatContext?.type === 'vehicle' ? ['Что делать с этой машиной?', 'Почему задерживается этот автомобиль?'] : chatContext?.type === 'problem' ? ['На чём основана гипотеза неисправности?', 'Какую проверку выполнить?', 'Сравни ремонт сейчас и продолжение работы'] : ['Что сейчас угрожает плану?', 'Что делать дальше?', 'Почему результат отличается от прогноза?']).map(q => `<button data-ask="${esc(q)}">${esc(q)}</button>`).join('');
   const log = $('side-chat-log'), host = log.parentElement, atBottom = host.scrollHeight - host.scrollTop - host.clientHeight < 40;

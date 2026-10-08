@@ -603,6 +603,24 @@ button.secondary{background:#F4F8FD;border-color:#B9CDE6;color:var(--link);font-
 }
 @media(prefers-reduced-motion:reduce){.sc-pulse{animation:none;opacity:0}.space-stage.enter{animation:none}}
 
+/* Read-only handover lists (T10). */
+.handover-items-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;min-width:0}
+.handover-items-section{min-width:0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow-wrap:anywhere}
+.handover-items-section h3{margin:0 0 12px;font-size:17px}
+.handover-items-count,.handover-items-note,.handover-items-empty{color:var(--muted);font-weight:400}
+.handover-items-list{list-style:none;margin:0;padding:0}
+.handover-items-item{padding:12px 0;border-top:1px solid var(--line);min-width:0}
+.handover-items-title{font-weight:650}
+.handover-items-fields{margin:8px 0 0;display:grid;gap:4px}
+.handover-items-field{display:grid;grid-template-columns:minmax(90px,1fr) minmax(0,2fr);gap:10px}
+.handover-items-field dt{color:var(--muted)}
+.handover-items-field dd{margin:0;min-width:0}
+.handover-items-refs{margin:8px 0 0}
+.handover-items-link{color:var(--link);text-decoration:underline;text-underline-offset:3px}
+.handover-items-more summary{padding:12px 4px;cursor:pointer;color:var(--link);font-weight:600}
+.handover-items-link:focus-visible,.handover-items-more summary:focus-visible{outline:3px solid var(--blue);outline-offset:3px;border-radius:3px}
+@media(max-width:760px){.handover-items-grid{grid-template-columns:minmax(0,1fr)}.handover-items-section{padding:12px}.handover-items-field{grid-template-columns:minmax(0,1fr);gap:0}}
+
 /* ===== Vehicle 3D card ===== */
 .car3d{position:absolute;inset:10px;z-index:8;background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:0 18px 48px rgba(20,40,60,.22);display:flex;flex-direction:column;overflow:hidden}
 .c3-head{display:flex;align-items:center;gap:14px;padding:10px 14px 10px 18px;border-bottom:1px solid #E4EAF0}
@@ -759,3 +777,118 @@ details.more>summary{cursor:pointer;font-weight:700;color:var(--link);min-height
 /* Live enterprise map: car markers move with a CSS transition (position set through CSSOM) */
 .em-car{cursor:pointer;transition:transform .9s ease;outline:none}.em-car.reduced{transition:none}
 .em-car:hover,.em-car:focus-visible{filter:drop-shadow(0 0 3px #1F6FD1)}.em-car.selected{filter:drop-shadow(0 0 4px #1F6FD1) drop-shadow(0 0 2px #1F6FD1)}
+
+/* Handover snapshot: scoped, read-only analytics. */
+.handover-view{max-width:1280px;margin:0 auto;color:#20313b;overflow-wrap:anywhere}
+.handover-header{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;padding:24px 0 20px}
+.handover-header h1{font-size:clamp(24px,3vw,34px);line-height:1.2;margin:8px 0 12px;letter-spacing:-.6px}
+.handover-eyebrow{font-size:12px;font-weight:750;letter-spacing:1.1px;color:#396273;margin:0}
+.handover-description,.handover-note{color:#52646f;line-height:1.6;margin:0}
+.handover-badge{flex-shrink:0;border:1px solid #b6cbd0;border-radius:20px;background:#eaf5f3;padding:9px 13px;color:#235a52;font-size:12px;font-weight:700}
+.handover-toolbar{display:flex;flex-wrap:wrap;gap:10px;padding:0 0 12px}
+.handover-refresh,.handover-download{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 17px;border:1px solid #a8bac3;border-radius:10px;background:#fff;color:#20313b;text-decoration:none;font:inherit;font-weight:650;cursor:pointer}
+.handover-refresh{background:#d9f284;border-color:#8aa737;color:#23330d}
+.handover-refresh:disabled{cursor:wait;opacity:.7}
+.handover-download:hover{background:#edf3f6}
+.handover-refresh:focus-visible,.handover-download:focus-visible{outline:3px solid #126488;outline-offset:3px}
+.handover-note{font-size:12px;max-width:780px}
+.handover-status{min-height:24px;margin:16px 0;color:#3c5361;line-height:1.5}
+.handover-meta{display:flex;flex-wrap:wrap;gap:10px 24px;border-top:1px solid #d4dfe5;padding:18px 0;color:#52646f;font-size:13px}
+.handover-meta strong{color:#20313b}
+.handover-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 24px}
+.handover-metric{min-width:0;background:#fff;border:1px solid #d4dfe5;border-radius:15px;padding:20px;box-shadow:0 3px 12px #20313b06}
+.handover-metric dt{font-size:13px;font-weight:650;color:#52646f}
+.handover-metric dd{margin:12px 0;font-size:32px;font-weight:750;line-height:1.1;font-variant-numeric:tabular-nums;color:#20313b}
+.handover-metric p{margin:0;font-size:12px;line-height:1.5;color:#52646f}
+.handover-empty{padding:20px;background:#eff5f8;border:1px solid #d4dfe5;border-radius:12px;color:#3c5361;line-height:1.6}
+.handover-view .handover-items-link{display:inline-flex;align-items:center;min-height:44px;max-width:100%}
+.handover-view .handover-items-more>summary{min-height:44px}
+@media(max-width:760px){.handover-header{flex-direction:column;gap:14px;padding-top:16px}.handover-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.handover-metric{padding:15px}.handover-metric dd{font-size:27px}.handover-toolbar>*{flex:1 1 auto}.handover-badge{max-width:100%;flex-shrink:1}}
+@media(max-width:360px){.handover-metrics{grid-template-columns:1fr}}
+/* A referenced record remains distinguishable without relying only on color. */
+.ev.ref-highlight,.decision.ref-highlight{outline:3px solid var(--blue);outline-offset:-3px}
+/* T2: shared mobile sheet and readable controls, scoped away from desktop cards. */
+.sheet-bar,.mobile-tool-label{display:none}
+.sheet-content{display:contents}
+@media(max-width:1100px){
+  .side{overflow:auto;overscroll-behavior:contain;overflow-wrap:anywhere}
+  .sheet-content{display:block;overflow:auto;min-height:0;flex:1 1 auto}
+  .side-head,.side-foot{flex:none}
+  .side-body{overflow:visible}
+  .side .tagchip{max-width:100%;flex-wrap:wrap}
+  .side .st,.side .mini-table th,.side .mini-table td{white-space:normal}
+  .side-tools{flex:none}
+  .side-top>.eyebrow{min-width:0}
+  .menu-list{max-height:calc(100dvh - 90px);overflow-y:auto;overscroll-behavior:contain}
+}
+@media(max-width:760px){
+  .topbar{grid-template-columns:40px auto minmax(0,1fr) 40px;gap:6px;padding:6px 8px;flex:none}
+  .topbar .brand,.topbar .brand-mark{width:40px;height:40px}
+  .topbar .timebox{grid-column:2;grid-row:1}
+  .topbar .synthetic{grid-column:3;grid-row:1;justify-self:stretch;margin:0;min-width:0;height:40px;font-size:12px;white-space:normal;line-height:1.2;justify-content:center;text-align:center;padding:0 4px}
+  .topbar .menu{grid-column:4;grid-row:1;position:static}
+  .topbar .menu summary{width:40px;height:40px}
+  .topbar #play{width:40px;height:40px}
+  .clockbox span{font-size:12px}
+  .topbar .menu-list{left:8px;right:8px;top:calc(100% + 4px);width:auto}
+  .topbar .menu .mobile-speed{height:40px}
+  .topbar .menu .speed button{min-width:40px;min-height:40px;font-size:12px}
+  .topbar .menu #chat-toggle,.topbar .menu .alerts{width:auto;height:auto;min-height:40px;display:flex;justify-content:flex-start;gap:8px;padding:8px 12px;font-size:12px}
+  .topbar .menu .primary-nav{display:flex;flex-direction:column;width:auto;flex:none;order:0}
+  .topbar .menu .primary-nav a{flex:none;justify-content:flex-start;min-height:40px;font-size:12px}
+  .mobile-tool-label{display:inline}
+  .workarea{--sheet-height:60vh;--sheet-height:60dvh}
+  .workarea:has(>.side.sheet-collapsed){--sheet-height:66px}
+  #legacy:not([hidden])~.side,.side{height:var(--sheet-height);max-height:var(--sheet-height);display:flex;overflow:hidden}
+  .sheet-bar{display:flex;align-items:center;justify-content:flex-end;gap:8px;position:relative;padding:16px 12px 8px;flex:none;border-bottom:1px solid var(--line);background:#fff}
+  .sheet-grip{position:absolute;top:5px;left:calc(50% - 20px);width:40px;height:4px;border-radius:2px;background:#9AAABA}
+  .sheet-bar button{min-width:40px;min-height:40px;font-size:12px}
+  .side.sheet-collapsed .sheet-content{display:none}
+  .sheet-content [data-close-panel]{display:none}
+  .side button,.side .icon-btn.small,.side .ref,.cam button,.seg button,.ribbon button,.context-link,.context-tabs a,.shop-picker select{min-width:40px;min-height:40px}
+  .side .icon-btn.small{width:40px;height:40px}
+  .side .fine-print,.side .eyebrow,.side .lock,.side .st,.side .tagchip{font-size:12px}
+  .side .side-top{flex-wrap:wrap}
+  .workarea:has(>.side:not([hidden])) .ribbon{bottom:calc(var(--sheet-height) + 8px)}
+  .workarea:has(>.side:not([hidden])) .scene-wrap,.workarea:has(>.side:not([hidden])) .enterprise-wrap{bottom:calc(var(--sheet-height) + 64px)}
+  .workarea:has(>.side:not([hidden])) .space-stage:has(.ribbon:not(.collapsed)) .scene-wrap{bottom:calc(var(--sheet-height) + 112px)}
+  .workarea:has(>.side:not([hidden]):not(.sheet-collapsed)) .hud,.workarea:has(>.side:not([hidden]):not(.sheet-collapsed)) .cam{display:none}
+  .ribbon.collapsed{gap:6px;padding:0 8px}
+  .ribbon.collapsed>b{font-size:12px}.ev-last{min-width:0}
+  .ribbon:not(.collapsed){height:96px}
+}
+/* Low landscape: keep a usable strip of the selected scene above the card. */
+@media(max-width:760px) and (max-height:500px){
+  .workarea{--sheet-height:50dvh}
+  body:has(.side:not([hidden]):not(.sheet-collapsed)) .workspace-bar{display:none}
+  .workarea:has(>.side:not([hidden]):not(.sheet-collapsed)) .ribbon{display:none}
+  .workarea:has(>.side:not([hidden]):not(.sheet-collapsed)) .scene-wrap,.workarea:has(>.side:not([hidden]):not(.sheet-collapsed)) .enterprise-wrap{bottom:calc(var(--sheet-height) + 8px)}
+}
+/* T4: additions scoped to orders-/shiftx-, preserving the PR45 shell. */
+.orders-filters{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 8px}
+.orders-filters button[aria-pressed=true]{background:#E3EEFB;border-color:#1A5FB4;color:#14222E}
+.orders-result,.orders-empty,.shiftx-note{color:#4F6072;font-size:13px;line-height:1.5}
+.orders-counts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}
+.orders-counts div{background:#F1F4F8;border-radius:8px;padding:8px 10px}
+.orders-counts dt{font-size:13px;color:#4F6072}.orders-counts dd{margin:2px 0 0;font-size:20px;font-weight:700}
+.orders-view .order,.shiftx-view .panel{min-width:0}
+.orders-view .mini,.orders-view .segmented-buttons button,.shiftx-view button.link{min-height:40px;min-width:40px}
+.orders-view .eyebrow{font-size:12px;letter-spacing:.8px}
+.orders-view .order-head{flex-wrap:wrap}.orders-view .order-due{text-align:left}
+.shiftx-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0}
+.shiftx-metric{padding:12px;background:#F1F4F8;border-radius:10px;border-top:4px solid #526474;min-width:0}
+.shiftx-metric dt{font-size:14px;font-weight:700}.shiftx-metric dd{font-size:28px;font-weight:700;margin:6px 0 0}
+.shiftx-metric dd span{font-size:13px;font-weight:400;color:#4F6072}
+.shiftx-metric small{display:block;font-size:13px;line-height:1.5;font-weight:400;color:#4F6072;margin-top:6px}
+.shiftx-target{border-top-color:#8A5A00}.shiftx-reference{border-top-style:dashed}.shiftx-forecast{border-top-color:#0B7A73;border-top-style:dotted}.shiftx-fact{border-top-color:#1A5FB4}
+.shiftx-gap{font-size:14px}
+.shiftx-oee caption{text-align:left;font-size:13px;color:#4F6072;padding:8px 0}
+.shiftx-oee thead{background:#EEF2F6}.shiftx-oee thead button{border:0;background:transparent;padding:6px;color:#14222E;min-width:40px;min-height:40px}
+.shiftx-oee tbody tr:nth-child(even){background:#F7F9FB}
+.shiftx-oee th[scope=row]{position:sticky;left:0;background:#fff;border-right:1px solid #DCE3EA}
+.shiftx-view .chart-axis,.shiftx-view .chart-label{font-size:13px;fill:#4F6072}
+.shiftx-view .k-target{color:#8A5A00}.shiftx-view .k-plan{color:#4F6072}
+.shiftx-view .table-scroll{max-width:100%}.shiftx-view .shift-grid,.shiftx-view .split{min-width:0}
+@media(max-width:1100px){.shiftx-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.shiftx-metrics{grid-template-columns:1fr}.orders-view .order-list{grid-template-columns:minmax(0,1fr)}.shiftx-view .shift-grid,.shiftx-view .split{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:760px){#analytics-navigation>a{min-width:0;white-space:normal;min-height:40px}}

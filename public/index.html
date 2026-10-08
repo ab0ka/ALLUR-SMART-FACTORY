@@ -39,7 +39,7 @@
     <span id="diag-count" class="sr-only" aria-hidden="true" hidden></span>
   </div>
   <nav id="manage-navigation" class="context-tabs" aria-label="Управление" hidden><a href="#dispatcher" data-nav="dispatcher">Задачи и решения <span id="nav-problems" class="nav-count"></span></a><a href="#orders" data-nav="orders">Задания <span id="nav-orders" class="nav-count"></span></a></nav>
-  <nav id="analytics-navigation" class="context-tabs" aria-label="Аналитика" hidden><a href="#shift" data-nav="shift">Результаты смены</a><a href="#lab" data-nav="lab">Модели и эксперименты</a></nav>
+  <nav id="analytics-navigation" class="context-tabs" aria-label="Аналитика" hidden><a href="#shift" data-nav="shift">Результаты смены</a><a href="#handover" data-nav="handover">Передача смены</a><a href="#lab" data-nav="lab">Модели и эксперименты</a></nav>
 </div>
 <div id="error" role="alert" hidden></div>
 <main>
@@ -95,7 +95,7 @@
       <div class="split"><div id="vehicle-list" class="panel list-panel"></div><article id="vehicle-passport" class="panel passport" aria-live="polite"></article></div>
     </section>
 
-    <section id="view-orders" class="view" aria-labelledby="h-orders" hidden>
+    <section id="view-orders" class="view orders-view" aria-labelledby="h-orders" hidden>
       <h1 id="h-orders" class="view-title">Производственные задания <span>партии разворачиваются в конкретные автомобили</span></h1>
       <form id="release-form" class="panel release-form">
         <h2 class="panel-title">Выпустить задание</h2>
@@ -109,10 +109,12 @@
         <button class="primary" type="submit">Выпустить в работу</button>
         <p id="release-note" class="fine-print"></p>
       </form>
+      <div id="orders-filters" class="orders-filters" role="group" aria-label="Фильтр заданий"></div>
+      <p id="orders-result" class="orders-result" role="status"></p>
       <div id="order-list" class="order-list"></div>
     </section>
 
-    <section id="view-shift" class="view" aria-labelledby="h-shift" hidden>
+    <section id="view-shift" class="view shiftx-view" aria-labelledby="h-shift" hidden>
       <h1 id="h-shift" class="view-title">Результаты смены <span>все показатели из того же состояния мастерской</span></h1>
       <section class="panel shift-first" aria-labelledby="h-shift-first"><h2 id="h-shift-first" class="sr-only">Главное о смене</h2><div id="shift-first"></div>
         <div class="ai-header"><div><strong>Объяснение</strong><span id="ai-source">Локальный режим доступен без ключа</span></div><button id="explain" class="primary">Объяснить ↗</button></div>
@@ -137,8 +139,10 @@
       </details>
       <details class="more"><summary>OEE по постам, определения метрик, журналы инцидентов и событий</summary>
       <div class="panel">
-        <h2 class="panel-title">Посты: доступность, производительность, качество</h2>
-        <div class="table-scroll" tabindex="0" role="region" aria-label="Таблица OEE постов"><table id="oee-table"></table></div>
+        <h2 class="panel-title">OEE по постам</h2>
+        <p id="shiftx-oee-note" class="shiftx-note">A — доступность, P — производительность, Q — качество. Время работы и потерь — модельные минуты. Прочерк: нет времени смены для A, времени работы для P или завершённых операций для Q производственных участков; OEE требует все три компонента. Для контроля, доработки и отгрузки Q = 100% по определению модели, не по выборке измерений. Нажмите заголовок для сортировки.</p>
+        <p id="shiftx-sort-status" class="shiftx-note" role="status"></p>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="Таблица OEE постов"><table id="oee-table" class="shiftx-oee" aria-describedby="shiftx-oee-note"></table></div>
         <details class="definitions"><summary>Определения метрик</summary>
           <p><b>Плановое время</b> поста — прошедшие минуты смены. <b>A</b> = минуты работы / плановое время; все остановки — неисправность, работы техника, нет автомобиля на входе, блокировка следующим буфером — потери доступности, показаны раздельно.</p>
           <p><b>P</b> = нормативная работа / минуты работы (снижение темпа и износ подъёмника уменьшают P). <b>Q</b> поста = (выполненные операции − операции на автомобилях, у которых контроль выявил дефект этого участка именно с этого поста) / выполненные операции. Для контроля, доработки и отгрузки Q = 100%: они не создают продукцию. Доработка не считается выпуском. <b>OEE</b> = A × P × Q по каждому посту; среднего «OEE завода» нет — общий выпуск показан отдельно.</p>
@@ -150,6 +154,14 @@
         <div class="panel"><h2 class="panel-title">Журнал событий <span id="event-count" class="tag"></span></h2><ol id="event-log" class="event-log" reversed></ol></div>
       </div>
       </details>
+    </section>
+
+    <section id="view-handover" class="view handover-view" aria-labelledby="h-handover" hidden>
+      <header class="handover-header"><div><p class="handover-eyebrow">АНАЛИТИКА · ПЕРЕДАЧА СМЕНЫ</p><h1 id="h-handover">Что передаём следующей смене</h1><p class="handover-description">Показатели и незавершённые дела из одного снимка производства.</p></div><span class="handover-badge">Синтетические данные</span></header>
+      <div class="handover-toolbar" aria-label="Срез и выгрузка"><button type="button" id="handover-refresh" class="handover-refresh" data-handover-refresh="1" data-focus-key="handover-refresh">Обновить срез</button><a class="handover-download" data-focus-key="handover-json" href="/api/handover?format=json" download>Скачать JSON</a><a class="handover-download" data-focus-key="handover-csv" href="/api/handover?format=csv" download>Скачать CSV</a></div>
+      <p class="handover-note">Выгрузка создаёт новый срез на момент скачивания. Время указано в модельных часах смены; «—» означает отсутствие данных.</p>
+      <p id="handover-status" class="handover-status" role="status" aria-live="polite" aria-atomic="true">Ожидаем загрузку среза.</p>
+      <div id="handover-content" aria-busy="false"></div>
     </section>
 
     <section id="view-lab" class="view" aria-labelledby="h-lab" hidden>
