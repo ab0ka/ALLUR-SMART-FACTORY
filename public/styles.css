@@ -493,6 +493,7 @@ button.secondary{background:#F4F8FD;border-color:#B9CDE6;color:var(--link);font-
 .chat-body{background:#FAFBFC}
 .chat-foot{flex-direction:column;flex-wrap:nowrap;flex-shrink:0}
 .chat-foot .chips{margin:0}
+#side-chat-hint{margin-bottom:8px}
 .side .chat-log{margin:0}
 .side .msg.user{background:var(--blue);color:#fff}.side .msg.user .msg-meta{color:#DCE9FA}
 .side .msg.assistant{background:#fff;border:1px solid var(--line)}
