@@ -574,6 +574,9 @@ button.secondary{background:#F4F8FD;border-color:#B9CDE6;color:var(--link);font-
 }
 @media(max-width:760px){
   .topbar{gap:6px;padding:6px 8px}.planfact{display:none}.timebox{gap:5px}.speed{height:36px}.speed button{width:28px}.icon-btn{width:36px;height:36px}.brand-mark{width:34px;height:34px}
+  /* Anchor the dropdown to the header when alerts wrap its trigger to a new row. */
+  .menu{position:static}
+  .menu-list{left:8px;right:8px;top:calc(100% + 6px);width:auto;max-height:60vh;max-height:60dvh;overflow-y:auto;overscroll-behavior:contain}
   .menu summary{height:36px;padding:0 9px}.synthetic{order:4;height:30px;font-size:11px}.spaces{order:5;width:auto;flex:1 1 0;min-width:0}
   #diag-toggle-wrap{display:none!important}.clockbox strong{font-size:18px}
   .space-view{height:calc(100vh - 96px)}
