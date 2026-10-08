@@ -112,10 +112,14 @@ $('explain').addEventListener('click', async () => {
 async function refresh() {
   if (updating || fetching || chatBusy) return;
   fetching = true;
+  // A completed POST can replace state while this GET is still in flight.
+  // Identity also works across reset/restart, where revisions can decrease.
+  const requestedState = state;
+  const stillCurrent = () => !updating && !chatBusy && state === requestedState;
   try {
     const next = await api('/api/state');
-    if (!updating) { const changed = !state || state.revision !== next.revision || state.recordVersion !== next.recordVersion || state.running !== next.running || state.speed !== next.speed || state.csrf !== next.csrf; state = next; if (changed && !$('confirm').open) render(); error(''); }
-  } catch { error('Нет связи с локальным сервером. Проверьте, что npm start продолжает работать. Повторяем подключение…'); }
+    if (stillCurrent()) { const changed = !state || state.revision !== next.revision || state.recordVersion !== next.recordVersion || state.running !== next.running || state.speed !== next.speed || state.csrf !== next.csrf; state = next; if (changed && !$('confirm').open) render(); error(''); }
+  } catch { if (stillCurrent()) error('Нет связи с локальным сервером. Проверьте, что npm start продолжает работать. Повторяем подключение…'); }
   finally { fetching = false; }
 }
 await refresh(); setView(location.hash.slice(1)); setInterval(refresh, 1200);
