@@ -749,3 +749,29 @@ details.more>summary{cursor:pointer;font-weight:700;color:var(--link);min-height
 .c3-badge a{color:inherit}
 .c3-badge .short{display:none}
 @media(max-width:760px){.c3-badge .long{display:none}.c3-badge .short{display:inline}.c3-badge{left:6px;bottom:6px;padding:3px 7px;font-size:10.5px}}
+
+/* Handover snapshot: scoped, read-only analytics. */
+.handover-view{max-width:1280px;margin:0 auto;color:#20313b;overflow-wrap:anywhere}
+.handover-header{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;padding:24px 0 20px}
+.handover-header h1{font-size:clamp(24px,3vw,34px);line-height:1.2;margin:8px 0 12px;letter-spacing:-.6px}
+.handover-eyebrow{font-size:12px;font-weight:750;letter-spacing:1.1px;color:#396273;margin:0}
+.handover-description,.handover-note{color:#52646f;line-height:1.6;margin:0}
+.handover-badge{flex-shrink:0;border:1px solid #b6cbd0;border-radius:20px;background:#eaf5f3;padding:9px 13px;color:#235a52;font-size:12px;font-weight:700}
+.handover-toolbar{display:flex;flex-wrap:wrap;gap:10px;padding:0 0 12px}
+.handover-refresh,.handover-download{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 17px;border:1px solid #a8bac3;border-radius:10px;background:#fff;color:#20313b;text-decoration:none;font:inherit;font-weight:650;cursor:pointer}
+.handover-refresh{background:#d9f284;border-color:#8aa737;color:#23330d}
+.handover-refresh:disabled{cursor:wait;opacity:.7}
+.handover-download:hover{background:#edf3f6}
+.handover-refresh:focus-visible,.handover-download:focus-visible{outline:3px solid #126488;outline-offset:3px}
+.handover-note{font-size:12px;max-width:780px}
+.handover-status{min-height:24px;margin:16px 0;color:#3c5361;line-height:1.5}
+.handover-meta{display:flex;flex-wrap:wrap;gap:10px 24px;border-top:1px solid #d4dfe5;padding:18px 0;color:#52646f;font-size:13px}
+.handover-meta strong{color:#20313b}
+.handover-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 24px}
+.handover-metric{min-width:0;background:#fff;border:1px solid #d4dfe5;border-radius:15px;padding:20px;box-shadow:0 3px 12px #20313b06}
+.handover-metric dt{font-size:13px;font-weight:650;color:#52646f}
+.handover-metric dd{margin:12px 0;font-size:32px;font-weight:750;line-height:1.1;font-variant-numeric:tabular-nums;color:#20313b}
+.handover-metric p{margin:0;font-size:12px;line-height:1.5;color:#52646f}
+.handover-empty{padding:20px;background:#eff5f8;border:1px solid #d4dfe5;border-radius:12px;color:#3c5361;line-height:1.6}
+@media(max-width:760px){.handover-header{flex-direction:column;gap:14px;padding-top:16px}.handover-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.handover-metric{padding:15px}.handover-metric dd{font-size:27px}.handover-toolbar>*{flex:1 1 auto}.handover-badge{max-width:100%;flex-shrink:1}}
+@media(max-width:360px){.handover-metrics{grid-template-columns:1fr}}
