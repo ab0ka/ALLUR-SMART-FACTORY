@@ -1,14 +1,16 @@
 // ---------- Routing and render ----------
 function setView(hash) {
-  const [name, arg, type, id] = hash.split('/');
+  const name = hash.split('?')[0].split('/')[0];
   if (VIEWS.includes(name)) view = name;
   else {
-    view = 'space'; space = SPACES[arg] ? arg : 'assembly';
+    const route = parseSpaceRoute(hash);
+    view = 'space'; space = route.space; ui.table = route.table;
+    ui.panel = route.panel; ui.selected = null;
     // Deep links: #space/<space>/<vehicle|post|problem|compare|chat>/<id> open the same card as a click.
-    if (['vehicle', 'post', 'problem', 'compare', 'chat'].includes(type)) {
-      const objId = id ? decodeURIComponent(id) : undefined;
-      ui.panel = { type, id: objId };
+    if (route.panel) {
+      const { type, id: objId } = route.panel;
       if (type === 'vehicle' || type === 'post') ui.selected = { type, id: objId };
+      else if (state && (type === 'problem' || type === 'compare')) { const p = problem(objId); if (p) ui.selected = { type: 'post', id: p.postId }; }
       if (type !== 'chat' && objId) chatContext = { type: type === 'compare' ? 'problem' : type, id: objId };
     }
   }
@@ -114,4 +116,4 @@ async function refresh() {
   } catch { error('Нет связи с локальным сервером. Проверьте, что npm start продолжает работать. Повторяем подключение…'); }
   finally { fetching = false; }
 }
-await refresh(); setView(location.hash.slice(1)); setInterval(refresh, 1200);
+setView(location.hash.slice(1)); await refresh(); setView(location.hash.slice(1)); setInterval(refresh, 1200);

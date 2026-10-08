@@ -1,7 +1,7 @@
 // ---------- Selection and navigation inside spaces ----------
 function openPanel(panel, selected, ctx) {
   ui.panel = panel; if (selected !== undefined) ui.selected = selected; if (ctx) chatContext = ctx;
-  if (view !== 'space') { location.hash = `space/${['assembly', 'diag'].includes(space) ? space : 'assembly'}`; return; }
+  if (view !== 'space') { location.hash = spaceHash({ space: ['assembly', 'diag'].includes(space) ? space : 'assembly', panel, table: ui.table }); return; }
   syncHash(); render();
   if (narrow() && scene && ui.selected) { if (ui.selected.type === 'vehicle') scene.focusVehicle(ui.selected.id, 1.6); else if (ui.selected.type === 'post') scene.focusPost(ui.selected.id, 1.6); }
   requestAnimationFrame(() => $('side').querySelector('h2')?.focus?.());
@@ -11,8 +11,9 @@ const selectPost = id => openPanel({ type: 'post', id }, { type: 'post', id }, {
 const selectProblem = id => { const p = problem(id); openPanel({ type: 'problem', id }, p ? { type: 'post', id: p.postId } : null, { type: 'problem', id }); };
 function closePanel() { ui.panel = null; ui.selected = null; ui.ribbonOnlySelected = false; syncHash(); render(); }
 // The address bar follows the open card, so a link can be shared or opened again; replaceState does not fire hashchange.
-function syncHash() { if (view !== 'space') return; const p = ui.panel; history.replaceState(null, '', `#space/${space}${p ? `/${p.type}${p.id ? `/${encodeURIComponent(p.id)}` : ''}` : ''}`); }
-function goSpace(id) { location.hash = `space/${id}`; }
+function syncHash() { if (view !== 'space') return; history.replaceState(null, '', spaceHash({ space, panel: ui.panel, table: ui.table })); }
+function setTableMode(table) { ui.table = Boolean(table || (sceneFailed && SPACES[space]?.scene)); syncHash(); render(); }
+function goSpace(id) { location.hash = spaceHash({ space: id, table: ui.table }); }
 function openRefSpace(type, id) {
   if (type === 'vehicle') return selectVehicle(id);
   if (type === 'post') return selectPost(id);
@@ -32,7 +33,7 @@ function openEvent(e) {
 // Returns true when the click was handled by the space UI.
 async function spaceClick(t, d) {
   if (d.closePanel) { closePanel(); return true; }
-  if (d.mode) { ui.table = d.mode === 'table'; render(); return true; }
+  if (d.mode) { setTableMode(d.mode === 'table'); return true; }
   if (d.cam) { if (scene) { if (d.cam === 'home') scene.home(); else scene.zoom(d.cam === 'in' ? 1.2 : 1 / 1.2); } return true; }
   if (d.space) { goSpace(d.space); return true; }
   if (d.ribbon) { if (d.ribbon === 'open') ui.ribbonOpen = true; else if (d.ribbon === 'close') ui.ribbonOpen = false; else ui.ribbonOnlySelected = !ui.ribbonOnlySelected; renderRibbon(); return true; }
@@ -40,7 +41,7 @@ async function spaceClick(t, d) {
   if (d.vehicle || d.vehicleSelect) { selectVehicle(d.vehicle || d.vehicleSelect); return true; }
   if (d.post || d.postLink) { selectPost(d.post || d.postLink); return true; }
   if (d.problem) { selectProblem(d.problem); return true; }
-  if (d.table) { ui.table = true; render(); return true; }
+  if (d.table) { setTableMode(true); return true; }
   if (d.openChat) { if (d.ctxType) chatContext = { type: d.ctxType, id: d.ctxId }; else if (ui.selected) chatContext = ui.selected.type === 'vehicle' ? { type: 'vehicle', id: ui.selected.id } : ui.panel?.type === 'problem' ? { type: 'problem', id: ui.panel.id } : { type: 'post', id: ui.selected.id }; ui.panel = { type: 'chat' }; syncHash(); render(); requestAnimationFrame(() => $('side-chat-input')?.focus()); return true; }
   if (d.refType) { openRefSpace(d.refType, d.refId); return true; }
   if (d.ask) { const input = $('side-chat-input'); if (input) input.value = d.ask; ask(d.ask, SIDE_CHAT); return true; }
@@ -81,6 +82,5 @@ document.addEventListener('keydown', e => {
   if (e.key === '0') { scene?.home(); return; }
   if (e.key === '+' || e.key === '=') { scene?.zoom(1.2); return; }
   if (e.key === '-') { scene?.zoom(1 / 1.2); return; }
-  if (e.key.toLowerCase() === 't' || e.key.toLowerCase() === 'е') { ui.table = !ui.table; render(); }
+  if (e.key.toLowerCase() === 't' || e.key.toLowerCase() === 'е') { setTableMode(!ui.table); }
 });
-

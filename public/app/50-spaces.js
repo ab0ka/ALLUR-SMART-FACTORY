@@ -36,12 +36,16 @@ function ensureScene() {
 function destroyScene() { scene?.destroy(); scene = null; }
 
 function renderSpace() {
+  if (SPACES[space]?.scene && sceneFailed && !ui.table) { ui.table = true; syncHash(); }
   const meta = SPACES[space] ?? SPACES.assembly, sceneSpace = Boolean(meta.scene), table = ui.table || (sceneSpace && sceneFailed);
   if (enteredSpace !== space) {
     enteredSpace = space; $('space-stage').classList.remove('enter'); void $('space-stage').offsetWidth; $('space-stage').classList.add('enter');
     if (space === 'diag' && !ui.panel) { const p = state.problems.find(x => x.status === 'open') ?? state.problems.at(-1); if (p) { ui.panel = { type: 'problem', id: p.id }; ui.selected = { type: 'post', id: p.postId }; chatContext = { type: 'problem', id: p.id }; } }
   }
-  $('crumbs').innerHTML = space === 'enterprise' ? '<b>Предприятие</b>' : `<a href="#space/enterprise">Предприятие</a> › <b>${esc(meta.short)}</b>`;
+  $('crumbs').innerHTML = space === 'enterprise' ? '<b>Предприятие</b>' : `<a href="${spaceHash({ space: 'enterprise', table: ui.table })}">Предприятие</a> › <b>${esc(meta.short)}</b>`;
+  for (const link of document.querySelectorAll('[data-space-link]')) link.href = spaceHash({ space: link.dataset.spaceLink, table: ui.table });
+  document.querySelector('.brand').href = spaceHash({ space: 'assembly', table: ui.table });
+  $('alerts').href = spaceHash({ space: 'diag', table: ui.table });
   text('space-title', meta.title); text('space-sub', meta.sub ?? meta.note ?? '');
   const open = state.problems.filter(p => p.status === 'open');
   const busy = ['A1', 'A2', 'A3'].filter(id => post(id).vehicleId).length;
@@ -117,4 +121,3 @@ function objectsTable() {
     <div class="table-scroll"><table class="obj-table"><caption class="sr-only">Объекты пространства «${esc(SPACES[space].short)}» на ${clock(state.elapsed)}</caption><thead><tr><th scope="col">Объект</th><th scope="col">Тип</th><th scope="col">Состояние</th><th scope="col">Автомобиль</th><th scope="col">Операция</th><th scope="col">Ход / заполнение</th><th scope="col">Причина</th><th scope="col"><span class="sr-only">Действие</span></th></tr></thead><tbody>${rows}</tbody></table></div>
     <p class="keys"><b>Клавиатура:</b> <kbd>Tab</kbd> объекты · <kbd>Enter</kbd> карточка · <kbd>Esc</kbd> закрыть · <kbd>1</kbd>–<kbd>6</kbd> пространства · <kbd>0</kbd> общий вид · <kbd>T</kbd> сцена ↔ таблица</p></div>`;
 }
-
