@@ -134,3 +134,35 @@ test('public event sequence regression detects another tab reset on the same min
   h.calls[0].resolve({ ok: true, json: async () => report }); await pending;
   assert.equal(h.$('handover-content').innerHTML, '');
 });
+test('epoch rotation invalidates pending request even when all legacy reset clues are unchanged', async () => {
+  const h = setup(); h.context.state.shiftEpoch = 'shift-a';
+  const pending = h.run('loadHandover()');
+  h.context.state = { ...h.context.state, shiftEpoch: 'shift-b', revision: 2 };
+  h.run('renderHandover()');
+  assert.equal(h.calls[0].options.signal.aborted, true);
+  h.calls[0].resolve({ ok: true, json: async () => ({ ...report, shiftEpoch: 'shift-a' }) }); await pending;
+  assert.equal(h.$('handover-content').innerHTML, '');
+  assert.match(h.$('handover-status').textContent, /Смена изменилась/);
+});
+test('mismatched response epoch is rejected in both response orders without another request', async () => {
+  for (const [currentEpoch, reportEpoch] of [['shift-a', 'shift-b'], ['shift-b', 'shift-a']]) {
+    const h = setup(); h.context.state.shiftEpoch = currentEpoch;
+    const pending = h.run('loadHandover()');
+    h.calls[0].resolve({ ok: true, json: async () => ({ ...report, shiftEpoch: reportEpoch }) }); await pending;
+    assert.equal(h.$('handover-content').innerHTML, '');
+    assert.match(h.$('handover-status').textContent, /Смена изменилась/);
+    h.run('renderHandover()'); assert.equal(h.calls.length, 1);
+  }
+});
+test('matching epoch preserves snapshot across polling and legacy missing epoch remains supported', async () => {
+  for (const shiftEpoch of ['shift-a', undefined]) {
+    const h = setup(); h.context.state.shiftEpoch = 'shift-a';
+    const pending = h.run('loadHandover()');
+    h.calls[0].resolve({ ok: true, json: async () => ({ ...report, shiftEpoch }) }); await pending;
+    const html = h.$('handover-content').innerHTML;
+    assert.match(html, /Срез на/);
+    h.context.state.revision++; h.run('renderHandover()');
+    assert.equal(h.$('handover-content').innerHTML, html);
+    assert.equal(h.calls.length, 1);
+  }
+});
