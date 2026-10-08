@@ -69,3 +69,31 @@ for (const [name, first, second] of [
     assert.deepEqual(Array.from(context.result), ['setup', 'startup']);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+for (const scenario of ['missing asset', 'secret in late asset', 'invalid app', 'invalid scene']) {
+  test(`failed source validation preserves the previous build: ${scenario}`, async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'allur-build-preserve-'));
+    try {
+      const publicDir = path.join(dir, 'public'), distDir = path.join(dir, 'dist'), quarantineRoot = path.join(dir, 'quarantine');
+      await copyPublic(publicDir);
+      await mkdir(distDir);
+      for (const file of [...PUBLIC_ASSETS, 'stale.txt']) await writeFile(path.join(distDir, file), `previous ${file}`);
+      let expected;
+      if (scenario === 'missing asset') {
+        await rm(path.join(publicDir, 'favicon.svg'));
+        expected = /ENOENT/;
+      } else if (scenario === 'secret in late asset') {
+        await writeFile(path.join(publicDir, 'favicon.svg'), 'sk-proj-' + 'x'.repeat(24));
+        expected = /Possible secret in client asset favicon.svg/;
+      } else {
+        const file = scenario === 'invalid app' ? path.join(publicDir, 'app', '99-invalid.js') : path.join(publicDir, 'scene.js');
+        await writeFile(file, 'const = ;');
+        expected = /Invalid JavaScript in client asset (app|scene)\.js/;
+      }
+      await assert.rejects(buildDist({ publicDir, distDir, quarantineRoot }), expected);
+      assert.deepEqual((await readdir(distDir)).sort(), [...PUBLIC_ASSETS, 'stale.txt'].sort());
+      for (const file of [...PUBLIC_ASSETS, 'stale.txt']) assert.equal(await readFile(path.join(distDir, file), 'utf8'), `previous ${file}`);
+      await assert.rejects(readdir(quarantineRoot), { code: 'ENOENT' });
+    } finally { await rm(dir, { recursive: true, force: true }); }
+  });
+}
