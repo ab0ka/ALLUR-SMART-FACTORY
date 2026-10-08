@@ -93,12 +93,12 @@ export async function main() {
   await buildDist();
   const output = path.join(root, 'screenshots', 'handover');
   await mkdir(output, { recursive: true });
-  const profile = await mkdtemp(path.join(os.tmpdir(), 'allur-handover-'));
   const sim = new Workshop(); sim.running = false;
   // Only this fresh synthetic simulation is changed; no saved production state is loaded.
   sim.command({ action: 'fault', postId: 'A1', kind: 'breakdown', requestId: 'handover-fault' }, 'operator');
   sim.command({ action: 'job', postId: 'A1', kind: 'repair_generic', requestId: 'handover-job' }, 'operator');
   sim.advance(15);
+  const profile = await mkdtemp(path.join(os.tmpdir(), 'allur-handover-'));
   const server = createApp({ simulation: sim, aiOptions: { provider: 'local' }, storePath: path.join(profile, 'synthetic-state.json') });
   let child, cdp;
   const deadline = setTimeout(() => { console.error('FAIL: overall E2E deadline'); child?.kill(); server.closeAllConnections(); server.close(); process.exitCode = 1; }, 180000);
@@ -109,6 +109,7 @@ export async function main() {
     const before = sim.snapshot();
     const response = await get('/api/handover'); assert.equal(response.status, 200, 'handover endpoint must be integrated');
     const report = await response.json(); checkReport(report, before);
+    checkReport(report, await (await get('/api/state')).json());
     assert.deepEqual(report, await (await get('/api/handover')).json(), 'deterministic report');
     const json = await get('/api/handover?format=json');
     assert.match(json.headers.get('content-type'), /application\/json/i);
@@ -135,7 +136,11 @@ export async function main() {
     }, 'Edge debugging endpoint');
     const targets = await (await fetch(`http://127.0.0.1:${debugPort}/json/list`, { signal: AbortSignal.timeout(5000) })).json();
     const socket = new WebSocket(targets.find(t => t.type === 'page').webSocketDebuggerUrl);
-    await new Promise((resolve, reject) => { socket.addEventListener('open', resolve, { once: true }); socket.addEventListener('error', reject, { once: true }); });
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => { socket.close(); reject(new Error('WebSocket connection timeout')); }, 10000);
+      socket.addEventListener('open', () => { clearTimeout(timer); resolve(); }, { once: true });
+      socket.addEventListener('error', error => { clearTimeout(timer); reject(error); }, { once: true });
+    });
     cdp = new CDP(socket);
     const errors = []; let faultMode = false, pausedRequest;
     cdp.on('Runtime.exceptionThrown', e => errors.push(e.exceptionDetails.exception?.description || e.exceptionDetails.text));
@@ -148,7 +153,7 @@ export async function main() {
     for (const width of [1280, 390]) {
       await cdp.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: width === 390 });
       await cdp.send('Page.navigate', { url: base + '/#handover' });
-      await until(() => cdp.evaluate(`${visible} && /${report.resources.stock[0].name}/.test(${content})`), 'handover content');
+      await until(() => cdp.evaluate(`${visible} && (${content}).includes(${JSON.stringify(report.resources.stock[0].name)})`), 'handover content');
       assert.equal(await cdp.evaluate('document.documentElement.scrollWidth <= innerWidth + 1'), true, `overflow at ${width}`);
       const text = await cdp.evaluate(content);
       for (const item of [...report.problems, ...report.jobs]) assert.ok(text.includes(item.title), `UI includes ${item.id}`);
