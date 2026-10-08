@@ -749,3 +749,6 @@ details.more>summary{cursor:pointer;font-weight:700;color:var(--link);min-height
 .c3-badge a{color:inherit}
 .c3-badge .short{display:none}
 @media(max-width:760px){.c3-badge .long{display:none}.c3-badge .short{display:inline}.c3-badge{left:6px;bottom:6px;padding:3px 7px;font-size:10.5px}}
+
+/* A referenced record remains distinguishable without relying only on color. */
+.ev.ref-highlight,.decision.ref-highlight{outline:3px solid var(--blue);outline-offset:-3px}

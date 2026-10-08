@@ -1,26 +1,27 @@
 // ---------- Cards, selection and history on every screen ----------
 // Address: #<screen>[/<vehicle|post|problem|compare|chat|car3d>/<id>], where <screen> is a view or space/<shop>.
-// Opening a card or the 3D view from a screen is one history step; switching between cards replaces it.
+// Keep the return stack; chat transitions retain their own object and focus in history.
 function currentHash() {
   const p = ui.car3d ? { type: 'car3d', id: ui.car3d } : ui.panel;
   let tail = '';
   if (p) { const id = p.type === 'chat' ? (chatContext ? `${chatContext.type}:${chatContext.id}` : '') : p.id; tail = `/${p.type}${id ? `/${encodeURIComponent(id)}` : ''}`; }
+  else if (ui.routeRef) tail = `/${ui.routeRef.type}/${encodeURIComponent(ui.routeRef.id)}`;
   else if (view === 'vehicles' && selectedVehicle) tail = `/vehicle/${encodeURIComponent(selectedVehicle)}`;
   return baseHash() + tail;
 }
 function syncHash() { const h = `#${currentHash()}`; if (location.hash !== h) history.replaceState(history.state, '', h); }
 function showPanel(panel) {
-  const fresh = !ui.panel && !ui.car3d;
-  ui.car3d = null; ui.panel = panel;
-  if (fresh) pushHash(currentHash()); else syncHash();
+  const fresh = !ui.panel && !ui.car3d, chatStep = ui.panel?.type === 'chat' || panel.type === 'chat';
+  ui.car3d = null; ui.panel = panel; ui.routeRef = null;
+  if ((fresh || chatStep) && location.hash !== `#${currentHash()}`) pushHash(currentHash()); else syncHash();
   render();
 }
 function openPanel(panel, selected, ctx) {
   if (selected !== undefined) ui.selected = selected;
-  if (ctx) setChatContext(ctx);
+  if (ctx !== undefined) setChatContext(ctx);
   showPanel(panel);
   if (view === 'space' && narrow() && scene && ui.selected) { if (ui.selected.type === 'vehicle') scene.focusVehicle(ui.selected.id, 1.6); else if (ui.selected.type === 'post') scene.focusPost(ui.selected.id, 1.6); }
-  requestAnimationFrame(() => $('side').querySelector('h2')?.focus?.());
+  requestAnimationFrame(() => { const heading = $('side').querySelector('h2'); if (heading) { heading.tabIndex = -1; heading.focus(); } });
 }
 const selectVehicle = id => openPanel({ type: 'vehicle', id }, { type: 'vehicle', id }, { type: 'vehicle', id });
 const selectPost = id => openPanel({ type: 'post', id }, { type: 'post', id }, { type: 'post', id });
@@ -28,7 +29,7 @@ const selectProblem = id => { const p = problem(id); openPanel({ type: 'problem'
 function closePanel() {
   ui.panel = null; ui.selected = null; ui.ribbonOnlySelected = false;
   if (history.state?.ret) { render(); history.back(); return; }
-  syncHash(); render();
+  setChatContext(null); syncHash(); render(); restoreNavigationFocus(true);
 }
 function selectInList(id) {
   selectedVehicle = id; setChatContext({ type: 'vehicle', id });
@@ -38,24 +39,27 @@ function selectInList(id) {
 }
 // One entry point for an object reference: a click on the map, a list row, a task, an event or a chat link.
 function openCard(type, id) {
-  if (type === 'vehicle') return view === 'vehicles' ? selectInList(id) : selectVehicle(id);
-  if (type === 'post') { if (view === 'workshop') { selectedPost = id; setChatContext({ type: 'post', id }); render(); return; } return selectPost(id); }
+  const ctx = validChatContext(type, id);
+  if (!ctx) { error('Объект не найден'); return; }
+  id = ctx.id;
+  if (type === 'vehicle') return view === 'vehicles' ? (ui.panel || ui.car3d ? navPush(`vehicles/vehicle/${encodeURIComponent(id)}`) : selectInList(id)) : selectVehicle(id);
+  if (type === 'post') return selectPost(id);
   if (type === 'problem') return selectProblem(id);
   if (type === 'order') return openOrder(id);
 }
 function openOrder(id) {
-  setChatContext({ type: 'order', id });
-  if (view !== 'orders') navPush('orders');
-  requestAnimationFrame(() => document.getElementById(`order-${id}`)?.scrollIntoView({ block: 'start' }));
+  const ctx = validChatContext('order', id);
+  if (!ctx) { error('Объект не найден'); return; }
+  navPush(`orders/order/${encodeURIComponent(ctx.id)}`);
 }
 function goSpace(id) { location.hash = `space/${id}`; }
 function openRef(type, id) {
   if (['vehicle', 'post', 'problem', 'order'].includes(type)) return openCard(type, id);
-  if (type === 'experiment') { const e = state.experiments.find(x => x.id === id); if (e) openPanel({ type: 'compare', id: e.problemId }); return; }
-  if (type === 'decision') { const d = state.decisions.find(x => x.id === id); if (d) selectProblem(d.problemId); return; }
+  if (type === 'experiment') { const e = state.experiments.find(x => x.id === id); if (e) openPanel({ type: 'compare', id: e.problemId }, null, { type: 'problem', id: e.problemId }); return; }
+  if (type === 'decision') { const d = state.decisions.find(x => x.id === id); if (d) navPush(`dispatcher/decision/${encodeURIComponent(id)}`); return; }
   if (type === 'job') { const j = state.jobs.find(x => x.id === id); if (j?.problemId) return selectProblem(j.problemId); if (j) return openCard('post', j.postId); return; }
   if (type === 'task') return openTask(id);
-  if (type === 'event') { const e = state.events.find(x => String(x.seq) === String(id)); if (e) return openEvent(e); }
+  if (type === 'event') { const e = state.events.find(x => String(x.seq) === String(id)); if (e) navPush(`${view === 'space' ? baseHash() : `space/${space}`}/event/${encodeURIComponent(id)}`); }
 }
 function openEvent(e) {
   if (e.problemId && ['problem_detected', 'problem_resolved', 'decision_applied', 'check_completed', 'verify_completed'].includes(e.type)) return selectProblem(e.problemId);
@@ -65,16 +69,20 @@ function openEvent(e) {
 }
 // The chat takes the object the user is looking at; a different object is announced in the chat.
 function currentObjectCtx() {
-  if (ui.car3d) return { type: 'vehicle', id: ui.car3d };
+  if (ui.car3d) return validChatContext('vehicle', ui.car3d);
   const p = ui.panel;
-  if (p && p.type !== 'chat') return { type: p.type === 'compare' ? 'problem' : p.type, id: p.id };
-  if (view === 'vehicles' && selectedVehicle) return { type: 'vehicle', id: selectedVehicle };
-  if (view === 'dispatcher' && currentTask) { const t = state.tasks.find(x => x.id === currentTask); if (t) return { type: t.object.type, id: t.object.id }; }
-  return undefined;
+  if (p?.type === 'chat') return chatContext && validChatContext(chatContext.type, chatContext.id);
+  if (p) return validChatContext(p.type === 'compare' ? 'problem' : p.type, p.id);
+  if (ui.routeRef?.type === 'order') return validChatContext('order', ui.routeRef.id);
+  if (ui.routeRef?.type === 'decision') return recordChatContext(state.decisions.find(x => x.id === ui.routeRef.id));
+  if (ui.routeRef?.type === 'event') return recordChatContext(state.events.find(x => String(x.seq) === ui.routeRef.id));
+  if (view === 'vehicles' && selectedVehicle) return validChatContext('vehicle', selectedVehicle);
+  if (view === 'dispatcher' && currentTask) { const t = state.tasks.find(x => x.id === currentTask); if (t) return validChatContext(t.object.type, t.object.id); }
+  return null;
 }
 function openChat(d) {
   const ctx = d.ctxType ? { type: d.ctxType, id: d.ctxId } : currentObjectCtx();
-  if (ctx) setChatContext(ctx);
+  setChatContext(ctx);
   showPanel({ type: 'chat' });
   requestAnimationFrame(() => $('side-chat-input')?.focus());
 }
@@ -107,8 +115,8 @@ async function cardClick(d) {
   if (d.openChat) { openChat(d); return true; }
   if (d.refType) { openRef(d.refType, d.refId); return true; }
   if (d.ask) { const input = $('side-chat-input'); if (input) input.value = d.ask; ask(d.ask); return true; }
-  if (d.chatClear) { setChatContext(null); chatPrevContext = null; syncHash(); updateSideChat(); return true; }
-  if (d.chatRestore) { const prev = chatPrevContext; chatPrevContext = null; chatContext = prev; syncHash(); updateSideChat(); return true; }
+  if (d.chatClear) { setChatContext(null); chatPrevContext = null; showPanel({ type: 'chat' }); return true; }
+  if (d.chatRestore) { const prev = chatPrevContext; setChatContext(prev); chatPrevContext = null; showPanel({ type: 'chat' }); return true; }
   if (d.chatOk) { chatPrevContext = null; updateSideChat(); return true; }
   if (d.applyChoice) { const id = ui.choice[d.applyChoice]; if (id) await applyDecision(d.applyChoice, id); return true; }
   return false;
@@ -135,11 +143,12 @@ addEventListener('resize', () => { if (scene?.atHome && !narrow()) scene.home();
 $('diag-toggle').addEventListener('change', e => { ui.diag = e.target.checked; render(); });
 document.addEventListener('change', e => { const c = e.target.dataset?.choice; if (c) { ui.choice[c] = e.target.value; renderSide(); } });
 document.addEventListener('submit', e => { if (e.target.id === 'side-chat-form') { e.preventDefault(); ask($('side-chat-input').value); } });
-document.addEventListener('input', e => { if (e.target.id === 'side-chat-input') { chatDraft = e.target.value; text('side-chat-count', `${e.target.value.length}/500`); } });
+document.addEventListener('input', e => { if (e.target.id === 'side-chat-input') { chatDraft = e.target.value; chatDraftVersion++; text('side-chat-count', `${e.target.value.length}/500`); } });
 document.addEventListener('keydown', e => {
   if (e.target.id === 'side-chat-input' && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(e.target.value); return; }
-  if (e.ctrlKey || e.metaKey || e.altKey || $('confirm').open || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+  if (e.ctrlKey || e.metaKey || e.altKey || $('confirm').open) return;
   if (e.key === 'Escape') { if ($('menu').open) { $('menu').open = false; return; } if (ui.car3d) { closeCar3d(); return; } if (ui.panel) closePanel(); return; }
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
   if (ui.car3d) return; // keyboard shortcuts of the shop scene are off while the 3D view is open
   if (view !== 'space') return;
   const n = Number(e.key);

@@ -19,7 +19,8 @@ function vehicleWhere(v) {
 // ---------- Navigation that remembers where the user came from ----------
 const VIEW_RETURN = { vehicles: 'К списку автомобилей', dispatcher: 'К задачам смены', orders: 'К заданиям', shift: 'К результатам смены', lab: 'К моделям', workshop: 'К 2D-схеме' };
 function labelForHash(h) {
-  const parts = (h || '').split('/'), [n, a] = parts, [type, id] = n === 'space' ? parts.slice(2) : parts.slice(1), oid = id ? decodeURIComponent(id) : '';
+  const parts = (h || '').split('/'), [n, a] = parts, [type, id] = n === 'space' ? parts.slice(2) : parts.slice(1);
+  let oid = ''; try { oid = id ? decodeURIComponent(id) : ''; } catch { /* A malformed origin still has a safe return label. */ }
   if (type === 'vehicle' && n !== 'vehicles') return `К карточке ${oid}`;
   if (type === 'problem' || type === 'compare') return `К ${oid}`;
   if (type === 'post') return `К посту ${post(oid)?.code ?? oid}`;
@@ -30,13 +31,32 @@ const baseHash = () => view === 'space' ? `space/${space}` : view;
 const returnLabel = () => history.state?.ret?.label ?? labelForHash(baseHash());
 function captureScroll() { return { win: scrollY, list: $('vehicle-list')?.scrollTop ?? 0 }; }
 function restoreScroll(sc) { if (!sc) return; requestAnimationFrame(() => { scrollTo(0, sc.win); if ($('vehicle-list')) $('vehicle-list').scrollTop = sc.list; }); }
+function navigationFocusKey() {
+  const el = document.activeElement;
+  if (!el || el === document.body) return null;
+  if (el.id) return `#${CSS.escape(el.id)}`;
+  const attrs = [...el.attributes].filter(a => a.name.startsWith('data-')).map(a => `[${a.name}="${CSS.escape(a.value)}"]`).join('');
+  return attrs ? el.tagName.toLowerCase() + attrs : null;
+}
+function visibleNavigationTarget(selector) {
+  if (!selector) return null;
+  const visible = [...document.querySelectorAll(selector)].filter(el => !el.disabled && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden');
+  return visible.find(el => el.closest('#side:not([hidden]), #legacy .view:not([hidden]), #view-space:not([hidden])')) ?? visible[0] ?? null;
+}
+function restoreNavigationFocus(fallback = false) {
+  requestAnimationFrame(() => {
+    const selector = history.state?.focus, el = visibleNavigationTarget(selector);
+    if (el) el.focus({ preventScroll: true });
+    else if (fallback || selector) $('chat-toggle')?.focus({ preventScroll: true });
+  });
+}
 // Opening a card or the 3D view from another screen is a history step: Back returns to the same list, filter and scroll.
 function pushHash(hash) {
   const from = location.hash.slice(1) || baseHash();
-  history.replaceState({ ...(history.state || {}), scroll: captureScroll() }, '');
+  history.replaceState({ ...(history.state || {}), scroll: captureScroll(), focus: navigationFocusKey() }, '');
   history.pushState({ ret: { from, label: labelForHash(from) } }, '', `#${hash}`);
 }
-function navPush(hash) { pushHash(hash); setView(hash); }
+function navPush(hash) { if (location.hash !== `#${hash}`) pushHash(hash); setView(hash); }
 // Without a remembered origin (a direct link) the fallback is the base screen of the current route.
 function navBack(fallback = baseHash()) {
   if (history.state?.ret) { history.back(); return; }
