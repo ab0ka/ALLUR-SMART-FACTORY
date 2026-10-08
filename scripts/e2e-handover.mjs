@@ -149,7 +149,8 @@ export async function main() {
     const debugPort = await until(async () => {
       if (launchError) throw launchError;
       if (child.exitCode !== null) throw new Error(`Edge exited: ${child.exitCode}`);
-      try { return (await readFile(path.join(profile, 'DevToolsActivePort'), 'utf8')).split('\n')[0]; } catch (e) { if (e.code !== 'ENOENT') throw e; }
+      try { return (await readFile(path.join(profile, 'DevToolsActivePort'), 'utf8')).split('\n')[0]; }
+      catch (e) { if (!['ENOENT', 'EBUSY'].includes(e.code)) throw e; }
     }, 'Edge debugging endpoint');
     const targets = await (await fetch(`http://127.0.0.1:${debugPort}/json/list`, { signal: AbortSignal.timeout(5000) })).json();
     const socket = new WebSocket(targets.find(t => t.type === 'page').webSocketDebuggerUrl);
@@ -167,8 +168,8 @@ export async function main() {
     await cdp.send('Runtime.enable'); await cdp.send('Page.enable'); await cdp.send('Log.enable');
     const visible = `document.querySelector('#view-handover') && !document.querySelector('#view-handover').hidden`;
     const content = `document.querySelector('#view-handover')?.innerText || ''`;
-    for (const width of [1280, 390]) {
-      await cdp.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: width === 390 });
+    for (const width of [1280, 390, 414]) {
+      await cdp.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: width < 760 });
       await cdp.send('Page.navigate', { url: base + '/#handover' });
       await until(() => cdp.evaluate(`${visible} && (${content}).includes(${JSON.stringify(report.resources.stock[0].name)})`), 'handover content');
       const geometry = await cdp.evaluate(`({ innerWidth, clientWidth: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth, visualWidth: visualViewport.width,
@@ -298,6 +299,7 @@ export async function main() {
       }
     }
     for (const error of cleanupErrors) console.error(`Cleanup: ${error.message}`);
+    if (!browserExited) child?.unref(); // Report failure without keeping this runner alive indefinitely.
     clearTimeout(cleanupDeadline);
     if (!failure && cleanupErrors.length) throw new AggregateError(cleanupErrors, 'E2E cleanup failed');
   }
