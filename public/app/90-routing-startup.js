@@ -1,15 +1,32 @@
 // ---------- Routing and render ----------
 function setView(hash) {
-  const [name, arg, type, id] = hash.split('/');
-  if (VIEWS.includes(name)) view = name;
+  const [name, arg, type, id, contextId, ...extra] = hash.split('/');
+  if (VIEWS.includes(name)) {
+    view = name;
+    if (name === 'orders') {
+      let orderId;
+      try { orderId = arg ? decodeURIComponent(arg) : undefined; } catch { orderId = undefined; }
+      chatContext = type === undefined ? validChatContext('order', orderId) : null;
+    }
+  }
   else {
     view = 'space'; space = SPACES[arg] ? arg : 'assembly';
-    // Deep links: #space/<space>/<vehicle|post|problem|compare|chat>/<id> open the same card as a click.
-    if (['vehicle', 'post', 'problem', 'compare', 'chat'].includes(type)) {
-      const objId = id ? decodeURIComponent(id) : undefined;
-      ui.panel = { type, id: objId };
-      if (type === 'vehicle' || type === 'post') ui.selected = { type, id: objId };
-      if (type !== 'chat' && objId) chatContext = { type: type === 'compare' ? 'problem' : type, id: objId };
+    ui.panel = null; ui.selected = null; chatContext = null;
+    // New chat links use /chat/<type>/<id>; old /chat/<id> links resolve only unique existing IDs.
+    const decode = value => { try { return value ? decodeURIComponent(value) : undefined; } catch { return undefined; } };
+    if (['vehicle', 'post', 'problem', 'compare', 'chat', 'experiment', 'decision', 'job', 'event'].includes(type)) {
+      ui.panel = { type, id: decode(id) };
+      if (type === 'chat') {
+        if (!extra.length) {
+          if (contextId !== undefined) chatContext = validChatContext(id, decode(contextId));
+          else if (id) {
+            const matches = ['vehicle', 'post', 'problem', 'order'].map(kind => validChatContext(kind, decode(id))).filter(Boolean);
+            if (matches.length === 1) chatContext = matches[0];
+          }
+        }
+        ui.panel = { type: 'chat' };
+      } else chatContext = panelChatContext(ui.panel);
+      if (chatContext && ['vehicle', 'post'].includes(chatContext.type)) ui.selected = { ...chatContext };
     }
   }
   $('view-space').hidden = view !== 'space'; $('legacy').hidden = view === 'space';
@@ -20,6 +37,10 @@ function setView(hash) {
   if (view !== 'space') destroyScene();
   if (view === 'lab' && !lab) loadLab();
   render();
+  if (view === 'orders' && chatContext?.type === 'order') {
+    const orderId = chatContext.id;
+    requestAnimationFrame(() => { if (view === 'orders' && chatContext?.id === orderId) document.getElementById(`order-${orderId}`)?.scrollIntoView({ block: 'start' }); });
+  }
 }
 function focusKey(el) {
   if (!el || el === document.body || !el.closest('main')) return null;
@@ -42,16 +63,13 @@ function render() {
 function openVehicle(id) { selectedVehicle = id; chatContext = { type: 'vehicle', id }; if (!filterOf[vehicleFilter](vehicle(id))) vehicleFilter = 'all'; if (location.hash !== '#vehicles') location.hash = 'vehicles'; else render(); requestAnimationFrame(() => $('vehicle-passport').scrollIntoView({ block: 'nearest' })); }
 function openPost(id) { selectedPost = id; chatContext = { type: 'post', id }; if (location.hash !== '#workshop') location.hash = 'workshop'; else render(); requestAnimationFrame(() => { if (matchMedia('(max-width: 1499px)').matches) $('post-detail').scrollIntoView({ block: 'nearest' }); }); }
 function openProblem(id) { selectedProblem = id; chatContext = { type: 'problem', id }; if (location.hash !== '#dispatcher') location.hash = 'dispatcher'; else render(); requestAnimationFrame(() => $('problem-card').scrollIntoView({ block: 'start' })); }
-function openOrder(id) { chatContext = { type: 'order', id }; if (location.hash !== '#orders') location.hash = 'orders'; else render(); requestAnimationFrame(() => document.getElementById(`order-${id}`)?.scrollIntoView({ block: 'start' })); }
+function openOrder(id) { const hash = `orders/${encodeURIComponent(id)}`; if (location.hash !== `#${hash}`) location.hash = hash; else setView(hash); }
 function openRef(type, id) {
   if (type === 'vehicle') return openVehicle(id);
   if (type === 'post') return openPost(id);
   if (type === 'order') return openOrder(id);
   if (type === 'problem') return openProblem(id);
-  if (type === 'experiment') { const e = state.experiments.find(x => x.id === id); if (e) selectedProblem = e.problemId; if (location.hash !== '#dispatcher') location.hash = 'dispatcher'; else render(); return requestAnimationFrame(() => $('comparison').scrollIntoView({ block: 'start' })); }
-  if (type === 'decision') { if (location.hash !== '#dispatcher') location.hash = 'dispatcher'; return requestAnimationFrame(() => $('decision-log').scrollIntoView({ block: 'start' })); }
-  if (type === 'job') { const j = state.jobs.find(x => x.id === id); if (j?.problemId) return openProblem(j.problemId); return openPost(j?.postId ?? selectedPost); }
-  if (type === 'event') { location.hash = 'shift'; requestAnimationFrame(() => { const el = document.getElementById(`ev-${id}`); if (el) { el.classList.add('highlight'); el.scrollIntoView({ block: 'center' }); } }); }
+  if (['experiment', 'decision', 'job', 'event'].includes(type)) return openRefSpace(type, id);
 }
 
 window.addEventListener('hashchange', () => setView(location.hash.slice(1)));
@@ -74,6 +92,7 @@ document.addEventListener('click', async e => {
   const d = t.dataset;
   if (d.speed) { action({ action: 'speed', value: Number(d.speed) }); return; }
   if (view === 'space' && await spaceClick(t, d)) return;
+  if (d.openChat && view === 'orders') { openPanel({ type: 'chat' }, null, chatContext && validChatContext(chatContext.type, chatContext.id)); return; }
   if (d.openChat) { location.hash = 'dispatcher'; requestAnimationFrame(() => $('chat-input').focus()); return; }
   if (d.post) { selectedPost = d.post; chatContext = { type: 'post', id: d.post }; render(); return; }
   if (d.postLink) return openPost(d.postLink);

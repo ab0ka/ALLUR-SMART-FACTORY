@@ -123,9 +123,12 @@ const LEGACY_CHAT = { input: 'chat-input', send: 'chat-send', count: 'chat-count
 async function ask(message, src = LEGACY_CHAT) {
   if (chatBusy || !message?.trim()) return;
   chatBusy = true;
+  const input = $(src.input), draft = input?.value, context = chatContext ? { ...chatContext } : null;
   const busy = on => { const b = $(src.send); if (b) { b.disabled = on; b.textContent = on ? 'Думаю…' : 'Спросить'; } };
   busy(true);
-  try { const r = await api('/api/chat', { message: message.trim(), context: chatContext ?? undefined }); state = r.state; if ($(src.input)) $(src.input).value = ''; if ($(src.count)) $(src.count).textContent = '0/500'; error(''); render(); }
+  try { const r = await api('/api/chat', { message: message.trim(), context: context ?? undefined }); state = r.state;
+    // A delayed reply must not clear a new draft or a newly opened object's composer.
+    if (input && $(src.input) === input && input.value === draft && chatContext?.type === context?.type && chatContext?.id === context?.id) { input.value = ''; if ($(src.count)) $(src.count).textContent = '0/500'; } error(''); render(); }
   catch (e) { error(`Чат: ${e.message}`); }
   finally { chatBusy = false; busy(false); }
 }
