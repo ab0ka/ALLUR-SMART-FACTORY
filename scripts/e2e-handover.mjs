@@ -14,6 +14,9 @@ export async function until(check, label, timeout = 15000) {
   while (Date.now() < deadline) { const value = await check(); if (value) return value; await delay(100); }
   throw new Error(`Timeout: ${label}`);
 }
+export function checkViewport(geometry, width) {
+  assert.ok(geometry.innerWidth <= width + 1 && geometry.scrollWidth <= width + 1, `overflow at ${width}: ${JSON.stringify(geometry)}`);
+}
 export function parseCsv(text) {
   const rows = []; let row = [], cell = '', quoted = false;
   text = text.replace(/^\uFEFF/, '');
@@ -171,7 +174,7 @@ export async function main() {
       const geometry = await cdp.evaluate(`({ innerWidth, clientWidth: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth, visualWidth: visualViewport.width,
         overflowing: [...document.querySelectorAll('body *')].filter(e => { const r=e.getBoundingClientRect(); return r.width && r.right > ${width} + 1; }).slice(0,12).map(e=>({tag:e.tagName,id:e.id,class:e.className,right:e.getBoundingClientRect().right})) })`);
       await writeFile(path.join(output, `geometry-${width}.json`), JSON.stringify(geometry, null, 2));
-      assert.ok(geometry.innerWidth <= width + 1 && geometry.scrollWidth <= width + 1, `overflow at ${width}: ${JSON.stringify(geometry)}`);
+      checkViewport(geometry, width);
       const text = await cdp.evaluate(content);
       for (const item of [...report.problems, ...report.jobs]) assert.ok(text.includes(item.title), `UI includes ${item.id}`);
       for (const item of report.resources.technicians) assert.ok(text.includes(item.name), `UI technician ${item.id}`);

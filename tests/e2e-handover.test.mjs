@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCsv, until, checkReport } from '../scripts/e2e-handover.mjs';
+import { parseCsv, until, checkReport, checkViewport } from '../scripts/e2e-handover.mjs';
+
+test('mobile auto-expanded layout viewport cannot hide overflow', () => {
+  checkViewport({ innerWidth: 390, scrollWidth: 390 }, 390);
+  assert.throws(() => checkViewport({ innerWidth: 421, clientWidth: 390, scrollWidth: 421 }, 390), /overflow at 390/);
+});
 
 test('CSV parser preserves UTF-8, escaped quotes, commas and multiline text', () => {
   assert.deepEqual(parseCsv('\uFEFFtype,title\r\nproblem,"Сбой, пост ""A1""\nстрока"\r\n'), [
