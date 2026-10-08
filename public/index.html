@@ -3,12 +3,12 @@
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#F5F7FA"><title>Allur Smart Factory — синтетическое демо</title><meta name="description" content="Учебная производственная сцена: цех сборки, диагностика подъёмников, сравнение решений и чат диспетчера. Только синтетические данные."><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/styles.css"><script type="module" src="/app.js"></script></head>
 <body>
 <header class="topbar">
-  <a class="brand" href="#space/assembly" aria-label="Allur Smart Factory — к цеху «Сборка»"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 22 22"><path d="M2.5 19 11 2.5 19.5 19h-4.4L11 10.6 6.9 19z"/><rect x="8.2" y="14.2" width="5.6" height="2.2"/></svg></span><span class="brand-text"><b>ALLUR</b><span>Smart Factory</span></span></a>
+  <a class="brand" href="#overview" aria-label="Allur Smart Factory — к обзору"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 22 22"><path d="M2.5 19 11 2.5 19.5 19h-4.4L11 10.6 6.9 19z"/><rect x="8.2" y="14.2" width="5.6" height="2.2"/></svg></span><span class="brand-text"><b>ALLUR</b><span>Smart Factory</span></span></a>
   <nav class="spaces primary-nav" aria-label="Основные разделы">
-    <a href="#space/assembly" data-section="shops">Цеха</a>
-    <a href="#vehicles" data-section="vehicles">Автомобили <span id="nav-vehicles" class="nav-count"></span></a>
-    <a href="#dispatcher" data-section="manage">Управление</a>
-    <a href="#shift" data-section="analytics">Аналитика</a>
+    <a href="#overview" data-section="overview">Обзор</a>
+    <a href="#space/enterprise" data-section="shops">Цеха</a>
+    <a href="#handover" data-section="report">Отчёт</a>
+    <a href="#dispatcher" data-section="more">Ещё <span id="nav-problems" class="nav-count"></span></a>
   </nav>
   <div class="timebox">
     <div class="clockbox"><strong id="clock">--:--</strong><span id="run-status">Загрузка…</span></div>
@@ -19,7 +19,7 @@
   <span class="grow"></span>
   <a class="planfact" href="#shift" id="planfact" aria-label="План-факт смены"><span class="pf-row"><span>Принято <b id="pf-accepted">—</b> / <span id="pf-plan">—</span></span><span id="pf-forecast">прогноз —</span></span><svg class="pf-bar" viewBox="0 0 100 5" preserveAspectRatio="none" aria-hidden="true"><rect class="pf-bg" width="100" height="5" rx="2.5"/><rect id="pf-fill" class="pf-fill" width="0" height="5" rx="2.5"/><rect id="pf-mark" class="pf-mark" x="0" width="1.5" height="5"/></svg></a>
   <a class="alerts" id="alerts" href="#space/diag" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path class="ic-warn" d="M8 1.2 15.3 14.3H.7z"/><rect class="ic-dark" x="7.1" y="5.6" width="1.8" height="4.6" rx=".6"/><circle class="ic-dark" cx="8" cy="12" r="1"/></svg><span id="alerts-count">0</span></a>
-  <span class="synthetic">Синтетические данные</span>
+  <span class="synthetic">Синтетическая симуляция</span>
   <button id="chat-toggle" class="icon-btn" aria-label="Открыть чат" data-open-chat="1"><svg viewBox="0 0 20 20" aria-hidden="true"><path class="ico-chat" d="M3 4.5A2.5 2.5 0 0 1 5.5 2h9A2.5 2.5 0 0 1 17 4.5v6a2.5 2.5 0 0 1-2.5 2.5H9l-4 3.5V13a2.5 2.5 0 0 1-2-2.5z"/></svg></button>
   <details class="menu" id="menu"><summary aria-label="Действия со сменой">Смена</summary><div class="menu-list">
     <p class="menu-caption">Управление временем симуляции</p>
@@ -38,8 +38,8 @@
     <a class="context-link" href="#workshop" data-nav="workshop">2D-схема</a>
     <span id="diag-count" class="sr-only" aria-hidden="true" hidden></span>
   </div>
-  <nav id="manage-navigation" class="context-tabs" aria-label="Управление" hidden><a href="#dispatcher" data-nav="dispatcher">Задачи и решения <span id="nav-problems" class="nav-count"></span></a><a href="#orders" data-nav="orders">Задания <span id="nav-orders" class="nav-count"></span></a></nav>
-  <nav id="analytics-navigation" class="context-tabs" aria-label="Аналитика" hidden><a href="#shift" data-nav="shift">Результаты смены</a><a href="#lab" data-nav="lab">Модели и эксперименты</a></nav>
+  <nav id="report-navigation" class="context-tabs" aria-label="Отчёт" hidden><a href="#case" data-nav="case">Данные кейса</a><a href="#handover" data-nav="handover">Передача смены</a><a href="#shift" data-nav="shift">Результаты смены</a><a href="#effect" data-nav="effect">Эффект</a></nav>
+  <nav id="more-navigation" class="context-tabs" aria-label="Дополнительные разделы" hidden><a href="#dispatcher" data-nav="dispatcher">Задачи и решения</a><a href="#vehicles" data-nav="vehicles">Автомобили <span id="nav-vehicles" class="nav-count"></span></a><a href="#orders" data-nav="orders">Задания <span id="nav-orders" class="nav-count"></span></a><a href="#lab" data-nav="lab">Модели</a><a href="#video" data-nav="video">Видеоэксперимент</a></nav>
 </div>
 <div id="error" role="alert" hidden></div>
 <main>
@@ -95,7 +95,7 @@
       <div class="split"><div id="vehicle-list" class="panel list-panel"></div><article id="vehicle-passport" class="panel passport" aria-live="polite"></article></div>
     </section>
 
-    <section id="view-orders" class="view" aria-labelledby="h-orders" hidden>
+    <section id="view-orders" class="view orders-view" aria-labelledby="h-orders" hidden>
       <h1 id="h-orders" class="view-title">Производственные задания <span>партии разворачиваются в конкретные автомобили</span></h1>
       <form id="release-form" class="panel release-form">
         <h2 class="panel-title">Выпустить задание</h2>
@@ -109,10 +109,12 @@
         <button class="primary" type="submit">Выпустить в работу</button>
         <p id="release-note" class="fine-print"></p>
       </form>
+      <div id="orders-filters" class="orders-filters" role="group" aria-label="Фильтр заданий"></div>
+      <p id="orders-result" class="orders-result" role="status"></p>
       <div id="order-list" class="order-list"></div>
     </section>
 
-    <section id="view-shift" class="view" aria-labelledby="h-shift" hidden>
+    <section id="view-shift" class="view shiftx-view" aria-labelledby="h-shift" hidden>
       <h1 id="h-shift" class="view-title">Результаты смены <span>все показатели из того же состояния мастерской</span></h1>
       <section class="panel shift-first" aria-labelledby="h-shift-first"><h2 id="h-shift-first" class="sr-only">Главное о смене</h2><div id="shift-first"></div>
         <div class="ai-header"><div><strong>Объяснение</strong><span id="ai-source">Локальный режим доступен без ключа</span></div><button id="explain" class="primary">Объяснить ↗</button></div>
@@ -137,8 +139,10 @@
       </details>
       <details class="more"><summary>OEE по постам, определения метрик, журналы инцидентов и событий</summary>
       <div class="panel">
-        <h2 class="panel-title">Посты: доступность, производительность, качество</h2>
-        <div class="table-scroll" tabindex="0" role="region" aria-label="Таблица OEE постов"><table id="oee-table"></table></div>
+        <h2 class="panel-title">OEE по постам</h2>
+        <p id="shiftx-oee-note" class="shiftx-note">A — доступность, P — производительность, Q — качество. Время работы и потерь — модельные минуты. Прочерк: нет времени смены для A, времени работы для P или завершённых операций для Q производственных участков; OEE требует все три компонента. Для контроля, доработки и отгрузки Q = 100% по определению модели, не по выборке измерений. Нажмите заголовок для сортировки.</p>
+        <p id="shiftx-sort-status" class="shiftx-note" role="status"></p>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="Таблица OEE постов"><table id="oee-table" class="shiftx-oee" aria-describedby="shiftx-oee-note"></table></div>
         <details class="definitions"><summary>Определения метрик</summary>
           <p><b>Плановое время</b> поста — прошедшие минуты смены. <b>A</b> = минуты работы / плановое время; все остановки — неисправность, работы техника, нет автомобиля на входе, блокировка следующим буфером — потери доступности, показаны раздельно.</p>
           <p><b>P</b> = нормативная работа / минуты работы (снижение темпа и износ подъёмника уменьшают P). <b>Q</b> поста = (выполненные операции − операции на автомобилях, у которых контроль выявил дефект этого участка именно с этого поста) / выполненные операции. Для контроля, доработки и отгрузки Q = 100%: они не создают продукцию. Доработка не считается выпуском. <b>OEE</b> = A × P × Q по каждому посту; среднего «OEE завода» нет — общий выпуск показан отдельно.</p>
@@ -152,9 +156,88 @@
       </details>
     </section>
 
+    <section id="view-overview" class="view" aria-labelledby="h-overview" hidden>
+      <div class="ov-head"><h1 id="h-overview" class="view-title">Обзор <span id="ov-period"></span></h1><div class="ov-switch" id="ov-switch" role="group" aria-label="Источник данных"></div></div>
+      <p class="case-mode" role="note" id="ov-label"></p>
+      <div id="ov-body"></div>
+    </section>
+    <section id="view-effect" class="view" aria-labelledby="h-effect" hidden>
+      <p class="case-mode" role="note">Синтетическая симуляция. Измеренный результат и потенциальный эффект показаны раздельно</p>
+      <h1 id="h-effect" class="view-title">Эффект <span>что измерено в симуляции и что можно оценить для предприятия</span></h1>
+      <div id="effect-body"></div>
+    </section>
+
+    <section id="view-handover" class="view handover-view" aria-labelledby="h-handover" hidden>
+      <header class="handover-header"><div><p class="handover-eyebrow">АНАЛИТИКА · ПЕРЕДАЧА СМЕНЫ</p><h1 id="h-handover">Что передаём следующей смене</h1><p class="handover-description">Показатели и незавершённые дела из одного снимка производства.</p></div><span class="handover-badge">Синтетические данные</span></header>
+      <div class="handover-toolbar" aria-label="Срез и выгрузка"><button type="button" id="handover-refresh" class="handover-refresh" data-handover-refresh="1" data-focus-key="handover-refresh">Обновить срез</button><a class="handover-download" data-focus-key="handover-json" href="/api/handover?format=json" download>Скачать JSON</a><a class="handover-download" data-focus-key="handover-csv" href="/api/handover?format=csv" download>Скачать CSV</a></div>
+      <p class="handover-note">Выгрузка создаёт новый срез на момент скачивания. Время указано в модельных часах смены; «—» означает отсутствие данных.</p>
+      <p id="handover-status" class="handover-status" role="status" aria-live="polite" aria-atomic="true">Ожидаем загрузку среза.</p>
+      <div id="handover-content" aria-busy="false"></div>
+    </section>
+
     <section id="view-lab" class="view" aria-labelledby="h-lab" hidden>
       <h1 id="h-lab" class="view-title">Лаборатория моделей <span>синтетическое обучение и проверка, не для реального оборудования Allur</span></h1>
       <div id="lab"></div>
+    </section>
+    <section id="view-case" class="view" aria-labelledby="h-case" hidden>
+      <p class="case-mode" role="note">Тестовые данные задания. Не подтверждённые реальные показатели Allur</p>
+      <h1 id="h-case" class="view-title">Данные кейса <span>отклонения по участкам → подтверждающие записи → проверки</span></h1>
+      <form id="case-filters" class="panel case-filters no-print">
+        <div class="case-source" id="case-source">Загрузка набора данных…</div>
+        <label>С даты <select id="case-from"></select></label>
+        <label>По дату <select id="case-to"></select></label>
+        <label>Участок <select id="case-stage"></select></label>
+        <button type="button" id="case-reset" class="quiet">Сбросить фильтр</button>
+        <span class="grow"></span>
+        <button type="button" id="case-csv">Экспорт CSV</button>
+        <button type="button" id="case-print" class="primary">Отчёт / PDF</button>
+      </form>
+      <div id="case-body"></div>
+    </section>
+
+    <section id="view-video" class="view" aria-labelledby="h-video" hidden>
+      <h1 id="h-video" class="view-title">Видеоанализ <span>воспроизведение результатов анализа записи — не прямой эфир</span></h1>
+      <div class="panel va-load no-print">
+        <label class="va-file">Видеозапись <input type="file" id="va-video-file" accept="video/*"></label>
+        <label class="va-file">Результаты анализа (JSON) <input type="file" id="va-json-file" accept=".json,application/json"></label>
+        <button type="button" id="va-demo" class="secondary">Пример: результаты анализа записи</button>
+        <p class="fine-print">Файлы открываются только в этом браузере и не отправляются на сервер. Видео не обязательно: без него показываются только результаты на схеме кадра.</p>
+        <div id="va-messages" aria-live="polite"></div>
+      </div>
+      <div id="va-body" hidden>
+        <div id="va-source" class="panel va-source"></div>
+        <div class="va-grid">
+          <div class="panel va-player-panel">
+            <div id="va-stage" class="va-stage no-video">
+              <video id="va-video" class="va-video" playsinline muted hidden></video>
+              <svg id="va-overlay" class="va-overlay" role="img" aria-label="Рамки объектов и зоны наблюдения на кадре"></svg>
+            </div>
+            <div class="va-controls no-print">
+              <button type="button" id="va-play" class="icon-btn" aria-label="Воспроизвести">▶</button>
+              <input type="range" id="va-seek" min="0" max="1" step="0.1" value="0" aria-label="Время записи">
+              <output id="va-time" class="va-time">00:00.0</output>
+            </div>
+            <p id="va-frame-note" class="fine-print" aria-live="polite"></p>
+          </div>
+          <div class="panel va-side">
+            <h2 class="panel-title">Превышения демонстрационного порога <span class="tag">причина не определяется</span></h2>
+            <ol id="va-delays" class="va-delays"></ol>
+          </div>
+        </div>
+        <div class="panel">
+          <h2 class="panel-title">Число наблюдаемых объектов в зоне по времени</h2>
+          <svg id="va-chart" class="va-chart" viewBox="0 0 900 200" role="img" aria-label="Число наблюдаемых объектов в каждой зоне по времени записи"></svg>
+          <div id="va-chart-legend" class="chart-legend"></div>
+          <p class="fine-print">Количество объектов, которые видны в зоне на проанализированном кадре. Это не длина очереди; разрыв линии — нет наблюдений.</p>
+        </div>
+        <div class="panel">
+          <div class="va-table-head"><h2 class="panel-title">Посещения зон</h2><span class="grow"></span><button type="button" id="va-csv" class="no-print">Экспорт CSV</button><button type="button" id="va-print" class="no-print">Печатный отчёт / PDF</button></div>
+          <div class="table-scroll" tabindex="0" role="region" aria-label="Таблица посещений зон"><table id="va-visits" class="va-table"></table></div>
+          <h3 class="va-subtitle">Незавершённые посещения</h3>
+          <div class="table-scroll" tabindex="0" role="region" aria-label="Незавершённые посещения"><table id="va-open" class="va-table"></table></div>
+          <p class="fine-print">Наблюдаемая длительность — время, когда объект виден в зоне на записи; это не подтверждённое время операции. Превышение = max(0, наблюдаемая длительность − порог). Для потерянных, оставшихся в зоне и обрезанных окном измерения объектов это нижняя оценка. OEE, брак и вероятность поломки по рамкам видео не рассчитываются.</p>
+        </div>
+      </div>
     </section>
     <footer><span>ALLUR SMART FACTORY · SYNTHETIC DEMO · учебная симуляция, не система Allur</span><span>Состояние сохраняется локально в data/ · «Сбросить смену» — в меню «Смена»</span></footer>
   </div>

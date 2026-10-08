@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "id": "case-test-data-2026-10",
+  "title": "Тестовые данные кейса «Цифровой двойник»",
+  "label": "Тестовые данные задания. Не подтверждённые реальные показатели Allur",
+  "source": {
+    "document": "Кейс_Цифровой_двойник_Тестовые_данные.docx",
+    "note": "Значения перенесены из транскрипции таблиц задания; исходный .docx при подготовке не был доступен. Записи не дополнялись."
+  },
+  "unit": "ед.",
+  "route": ["Склад комплектующих", "Сварка", "Окраска", "Сборка", "Контроль качества", "Склад готовой продукции"],
+  "lineStage": { "Сварка-1": "Сварка", "Окраска-1": "Окраска", "Сборка-1": "Сборка" },
+  "conditions": { "shifts": 2, "shiftHours": 8, "oeeTargetPct": 85, "maxDefectPct": 2, "maxCriticalDowntimeMinPerDay": 60, "monthlyPlanMin": 5500 },
+  "lines": [
+    { "date": "2026-10-01", "line": "Сварка-1", "plan": 120, "fact": 118, "hours": 7.8, "loadPct": 98 },
+    { "date": "2026-10-01", "line": "Окраска-1", "plan": 120, "fact": 115, "hours": 7.5, "loadPct": 94 },
+    { "date": "2026-10-01", "line": "Сборка-1", "plan": 120, "fact": 121, "hours": 8.0, "loadPct": 100 },
+    { "date": "2026-10-02", "line": "Сварка-1", "plan": 120, "fact": 111, "hours": 7.2, "loadPct": 91 },
+    { "date": "2026-10-02", "line": "Окраска-1", "plan": 120, "fact": 116, "hours": 7.7, "loadPct": 96 },
+    { "date": "2026-10-02", "line": "Сборка-1", "plan": 120, "fact": 119, "hours": 7.9, "loadPct": 99 }
+  ],
+  "downtime": [
+    { "date": "2026-10-01", "stage": "Сварка", "equipment": "ABB-01", "reason": "Ошибка датчика", "minutes": 25 },
+    { "date": "2026-10-01", "stage": "Окраска", "equipment": "Камера-02", "reason": "Замена фильтра", "minutes": 40 },
+    { "date": "2026-10-02", "stage": "Сборка", "equipment": "Конвейер-03", "reason": "Обрыв цепи", "minutes": 55 },
+    { "date": "2026-10-02", "stage": "Сварка", "equipment": "ABB-04", "reason": "Плановое ТО", "minutes": 30 }
+  ],
+  "modelPlan": [
+    { "model": "Chevrolet Onix", "plan": 2500 },
+    { "model": "Chevrolet Cobalt", "plan": 1800 },
+    { "model": "JAC J7", "plan": 500 }
+  ],
+  "quality": [
+    { "date": "2026-10-01", "stage": "Сварка", "produced": 118, "defects": 2, "sourceDefectPct": 1.7 },
+    { "date": "2026-10-01", "stage": "Окраска", "produced": 115, "defects": 4, "sourceDefectPct": 3.5 },
+    { "date": "2026-10-01", "stage": "Сборка", "produced": 121, "defects": 1, "sourceDefectPct": 0.8 },
+    { "date": "2026-10-02", "stage": "Сварка", "produced": 111, "defects": 3, "sourceDefectPct": 2.7 },
+    { "date": "2026-10-02", "stage": "Окраска", "produced": 116, "defects": 6, "sourceDefectPct": 5.2 },
+    { "date": "2026-10-02", "stage": "Сборка", "produced": 119, "defects": 2, "sourceDefectPct": 1.7 }
+  ]
+}

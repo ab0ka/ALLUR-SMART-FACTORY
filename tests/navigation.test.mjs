@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 
 // Exercise the actual route/render functions without a WebGL or HTTP dependency.
+const contextSource = await readFile(new URL('../public/app/56-context-routes.js', import.meta.url), 'utf8');
 const source = (await readFile(new URL('../public/app/90-routing-startup.js', import.meta.url), 'utf8')).split("window.addEventListener('hashchange'")[0];
 function harness() {
   const elements = new Map(), calls = [];
@@ -14,16 +15,17 @@ function harness() {
   const c = vm.createContext({
     VIEWS: ['dispatcher', 'workshop', 'vehicles', 'orders', 'shift', 'lab'],
     SPACES: { assembly: { short: 'Сборка' }, ship: { short: 'Отгрузка' } },
-    view: 'space', space: 'assembly', state: {}, lab: {}, chatContext: null, selectedVehicle: null,
+    view: 'space', space: 'assembly', state: { vehicles: [1,2,3,4,5].map(n => ({ id: `DEMO-00${n}` })), posts: [], problems: [], orders: [], decisions: [], events: [] }, lab: {}, chatContext: null, selectedVehicle: null,
     ui: { panel: { type: 'vehicle', id: 'DEMO-001' }, selected: { type: 'vehicle', id: 'DEMO-001' }, car3d: 'DEMO-001', ribbonOnlySelected: true },
     c3: { viewer: {}, loading: false },
     $: element, text: (id, value) => { element(id).textContent = value; },
     document: { querySelectorAll: () => [], activeElement: null, body: {} },
-    destroyScene() {}, loadLab() {}, renderChrome() {},
+    destroyScene() {}, loadLab() {}, renderChrome() {}, requestAnimationFrame() {},
+    setChatContext(ctx) { c.chatContext = ctx; },
     renderCar3d() { calls.push('dispose3d'); c.c3.viewer = null; },
   });
   for (const name of ['renderSpace', 'renderThreat', 'renderTasks', 'renderDecisions', 'renderSide', 'renderActiveProblems', 'renderMap', 'renderPostDetail', 'renderPostBoard', 'renderVehicles', 'renderOrders', 'renderShift', 'renderLab']) c[name] = () => calls.push(name);
-  vm.runInContext(source, c);
+  vm.runInContext(contextSource + source, c);
   return { c, elements, calls };
 }
 
@@ -53,18 +55,21 @@ test('leaving 3D renders the destination in the same cycle', () => {
   assert.deepEqual(calls, ['renderVehicles', 'renderSide', 'dispose3d']);
   assert.equal(c.ui.car3d, null);
   assert.equal(elements.get('shop-navigation').hidden, true);
-  assert.equal(elements.get('manage-navigation').hidden, true);
-  assert.equal(elements.get('analytics-navigation').hidden, true);
+  assert.equal(elements.get('report-navigation').hidden, true);
+  assert.equal(elements.get('more-navigation').hidden, false, 'the vehicle list is a secondary screen under «Ещё»');
 });
 
-test('secondary navigation is scoped to management or analytics', () => {
+test('secondary navigation is scoped to the report or the secondary screens', () => {
   const { c, elements } = harness();
   c.setView('orders');
-  assert.equal(elements.get('manage-navigation').hidden, false);
-  assert.equal(elements.get('analytics-navigation').hidden, true);
+  assert.equal(elements.get('report-navigation').hidden, true);
+  assert.equal(elements.get('more-navigation').hidden, false);
+  c.setView('shift');
+  assert.equal(elements.get('report-navigation').hidden, false);
+  assert.equal(elements.get('more-navigation').hidden, true);
   c.setView('lab');
-  assert.equal(elements.get('manage-navigation').hidden, true);
-  assert.equal(elements.get('analytics-navigation').hidden, false);
+  assert.equal(elements.get('report-navigation').hidden, true);
+  assert.equal(elements.get('more-navigation').hidden, false);
 });
 
 test('cards, 3D and chat deep links work on every screen, not only in shops', () => {

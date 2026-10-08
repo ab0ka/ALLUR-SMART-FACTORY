@@ -1,5 +1,7 @@
 import http from 'node:http';
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHandover } from './handover.mjs';
+import { formatHandover } from './handover-export.mjs';
+import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -13,7 +15,7 @@ import { loadRiskModel, assessRisk, labSummary, loadPolicyReport } from './risk-
 import { stageKpis } from './kpi.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const assets = { '/': ['index.html', 'text/html; charset=utf-8'], '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/scene.js': ['scene.js', 'text/javascript; charset=utf-8'], '/shop-scene.js': ['shop-scene.js', 'text/javascript; charset=utf-8'], '/viewer3d.js': ['viewer3d.js', 'text/javascript; charset=utf-8'], '/three.module.js': ['three.module.js', 'text/javascript; charset=utf-8'], '/three-orbit-controls.js': ['three-orbit-controls.js', 'text/javascript; charset=utf-8'], '/styles.css': ['styles.css', 'text/css; charset=utf-8'], '/favicon.svg': ['favicon.svg', 'image/svg+xml'], '/car-kia-a-done.webp': ['car-kia-a-done.webp', 'image/webp'], '/car-kia-a-body.webp': ['car-kia-a-body.webp', 'image/webp'], '/car-kia-b-done.webp': ['car-kia-b-done.webp', 'image/webp'], '/car-kia-b-body.webp': ['car-kia-b-body.webp', 'image/webp'], '/car-kia-c-done.webp': ['car-kia-c-done.webp', 'image/webp'], '/car-kia-c-body.webp': ['car-kia-c-body.webp', 'image/webp'] };
+const assets = { '/': ['index.html', 'text/html; charset=utf-8'], '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/scene.js': ['scene.js', 'text/javascript; charset=utf-8'], '/shop-scene.js': ['shop-scene.js', 'text/javascript; charset=utf-8'], '/video-analytics.js': ['video-analytics.js', 'text/javascript; charset=utf-8'], '/video-fixture.json': ['video-fixture.json', 'application/json; charset=utf-8'], '/case-analysis.js': ['case-analysis.js', 'text/javascript; charset=utf-8'], '/case-dataset.json': ['case-dataset.json', 'application/json; charset=utf-8'], '/viewer3d.js': ['viewer3d.js', 'text/javascript; charset=utf-8'], '/three.module.js': ['three.module.js', 'text/javascript; charset=utf-8'], '/three-orbit-controls.js': ['three-orbit-controls.js', 'text/javascript; charset=utf-8'], '/styles.css': ['styles.css', 'text/css; charset=utf-8'], '/favicon.svg': ['favicon.svg', 'image/svg+xml'], '/car-kia-a-done.webp': ['car-kia-a-done.webp', 'image/webp'], '/car-kia-a-body.webp': ['car-kia-a-body.webp', 'image/webp'], '/car-kia-b-done.webp': ['car-kia-b-done.webp', 'image/webp'], '/car-kia-b-body.webp': ['car-kia-b-body.webp', 'image/webp'], '/car-kia-c-done.webp': ['car-kia-c-done.webp', 'image/webp'], '/car-kia-c-body.webp': ['car-kia-c-body.webp', 'image/webp'] };
 // Optional exterior model downloaded by the user (CC BY 4.0, see docs/ASSETS.md). It is not in Git or dist: exactly two
 // files are served from assets-src/kia-sportage if they exist; nothing else in that folder is reachable.
 const MODEL_FILES = { '/models/kia-sportage/scene.gltf': ['scene.gltf', 'model/gltf+json'], '/models/kia-sportage/scene.bin': ['scene.bin', 'application/octet-stream'] };
@@ -39,6 +41,8 @@ export function fullState(sim, { aiOptions = {}, riskModel = null } = {}) {
 }
 export function createApp({ simulation = new Workshop(), aiOptions = {}, tickMs = 1200, publicDir = path.join(root, 'dist'), modelDir = path.join(root, 'assets-src', 'kia-sportage'), storePath = null, riskModel = null, policyReport = null, chatMinIntervalMs = 1000 } = {}) {
   let sim = simulation;
+  // Public lifetime marker for clients; independent of engine persistence and CSRF.
+  let shiftEpoch = randomUUID();
   const token = randomBytes(32).toString('hex'), llm = { busy: false, last: 0 };
   let lastChat = 0, ticksSinceSave = 0;
   const persist = () => {
@@ -46,12 +50,12 @@ export function createApp({ simulation = new Workshop(), aiOptions = {}, tickMs 
     try { saveState(storePath, sim, [aiOptions.key]); ticksSinceSave = 0; }
     catch { console.error('Не удалось сохранить состояние смены (подробности скрыты).'); }
   };
-  const state = () => ({ ...fullState(sim, { aiOptions, riskModel }), csrf: token });
+  const state = () => ({ ...fullState(sim, { aiOptions, riskModel }), shiftEpoch, csrf: token });
   const server = http.createServer(async (req, res) => {
     const send = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(body)); };
     res.setHeader('Cache-Control', 'no-store'); res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer'); res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
     const port = server.address()?.port;
     const allowedHosts = [`127.0.0.1:${port}`, `localhost:${port}`];
     if (!allowedHosts.includes(req.headers.host)) return send(403, { error: 'Недопустимый Host' });
@@ -63,6 +67,14 @@ export function createApp({ simulation = new Workshop(), aiOptions = {}, tickMs 
       // A plain top-level link from another site may open the page itself; API and assets stay same-origin only.
       const pageNavigation = req.method === 'GET' && url.pathname === '/' && req.headers['sec-fetch-mode'] === 'navigate' && req.headers['sec-fetch-dest'] === 'document';
       if (req.headers['sec-fetch-site'] === 'cross-site' && !pageNavigation) return send(403, { error: 'Внешние запросы запрещены' });
+      if (req.method === 'GET' && url.pathname === '/api/handover') {
+        const format = url.searchParams.get('format');
+        if (format !== null && format !== 'json' && format !== 'csv') throw clientError('Неизвестный формат передачи смены');
+        const snapshot = sim.snapshot();
+        snapshot.shiftEpoch = shiftEpoch;
+        const output = formatHandover(createHandover(snapshot), format);
+        res.writeHead(200, output.headers); return res.end(output.body);
+      }
       if (req.method === 'GET' && url.pathname === '/api/state') return send(200, state());
       if (req.method === 'GET' && url.pathname === '/api/health') return send(200, { ok: true, synthetic: true, aiProvider: aiOptions.provider || 'nvidia', aiConfigured: aiOptions.provider !== 'local' && Boolean(aiOptions.key?.trim()) });
       if (req.method === 'GET' && url.pathname === '/api/lab') return send(200, { ...labSummary(riskModel), policies: policyReport });
@@ -97,7 +109,7 @@ export function createApp({ simulation = new Workshop(), aiOptions = {}, tickMs 
           case 'pause': sim.running = false; break;
           case 'step': sim.advance(5); break;
           case 'speed': if (![1, 5, 15].includes(body.value)) throw clientError('Неизвестная скорость'); sim.speed = body.value; break;
-          case 'reset': sim.reset(42); break;
+          case 'reset': sim.reset(42); shiftEpoch = randomUUID(); break;
           default: { const r = sim.command(body, 'operator'); if (r.duplicate) { const s = state(); return send(200, { ...s, duplicate: true }); } }
         }
         persist();

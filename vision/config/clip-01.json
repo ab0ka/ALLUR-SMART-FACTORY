@@ -4,11 +4,15 @@
   "modelName": "YOLOX-S (Megvii, Apache-2.0), ONNX opset 11, COCO; onnxruntime 1.30 CPU",
   "source": {
     "id": "clip-01",
-    "title": "Машины ждут сигнала светофора: съёмка из машины, стоящей на перекрёстке (камера почти неподвижна). Иллюстрация метода — не производство и не Allur",
+    "title": "Машины ждут сигнала светофора: съёмка из машины, стоящей на перекрёстке (камера почти неподвижна до ~21,8 с). Иллюстрация метода — не производство и не Allur",
     "url": "https://www.pexels.com/video/cars-waiting-in-a-traffic-light-5675618/",
     "license": "Pexels License (https://www.pexels.com/license/): бесплатно, атрибуция не обязательна",
     "synthetic": false
   },
+  "validFromSec": 0,
+  "validUntilSec": 21.8,
+  "validReason": "камера неподвижна до ~21,8 с; дальше машина с камерой трогается и камера движется, зона в координатах кадра перестаёт быть местом на дороге",
+  "validNote": "дальше камера движется",
   "sampleFps": 5,
   "highThr": 0.5,
   "lowThr": 0.1,
