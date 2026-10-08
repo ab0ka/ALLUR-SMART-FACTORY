@@ -12,7 +12,7 @@ import { answerChat, CHAT_LIMITS } from './chat.mjs';
 import { loadRiskModel, assessRisk, labSummary, loadPolicyReport } from './risk-model.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const assets = { '/': ['index.html', 'text/html; charset=utf-8'], '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/scene.js': ['scene.js', 'text/javascript; charset=utf-8'], '/styles.css': ['styles.css', 'text/css; charset=utf-8'], '/favicon.svg': ['favicon.svg', 'image/svg+xml'] };
+const assets = { '/': ['index.html', 'text/html; charset=utf-8'], '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/scene.js': ['scene.js', 'text/javascript; charset=utf-8'], '/styles.css': ['styles.css', 'text/css; charset=utf-8'], '/favicon.svg': ['favicon.svg', 'image/svg+xml'], '/video-analytics.js': ['video-analytics.js', 'text/javascript; charset=utf-8'], '/video-fixture.json': ['video-fixture.json', 'application/json; charset=utf-8'] };
 const safeEqual = (a, b) => typeof a === 'string' && Buffer.byteLength(a) === Buffer.byteLength(b) && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 // Expected client errors carry `expose`; anything else is an unexpected server error (500, generic message).
 const clientError = (message, status = 400) => Object.assign(new Error(message), { status, expose: true });
@@ -46,7 +46,7 @@ export function createApp({ simulation = new Workshop(), aiOptions = {}, tickMs 
     const send = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(body)); };
     res.setHeader('Cache-Control', 'no-store'); res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer'); res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
     const port = server.address()?.port;
     const allowedHosts = [`127.0.0.1:${port}`, `localhost:${port}`];
     if (!allowedHosts.includes(req.headers.host)) return send(403, { error: 'Недопустимый Host' });

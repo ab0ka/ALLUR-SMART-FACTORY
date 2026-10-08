@@ -18,7 +18,7 @@ const JOB_STATUS = { queued: 'в очереди техника', running: 'вы�
 const FILTERS = [['all', 'Все'], ['active', 'В работе'], ['queued', 'В очередях'], ['problem', 'Пауза, блокировки, доработка'], ['done', 'Приняты и отгружены']];
 const filterOf = { all: () => true, active: v => ['processing', 'rework'].includes(v.state), queued: v => ['not_started', 'waiting'].includes(v.state), problem: v => ['paused', 'blocked', 'stopped', 'rework_wait', 'rework'].includes(v.state), done: v => v.accepted };
 const SUGGESTED = ['Что сейчас угрожает плану?', 'Почему задерживается этот автомобиль?', 'На чём основана гипотеза неисправности?', 'Какую проверку выполнить?', 'Сравни ремонт сейчас и продолжение работы', 'Что даст перевод на другой пост?', 'Почему результат отличается от прогноза?'];
-const VIEWS = ['dispatcher', 'workshop', 'vehicles', 'orders', 'shift', 'lab'];
+const VIEWS = ['dispatcher', 'workshop', 'vehicles', 'orders', 'shift', 'lab', 'video'];
 let state = null, view = 'space', selectedPost = 'A2', selectedVehicle = null, selectedProblem = null, vehicleFilter = 'all', chatContext = null;
 let updating = false, fetching = false, aiRevision = null, aiBusy = false, chatBusy = false, lab = null;
 const text = (id, value) => { $(id).textContent = value; };

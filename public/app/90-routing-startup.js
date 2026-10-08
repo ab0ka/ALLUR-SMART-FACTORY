@@ -36,6 +36,7 @@ function render() {
   else if (view === 'vehicles') renderVehicles();
   else if (view === 'orders') renderOrders();
   else if (view === 'shift') renderShift();
+  else if (view === 'video') renderVideo();
   else renderLab();
   if (key && !document.activeElement?.closest('main')) document.querySelector(key)?.focus({ preventScroll: true });
 }
