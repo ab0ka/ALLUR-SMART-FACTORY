@@ -1,0 +1,215 @@
+{
+  "synthetic": true,
+  "browser": "154.0.4258.62",
+  "port": 3032,
+  "vehicleId": "DEMO-008",
+  "problemId": "PR-1",
+  "checkpoints": [
+    {
+      "name": "01-vehicle",
+      "minute": 190,
+      "jobs": [],
+      "decisions": 0
+    },
+    {
+      "name": "02-diagnostic-confirmation",
+      "minute": 190,
+      "jobs": [],
+      "decisions": 0
+    },
+    {
+      "name": "03-diagnosis-result",
+      "minute": 200,
+      "jobs": [
+        {
+          "id": "JOB-1",
+          "kind": "pump_check",
+          "status": "done"
+        }
+      ],
+      "decisions": 0
+    },
+    {
+      "name": "04-repair-confirmation",
+      "minute": 200,
+      "jobs": [
+        {
+          "id": "JOB-1",
+          "kind": "pump_check",
+          "status": "done"
+        }
+      ],
+      "decisions": 0
+    },
+    {
+      "name": "05-repair-running",
+      "minute": 200,
+      "jobs": [
+        {
+          "id": "JOB-1",
+          "kind": "pump_check",
+          "status": "done"
+        },
+        {
+          "id": "JOB-2",
+          "kind": "repair_pump",
+          "status": "running"
+        }
+      ],
+      "decisions": 1
+    },
+    {
+      "name": "06-verification",
+      "minute": 255,
+      "jobs": [
+        {
+          "id": "JOB-1",
+          "kind": "pump_check",
+          "status": "done"
+        },
+        {
+          "id": "JOB-2",
+          "kind": "repair_pump",
+          "status": "done"
+        },
+        {
+          "id": "JOB-3",
+          "kind": "verify",
+          "status": "running"
+        }
+      ],
+      "decisions": 1
+    },
+    {
+      "name": "07-resolved",
+      "minute": 260,
+      "jobs": [
+        {
+          "id": "JOB-1",
+          "kind": "pump_check",
+          "status": "done"
+        },
+        {
+          "id": "JOB-2",
+          "kind": "repair_pump",
+          "status": "done"
+        },
+        {
+          "id": "JOB-3",
+          "kind": "verify",
+          "status": "done"
+        }
+      ],
+      "decisions": 1
+    }
+  ],
+  "result": {
+    "status": "passed",
+    "resolvedAt": 260,
+    "jobs": [
+      {
+        "id": "JOB-1",
+        "kind": "pump_check",
+        "title": "Замер тока и температуры насоса",
+        "type": "check",
+        "postId": "A2",
+        "postCode": "СБ-2",
+        "equipmentId": "LIFT-A2",
+        "problemId": "PR-1",
+        "technicianId": "T1",
+        "createdAt": 190,
+        "startedAt": 190,
+        "completedAt": 200,
+        "duration": 10,
+        "remaining": 0,
+        "status": "done",
+        "part": null,
+        "followUp": null,
+        "decisionId": null,
+        "urgent": false,
+        "result": {
+          "value": 14,
+          "unit": "А",
+          "measure": "Ток насоса под нагрузкой",
+          "text": "ток повышен — износ насоса подтверждён"
+        }
+      },
+      {
+        "id": "JOB-2",
+        "kind": "repair_pump",
+        "title": "Замена гидронасоса",
+        "type": "repair",
+        "postId": "A2",
+        "postCode": "СБ-2",
+        "equipmentId": "LIFT-A2",
+        "problemId": "PR-1",
+        "technicianId": "T1",
+        "createdAt": 200,
+        "startedAt": 200,
+        "completedAt": 255,
+        "duration": 55,
+        "remaining": 0,
+        "status": "done",
+        "part": "pump",
+        "followUp": null,
+        "decisionId": "DEC-1",
+        "urgent": false,
+        "result": {
+          "text": "ремонт выполнен, нужна проверка восстановления"
+        }
+      },
+      {
+        "id": "JOB-3",
+        "kind": "verify",
+        "title": "Проверка после ремонта",
+        "type": "verify",
+        "postId": "A2",
+        "postCode": "СБ-2",
+        "equipmentId": "LIFT-A2",
+        "problemId": "PR-1",
+        "technicianId": "T1",
+        "createdAt": 255,
+        "startedAt": 255,
+        "completedAt": 260,
+        "duration": 5,
+        "remaining": 0,
+        "status": "done",
+        "part": null,
+        "followUp": null,
+        "decisionId": "DEC-1",
+        "urgent": true,
+        "result": {
+          "restored": true,
+          "cycle": 42.2,
+          "pressure": 181.9,
+          "text": "параметры в норме — подъёмник восстановлен"
+        }
+      }
+    ],
+    "decisions": [
+      {
+        "id": "DEC-1",
+        "title": "Ремонт по установленной причине: замена гидронасоса"
+      }
+    ],
+    "partAfterScheduling": {
+      "id": "pump",
+      "name": "Гидронасос подъёмника",
+      "cost": 26000,
+      "onHand": 1,
+      "reserved": 1,
+      "used": 0,
+      "available": 0
+    },
+    "partAfterVerification": {
+      "id": "pump",
+      "name": "Гидронасос подъёмника",
+      "cost": 26000,
+      "onHand": 0,
+      "reserved": 0,
+      "used": 1,
+      "available": 0
+    }
+  },
+  "issues": []
+}
