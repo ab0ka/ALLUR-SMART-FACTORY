@@ -2,7 +2,7 @@
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html{scroll-padding-top:90px}
-body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.5}
+body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.5}
 button,select,input{font:inherit;color:inherit}
 button{border:1px solid #C9D3DD;border-radius:7px;background:#FFFFFF;padding:9px 13px;cursor:pointer;font-size:14px;font-weight:600;min-height:40px}
 button:hover{background:#EEF2F6}
@@ -339,7 +339,7 @@ code{background:#F7F9FB;padding:1px 5px;border-radius:4px}
 
 
 /* ===== Light game-style shell: top bar, spaces, isometric scene, side panel, ribbon ===== */
-.topbar{position:sticky;top:0;z-index:30;height:64px;display:flex;align-items:center;gap:12px;padding:0 14px;background:#fff;border-bottom:1px solid var(--line)}
+.topbar{position:sticky;top:0;z-index:30;flex:none;height:64px;display:flex;align-items:center;gap:12px;padding:0 14px;background:#fff;border-bottom:1px solid var(--line)}
 .brand{display:flex;gap:9px;align-items:center;text-decoration:none;color:var(--text);flex:none}
 .brand-mark{width:36px;height:36px;border-radius:10px;background:var(--lime);display:grid;place-items:center}
 .brand-mark svg{width:22px;height:22px;fill:#17240A}
@@ -376,11 +376,14 @@ code{background:#F7F9FB;padding:1px 5px;border-radius:4px}
 .menu-list a{display:flex;justify-content:space-between;padding:10px 12px;border-radius:8px;text-decoration:none;color:var(--text);font-weight:600;font-size:14px}
 .menu-list a:hover,.menu-list a[aria-current=page]{background:#EEF2F6}
 .menu-list button{margin-top:4px;text-align:left}
-#error{margin:8px 14px 0;padding:10px 14px;border:1px solid #E0675E;background:#FFF4F2;color:#8E1F16;border-radius:8px;position:relative;z-index:5}
-main{padding:0;min-width:0}
+#error{flex:none;margin:8px 14px 0;padding:10px 14px;border:1px solid #E0675E;background:#FFF4F2;color:#8E1F16;border-radius:8px;position:relative;z-index:5}
+main{padding:0;min-width:0;flex:1 0 auto}
 .legacy{max-width:1600px;margin:0 auto;padding:12px 24px 0}
 
-.space-view{position:relative;height:calc(100vh - 64px);min-height:560px;display:flex;overflow:hidden;background:var(--bg)}
+/* Scene height follows the actual header; legacy sections retain document scrolling. */
+body:has(#view-space:not([hidden])){height:100vh;height:100dvh;min-height:0;overflow:hidden}
+body:has(#view-space:not([hidden])) main{display:flex;flex:1 1 0;min-height:0}
+.space-view{position:relative;flex:1 1 0;min-width:0;min-height:0;display:flex;overflow:hidden;background:var(--bg)}
 .space-stage{position:relative;flex:1 1 auto;min-width:0;overflow:hidden}
 .space-stage.enter{animation:space-in .22s ease-out}
 @keyframes space-in{from{transform:scale(.985) translateY(4px)}to{transform:none}}
@@ -565,10 +568,11 @@ button.secondary{background:#F4F8FD;border-color:#B9CDE6;color:var(--link);font-
 .em-card-line{font-size:12.5px;font-weight:600;fill:#3A4B5C}.em-card-line.warn{fill:var(--amber-ink);font-weight:800}
 
 @media(max-width:1440px){.topbar{gap:8px;padding:0 10px}.planfact{width:136px}.brand-text{display:none}.spaces a{padding:0 8px;font-size:13px}.speed button{width:30px}.synthetic{font-size:11.5px;padding:0 8px}#step{display:none}}
-@media(max-width:1100px){
+@media(max-width:1360px){
   .topbar{height:auto;flex-wrap:wrap;padding:8px 10px;row-gap:8px}
-  .spaces{order:5;width:100%;overflow-x:auto}.grow{display:none}
-  .space-view{height:calc(100vh - 112px)}
+  .spaces{order:5;width:100%;max-width:100%;min-width:0;overflow-x:auto}.grow{display:none}
+}
+@media(max-width:1100px){
   .side{position:absolute;left:0;right:0;bottom:0;margin:0;max-height:62%;border-radius:20px 20px 0 0;flex:none}
   .hud{max-width:240px}.hud-card .space-sub{display:none}.hint{display:none}
 }
@@ -576,7 +580,6 @@ button.secondary{background:#F4F8FD;border-color:#B9CDE6;color:var(--link);font-
   .topbar{gap:6px;padding:6px 8px}.planfact{display:none}.timebox{gap:5px}.speed{height:36px}.speed button{width:28px}.icon-btn{width:36px;height:36px}.brand-mark{width:34px;height:34px}
   .menu summary{height:36px;padding:0 9px}.synthetic{order:4;height:30px;font-size:11px}.spaces{order:5;width:auto;flex:1 1 0;min-width:0}
   #diag-toggle-wrap{display:none!important}.clockbox strong{font-size:18px}
-  .space-view{height:calc(100vh - 96px)}
   .scene-wrap,.enterprise-wrap{bottom:60px}
   .ribbon{left:8px;right:8px;bottom:8px}
   .ribbon:not(.collapsed){height:96px}
