@@ -1,24 +1,38 @@
 // ---------- Routing and render ----------
 function setView(hash) {
   const parts = hash.split('/');
-  // A route owns its card. Never carry a selection from another shop or screen.
-  ui.panel = null; ui.selected = null; ui.car3d = null; ui.ribbonOnlySelected = false;
-  let type, id;
-  if (VIEWS.includes(parts[0])) { view = parts[0]; [, type, id] = parts; }
-  else { view = 'space'; space = SPACES[parts[1]] ? parts[1] : 'assembly'; [, , type, id] = parts; }
-  // Deep links: #<screen>/<vehicle|post|problem|compare|chat|car3d>/<id> open the same card as a click.
-  const objId = id ? decodeURIComponent(id) : undefined;
-  if (type === 'car3d' && objId) { ui.car3d = objId; if (view === 'vehicles') selectedVehicle = objId; chatContext = { type: 'vehicle', id: objId }; }
-  else if (type === 'vehicle' && view === 'vehicles') { if (objId) { selectedVehicle = objId; chatContext = { type: 'vehicle', id: objId }; } }
-  else if (['vehicle', 'post', 'problem', 'compare'].includes(type) && objId) {
-    ui.panel = { type, id: objId };
-    if (type === 'vehicle' || type === 'post') ui.selected = { type, id: objId };
-    chatContext = { type: type === 'compare' ? 'problem' : type, id: objId };
-  } else if (type === 'chat') {
+  // A route owns its selection and context, including a return through browser history.
+  ui.panel = null; ui.selected = null; ui.car3d = null; ui.ribbonOnlySelected = false; ui.routeRef = null;
+  let tail;
+  if (VIEWS.includes(parts[0])) { view = parts[0]; tail = parts.slice(1); }
+  else { view = 'space'; space = Object.hasOwn(SPACES, parts[1]) ? parts[1] : 'assembly'; tail = parts.slice(2); }
+  // Keep published ID-only order links readable; new links follow the screen/type/id convention.
+  if (view === 'orders' && tail.length === 1 && tail[0] && tail[0] !== 'chat') tail = ['order', tail[0]];
+  const [type, rawId] = tail, objId = decodeRoutePart(rawId);
+  let ctx = null, missing = false;
+  if (type === 'chat') {
     ui.panel = { type: 'chat' };
-    const [ct, ...rest] = (objId ?? '').split(':');
-    if (ct && rest.length) chatContext = { type: ct, id: rest.join(':') };
+    const resolved = chatRouteContext(tail.slice(1)); ctx = resolved.context; missing = resolved.missing;
+    if (ctx && ['vehicle', 'post'].includes(ctx.type)) ui.selected = { ...ctx };
+  } else if (tail.length === 2) {
+    if (type === 'car3d' && (ctx = validChatContext('vehicle', objId))) {
+      ui.car3d = ctx.id; if (view === 'vehicles') selectedVehicle = ctx.id;
+    } else if (type === 'vehicle' && view === 'vehicles') {
+      ctx = validChatContext('vehicle', objId); selectedVehicle = ctx?.id ?? null;
+    } else if (['vehicle', 'post', 'problem', 'compare'].includes(type)) {
+      ctx = validChatContext(type === 'compare' ? 'problem' : type, objId);
+      if (ctx) { ui.panel = { type, id: ctx.id }; if (['vehicle', 'post'].includes(type)) ui.selected = { ...ctx }; }
+    } else if (type === 'order' && view === 'orders') {
+      ctx = validChatContext('order', objId); if (ctx) ui.routeRef = { ...ctx };
+    } else if (type === 'decision' && view === 'dispatcher') {
+      const item = state.decisions.find(x => x.id === objId);
+      if (item) { ui.routeRef = { type, id: item.id }; ctx = recordChatContext(item); }
+    } else if (type === 'event' && view === 'space') {
+      const item = state.events.find(x => String(x.seq) === objId);
+      if (item) { ui.routeRef = { type, id: String(item.seq) }; ui.ribbonOpen = true; ctx = recordChatContext(item); }
+    }
   }
+  setChatContext(ctx); ui.chatMissing = missing;
   $('view-space').hidden = view !== 'space'; $('legacy').hidden = view === 'space';
   for (const s of document.querySelectorAll('#legacy .view')) s.hidden = s.id !== `view-${view}`;
   for (const a of document.querySelectorAll('[data-nav]')) { if (a.dataset.nav === view) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); }
@@ -29,7 +43,17 @@ function setView(hash) {
   if (view === 'lab' && !lab) loadLab();
   $('summary').hidden = view === 'handover';
   if (typeof handoverRoute === 'function') handoverRoute();
-  render();
+  render(); revealRouteReference();
+}
+function revealRouteReference() {
+  const ref = ui.routeRef;
+  if (!ref) return;
+  requestAnimationFrame(() => {
+    if (ui.routeRef?.type !== ref.type || ui.routeRef?.id !== ref.id) return;
+    const id = ref.type === 'event' ? `ribbon-event-${ref.id}` : `${ref.type}-${ref.id}`;
+    const box = document.getElementById(id), target = ref.type === 'order' ? box?.querySelector('h2') : box;
+    if (target) { target.tabIndex = -1; target.scrollIntoView({ block: 'center', inline: 'center' }); target.focus({ preventScroll: true }); }
+  });
 }
 function renderNavigation() {
   const section = view === 'space' || view === 'workshop' ? 'shops' : view === 'vehicles' ? 'vehicles' : ['dispatcher', 'orders'].includes(view) ? 'manage' : 'analytics';
@@ -63,9 +87,9 @@ function render() {
   else if (view === 'handover') renderHandover();
   else renderLab();
   renderSide(); renderCar3d();
-  if (key && !document.activeElement?.closest('main')) document.querySelector(key)?.focus({ preventScroll: true });
+  if (key && !document.activeElement?.closest('main')) visibleNavigationTarget(key)?.focus({ preventScroll: true });
 }
-window.addEventListener('hashchange', () => { setView(location.hash.slice(1)); restoreScroll(history.state?.scroll); });
+window.addEventListener('hashchange', () => { setView(location.hash.slice(1)); restoreScroll(history.state?.scroll); restoreNavigationFocus(); });
 $('shop-select').addEventListener('change', e => goSpace(e.target.value));
 document.addEventListener('click', e => { if (!$('menu').contains(e.target)) $('menu').open = false; });
 $('play').addEventListener('click', () => action({ action: state.running ? 'pause' : 'play' }));
