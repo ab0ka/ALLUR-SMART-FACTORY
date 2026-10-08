@@ -17,7 +17,7 @@ function vehicleWhere(v) {
 }
 
 // ---------- Navigation that remembers where the user came from ----------
-const VIEW_RETURN = { vehicles: 'К списку автомобилей', dispatcher: 'К задачам смены', orders: 'К заданиям', shift: 'К результатам смены', lab: 'К моделям', workshop: 'К 2D-схеме' };
+const VIEW_RETURN = { vehicles: 'К списку автомобилей', dispatcher: 'К задачам смены', orders: 'К заданиям', shift: 'К результатам смены', lab: 'К моделям', workshop: 'К 2D-схеме', handover: 'К передаче смены' };
 function labelForHash(h) {
   const parts = (h || '').split('/'), [n, a] = parts, [type, id] = n === 'space' ? parts.slice(2) : parts.slice(1);
   let oid = ''; try { oid = id ? decodeURIComponent(id) : ''; } catch { /* A malformed origin still has a safe return label. */ }
@@ -31,32 +31,84 @@ const baseHash = () => view === 'space' ? `space/${space}` : view;
 const returnLabel = () => history.state?.ret?.label ?? labelForHash(baseHash());
 function captureScroll() { return { win: scrollY, list: $('vehicle-list')?.scrollTop ?? 0 }; }
 function restoreScroll(sc) { if (!sc) return; requestAnimationFrame(() => { scrollTo(0, sc.win); if ($('vehicle-list')) $('vehicle-list').scrollTop = sc.list; }); }
-function navigationFocusKey() {
-  const el = document.activeElement;
+function navigationFocusKey(el = document.activeElement) {
   if (!el || el === document.body) return null;
+  if (el.dataset?.focusKey) {
+    const root = el.closest('.view[id]');
+    return `${root ? `#${CSS.escape(root.id)} ` : ''}[data-focus-key="${CSS.escape(el.dataset.focusKey)}"]`;
+  }
   if (el.id) return `#${CSS.escape(el.id)}`;
   const attrs = [...el.attributes].filter(a => a.name.startsWith('data-')).map(a => `[${a.name}="${CSS.escape(a.value)}"]`).join('');
   return attrs ? el.tagName.toLowerCase() + attrs : null;
 }
-function visibleNavigationTarget(selector) {
+function visibleNavigationTarget(selector, root = document) {
   if (!selector) return null;
-  const visible = [...document.querySelectorAll(selector)].filter(el => !el.disabled && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden');
+  const visible = [...root.querySelectorAll(selector)].filter(el => !el.disabled && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden');
   return visible.find(el => el.closest('#side:not([hidden]), #legacy .view:not([hidden]), #view-space:not([hidden])')) ?? visible[0] ?? null;
 }
 function restoreNavigationFocus(fallback = false) {
+  const hash = location.hash, selector = history.state?.focus, version = navigationFocusVersion;
   requestAnimationFrame(() => {
-    const selector = history.state?.focus, el = visibleNavigationTarget(selector);
+    if (location.hash !== hash || history.state?.focus !== selector || navigationFocusVersion !== version) return;
+    const el = visibleNavigationTarget(selector);
     if (el) el.focus({ preventScroll: true });
-    else if (fallback || selector) $('chat-toggle')?.focus({ preventScroll: true });
+    // A missing async list target is restored by its owner after rendering, not by the global chat toggle.
+    else if (fallback) $('chat-toggle')?.focus({ preventScroll: true });
   });
 }
+// Async views capture this token on route entry and complete it only after their current render finishes.
+let navigationFocusVersion = 0;
+document.addEventListener('focusin', () => { navigationFocusVersion++; });
+function captureNavigationReturnFocus(root) {
+  const selector = history.state?.focus;
+  if (!root?.id || !selector?.startsWith(`#${CSS.escape(root.id)} `)) return null;
+  return { root, selector, hash: location.hash, version: navigationFocusVersion };
+}
+function restoreNavigationReturnFocus(token, fallback) {
+  if (!token || token.used || location.hash !== token.hash || history.state?.focus !== token.selector || navigationFocusVersion !== token.version || token.root.closest('[hidden]')) return false;
+  token.used = true;
+  // A collapsed details hides its children from layout; reopen only the matching link's visible-view ancestors.
+  const target = [...token.root.querySelectorAll(token.selector)].find(el => {
+    if (el.disabled || el.closest('[hidden]')) return false;
+    for (let node = el; node; node = node.parentElement) {
+      const css = getComputedStyle(node);
+      if (css.display === 'none' || css.visibility === 'hidden') return false;
+      if (node === token.root) break;
+    }
+    return true;
+  });
+  for (let details = target?.closest('details'); details; details = details.parentElement?.closest('details')) details.open = true;
+  const visible = visibleNavigationTarget(token.selector, token.root);
+  if (visible) { restoreScroll(history.state?.scroll); visible.focus({ preventScroll: true }); return true; }
+  if (fallback?.getClientRects().length && !fallback.disabled) fallback.focus({ preventScroll: true });
+  return false;
+}
+const isReferenceRoute = hash => /^(?:orders\/order|dispatcher\/problem|vehicles\/vehicle|workshop\/post)\/[^/]+$/.test(hash);
+function referenceLinkClick(e) {
+  if (e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || !state) return;
+  const link = e.target.closest?.('a[data-focus-key][href^="#"]');
+  if (!link || link.hasAttribute('download') || (link.target && link.target !== '_self')) return;
+  const hash = link.getAttribute('href').slice(1);
+  if (!isReferenceRoute(hash)) return;
+  e.preventDefault(); navPush(hash, link);
+  requestAnimationFrame(() => {
+    if (location.hash !== `#${hash}`) return;
+    const heading = ui.panel ? $('side').querySelector('h2') : view === 'vehicles' ? $('vehicle-passport').querySelector('h2') : null;
+    if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
+  });
+}
+document.addEventListener('click', referenceLinkClick);
+function backFromReference() {
+  if (!history.state?.ret || !isReferenceRoute(location.hash.slice(1))) return false;
+  navBack(); return true;
+}
 // Opening a card or the 3D view from another screen is a history step: Back returns to the same list, filter and scroll.
-function pushHash(hash) {
+function pushHash(hash, opener = document.activeElement) {
   const from = location.hash.slice(1) || baseHash();
-  history.replaceState({ ...(history.state || {}), scroll: captureScroll(), focus: navigationFocusKey() }, '');
+  history.replaceState({ ...(history.state || {}), scroll: captureScroll(), focus: navigationFocusKey(opener) }, '');
   history.pushState({ ret: { from, label: labelForHash(from) } }, '', `#${hash}`);
 }
-function navPush(hash) { if (location.hash !== `#${hash}`) pushHash(hash); setView(hash); }
+function navPush(hash, opener = document.activeElement) { if (location.hash !== `#${hash}`) pushHash(hash, opener); setView(hash); }
 // Without a remembered origin (a direct link) the fallback is the base screen of the current route.
 function navBack(fallback = baseHash()) {
   if (history.state?.ret) { history.back(); return; }

@@ -147,7 +147,7 @@ document.addEventListener('input', e => { if (e.target.id === 'side-chat-input')
 document.addEventListener('keydown', e => {
   if (e.target.id === 'side-chat-input' && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(e.target.value); return; }
   if (e.ctrlKey || e.metaKey || e.altKey || $('confirm').open) return;
-  if (e.key === 'Escape') { if ($('menu').open) { $('menu').open = false; return; } if (ui.car3d) { closeCar3d(); return; } if (ui.panel) closePanel(); return; }
+  if (e.key === 'Escape') { if ($('menu').open) { $('menu').open = false; return; } if (ui.car3d) { closeCar3d(); return; } if (ui.panel) closePanel(); else backFromReference(); return; }
   if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
   if (ui.car3d) return; // keyboard shortcuts of the shop scene are off while the 3D view is open
   if (view !== 'space') return;
