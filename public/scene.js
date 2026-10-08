@@ -47,9 +47,41 @@ export function pointOf(place) {
   return { ...SLOTS[place.kind][place.index], o: 'x', z: 0 };
 }
 const same = (a, b) => a && b && a.kind === b.kind && a.id === b.id && a.index === b.index;
+// Turning on the spot: the car body rotates by 90° about its centre. The direction (+1: from +X towards +Y,
+// -1: the other way) is chosen so that the swept body clears every obstacle.
+export function turnCorners(c, deg) {
+  const r = deg * Math.PI / 180, ux = Math.cos(r), uy = Math.sin(r);
+  return [[55, 25], [-55, 25], [-55, -25], [55, -25]].map(([u, v]) => ({ x: c.x + u * ux - v * uy, y: c.y + u * uy + v * ux }));
+}
+function polyHitsBox(pts, b) {
+  const axes = [[1, 0], [0, 1], ...pts.slice(0, 2).map((p, i) => [pts[i + 1].y - p.y, p.x - pts[i + 1].x])];
+  const box = [{ x: b.x0, y: b.y0 }, { x: b.x1, y: b.y0 }, { x: b.x1, y: b.y1 }, { x: b.x0, y: b.y1 }];
+  for (const [ax, ay] of axes) {
+    const pr = q => q.map(p => p.x * ax + p.y * ay), A = pr(pts), B = pr(box);
+    if (Math.max(...A) <= Math.min(...B) + 1e-6 || Math.max(...B) <= Math.min(...A) + 1e-6) return false;
+  }
+  return true;
+}
+export function turnClear(c, fromO, dir, steps = 18) {
+  const start = fromO === 'y' ? 90 : 0;
+  for (let k = 1; k < steps; k++) {
+    const pts = turnCorners(c, start + dir * 90 * k / steps);
+    if (OBSTACLES.some(o => polyHitsBox(pts, o))) return false;
+  }
+  return true;
+}
+const turnDir = p => turnClear(p, p.o, 1) || !turnClear(p, p.o, -1) ? 1 : -1;
+function withTurns(path) {
+  for (let i = 1; i < path.length; i++) {
+    const a = path[i - 1], b = path[i];
+    if (a.o !== b.o && a.x === b.x && a.y === b.y && !a.fade && !b.fade) path[i] = { ...b, turn: turnDir(a) };
+  }
+  return path;
+}
 // Waypoints between two places. Cars run along X in bays and buffers and along Y in the aisles; turning
 // happens on the spot (two points with the same centre). Paths never cross lift posts, benches or racks.
-export function route(from, to) {
+export const route = (from, to) => withTurns(rawRoute(from, to));
+function rawRoute(from, to) {
   const a = pointOf(from), b = pointOf(to);
   if (!a && !b) return [];
   if (!a) return [{ ...b, x: b.x - (to.kind === 'B2' ? 60 : 0), fade: 'in' }, b];
@@ -92,6 +124,28 @@ function carModel(id, done) {
   <g transform="translate(0 -44) ${ISO}">${rect(26, 5, 58, 40, 'sc-body', ' rx="5" fill="currentColor"')}</g>
   ${done ? `<g transform="${FACE_Y(-45.03, 26)}"><circle cx="24" cy="9" r="9" class="sc-tire"/><circle cx="24" cy="9" r="4" class="sc-hub"/><circle cx="86" cy="9" r="9" class="sc-tire"/><circle cx="86" cy="9" r="4" class="sc-hub"/></g>` : ''}
 </g>`;
+}
+// Car body at an arbitrary heading, used only while it turns on the spot (the static models above cover 0° and 90°).
+// Coordinates are relative to the car centre; deg is the heading of the long axis from +X towards +Y.
+export function turningCarSvg(deg, z = 0, done = false) {
+  const r = deg * Math.PI / 180, ux = Math.cos(r), uy = Math.sin(r);
+  const P = (u, v, h) => { const x = u * ux - v * uy, y = u * uy + v * ux; return `${r1(.866 * (x - y))} ${r1(.5 * (x + y) - h - z)}`; };
+  const flat = (hu, hv, h, cls, extra = '') => `<path d="M${P(hu, hv, h)}L${P(-hu, hv, h)}L${P(-hu, -hv, h)}L${P(hu, -hv, h)}Z" class="${cls}"${extra}/>`;
+  const box = (hu, hv, z0, z1, cls, shade) => {
+    const c = [[hu, hv], [-hu, hv], [-hu, -hv], [hu, -hv]];
+    let out = '';
+    for (let i = 0; i < 4; i++) {
+      const [u0, v0] = c[i], [u1, v1] = c[(i + 1) % 4], nu = (u0 + u1) / 2 / hu, nv = (v0 + v1) / 2 / hv; // outward normal in car axes
+      const nx = nu * ux - nv * uy, ny = nu * uy + nv * ux;
+      if (nx + ny <= 0) continue; // faces away from the viewer
+      const d = `M${P(u0, v0, z0)}L${P(u1, v1, z0)}L${P(u1, v1, z1)}L${P(u0, v0, z1)}Z`;
+      out += `<path d="${d}" class="${cls}"${shade ? ' fill="currentColor"' : ''}/>`;
+      if (shade) out += `<path d="${d}" class="${ny >= nx ? 'sc-shade1' : 'sc-shade2'}"/>`;
+    }
+    return out + flat(hu, hv, z1, cls, shade ? ' fill="currentColor"' : '');
+  };
+  return flat(69, 35, -z, 'sc-selring') + flat(64, 32, -z, 'sc-shadow')
+    + box(49, 21, 0, 8, done ? 'sc-tire' : 'sc-skid', false) + box(55, 25, 8, 28, 'sc-body', true) + box(29, 20, 28, 44, 'sc-body', true);
 }
 const DEFS = `<defs>
 <pattern id="sc-grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" class="sc-gridline"/></pattern>
@@ -190,6 +244,7 @@ const JOB_SHORT = { pump_check: 'замер тока', pressure_hold: 'тест 
 const MODEL_COLOR = { A: 'sc-model-a', B: 'sc-model-b', C: 'sc-model-c' };
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const lenOf = (p, q) => Math.hypot(q.x - p.x, q.y - p.y);
+const TURN_MS = 200;
 
 export class AssemblyScene {
   constructor(svg, { onSelect } = {}) {
@@ -259,6 +314,7 @@ export class AssemblyScene {
       car.v = v;
       car.model.setAttribute('href', assembled ? '#sc-car-done' : '#sc-car-body');
       car.model.setAttribute('class', MODEL_COLOR[v.modelId] ?? 'sc-model-b');
+      car.turning.setAttribute('class', MODEL_COLOR[v.modelId] ?? 'sc-model-b'); car.done = assembled;
       car.el.setAttribute('aria-label', `${v.id}, ${v.modelName}: ${v.status}`);
       car.el.classList.toggle('selected', ui.selected?.type === 'vehicle' && ui.selected.id === v.id);
       car.el.classList.toggle('problem', v.state === 'paused');
@@ -281,18 +337,33 @@ export class AssemblyScene {
   createCar(v) {
     const el = document.createElementNS(NS, 'g');
     el.setAttribute('class', 'sc-car'); el.setAttribute('role', 'button'); el.setAttribute('tabindex', '0'); el.dataset.vehicle = v.id;
-    el.innerHTML = `<g class="sc-orient"><g transform="${ISO}"><rect x="-14" y="-10" width="138" height="70" rx="14" class="sc-selring"/></g><use href="#sc-shadow"/><g class="sc-lift"><use class="sc-model-b" href="#sc-car-body"/></g></g>`;
+    el.innerHTML = `<g class="sc-orient"><g transform="${ISO}"><rect x="-14" y="-10" width="138" height="70" rx="14" class="sc-selring"/></g><use href="#sc-shadow"/><g class="sc-lift"><use class="sc-model-b" href="#sc-car-body"/></g></g><g class="sc-model-b" display="none"></g>`;
     this.objectsEl.append(el);
-    const car = { el, orient: el.firstChild, lift: el.querySelector('.sc-lift'), model: el.querySelector('.sc-lift use'), pos: null, path: null, v };
+    const car = { el, orient: el.firstChild, lift: el.querySelector('.sc-lift'), model: el.querySelector('.sc-lift use'), turning: el.lastChild, pos: null, path: null, v };
     this.cars.set(v.id, car);
     return car;
   }
+  // A path is a timeline of phases: straight runs (each eased on its own, so the car stops before turning)
+  // and on-the-spot turns of TURN_MS. Only the picture moves; positions come from the snapshots.
   makePath(points, animate = true) {
     if (!points.length) return null;
     const segs = []; let total = 0;
-    for (let i = 1; i < points.length; i++) { const l = lenOf(points[i - 1], points[i]) || (points[i].fade || points[i - 1].fade ? 30 : 0); segs.push({ a: points[i - 1], b: points[i], l, from: total }); total += l; }
-    const instant = !animate || reduceMotion() || document.hidden || total === 0;
-    return { points, segs, total, t0: performance.now(), dur: instant ? 0 : Math.min(1300, Math.max(320, total / .5)) };
+    for (let i = 1; i < points.length; i++) {
+      const a = points[i - 1], b = points[i], turn = Boolean(b.turn) && a.o !== b.o && !lenOf(a, b);
+      const l = turn ? 0 : lenOf(a, b) || (b.fade || a.fade ? 30 : 0);
+      segs.push({ a, b, l, turn, from: total }); total += l;
+    }
+    const turns = segs.filter(s => s.turn).length;
+    const instant = !animate || reduceMotion() || document.hidden || (total === 0 && !turns);
+    const move = total ? Math.min(1300 - turns * TURN_MS, Math.max(320, total / .5)) : 0, phases = []; // whole path within 1.3 s
+    let t = 0, run = null;
+    for (const s of segs) {
+      if (s.turn) { run = null; phases.push({ turn: s, t0: t, dur: TURN_MS }); t += TURN_MS; continue; }
+      if (!run) { run = { segs: [], from: s.from, len: 0, t0: t, dur: 0 }; phases.push(run); }
+      const d = total ? move * s.l / total : 0;
+      run.segs.push(s); run.len += s.l; run.dur += d; t += d;
+    }
+    return { points, segs, phases, total, t0: performance.now(), dur: instant ? 0 : t };
   }
   startMove(car, points, leaving = false) {
     if (!car.pos) car.pos = { ...points[0] };
@@ -305,13 +376,22 @@ export class AssemblyScene {
   }
   kick() { if (!this.raf) this.raf = requestAnimationFrame(t => this.frame(t)); }
   sample(path, now) {
-    const f = path.dur ? Math.min(1, (now - path.t0) / path.dur) : 1;
-    const e = f < .5 ? 2 * f * f : 1 - (-2 * f + 2) ** 2 / 2, d = e * path.total;
-    if (!path.segs.length) return { p: { ...path.points[0], op: path.points[0].fade === 'out' ? 0 : 1 }, done: f >= 1 };
-    let seg = path.segs.find(s => d <= s.from + s.l) ?? path.segs.at(-1);
-    const t = seg.l ? Math.min(1, Math.max(0, (d - seg.from) / seg.l)) : 1, a = seg.a, b = seg.b;
-    const op = b.fade === 'out' ? 1 - t : a.fade === 'in' ? t : 1;
-    return { p: { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: (a.z ?? 0) + ((b.z ?? 0) - (a.z ?? 0)) * t, o: t >= 1 || a.o === b.o ? b.o : (seg.l ? a.o : b.o), op }, done: f >= 1 };
+    const ease = f => f < .5 ? 2 * f * f : 1 - (-2 * f + 2) ** 2 / 2;
+    const at = (seg, t) => {
+      const a = seg.a, b = seg.b, op = b.fade === 'out' ? 1 - t : a.fade === 'in' ? t : 1;
+      return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: (a.z ?? 0) + ((b.z ?? 0) - (a.z ?? 0)) * t, o: t >= 1 || a.o === b.o ? b.o : (seg.l ? a.o : b.o), op };
+    };
+    if (!path.segs.length) return { p: { ...path.points[0], op: path.points[0].fade === 'out' ? 0 : 1 }, done: true };
+    const el = now - path.t0;
+    if (!path.dur || el >= path.dur) return { p: at(path.segs.at(-1), 1), done: true };
+    const ph = path.phases.find(q => el < q.t0 + q.dur) ?? path.phases.at(-1);
+    const e = ease(ph.dur ? Math.min(1, Math.max(0, (el - ph.t0) / ph.dur)) : 1);
+    if (ph.turn) {
+      const { a, b, turn } = ph.turn, start = a.o === 'y' ? 90 : 0;
+      return { p: { ...at(ph.turn, 0), o: e >= 1 ? b.o : a.o, deg: e > 0 && e < 1 ? start + turn * 90 * e : null }, done: false };
+    }
+    const d = ph.from + e * ph.len, seg = ph.segs.find(s => d <= s.from + s.l) ?? ph.segs.at(-1);
+    return { p: at(seg, seg.l ? Math.min(1, Math.max(0, (d - seg.from) / seg.l)) : 1), done: false };
   }
   frame(now) {
     this.raf = 0; let moving = false, changed = false;
@@ -331,11 +411,20 @@ export class AssemblyScene {
   }
   applyCar(car) {
     const p = car.pos, o = p.o === 'y';
+    car.el.setAttribute('opacity', String(r1(p.op ?? 1)));
+    if (p.deg != null) { // mid-turn: a body drawn at the current heading replaces the two static models
+      const [sx, sy] = iso(p.x, p.y), pts = turnCorners(p, p.deg), xs = pts.map(q => q.x), ys = pts.map(q => q.y);
+      car.el.setAttribute('transform', `translate(${r1(sx)} ${r1(sy)})`);
+      car.orient.setAttribute('display', 'none'); car.turning.removeAttribute('display');
+      car.turning.innerHTML = turningCarSvg(p.deg, p.z ?? 0, car.done);
+      car.fp = { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+      return;
+    }
+    if (!car.turning.hasAttribute('display')) { car.turning.setAttribute('display', 'none'); car.turning.innerHTML = ''; car.orient.removeAttribute('display'); }
     const [sx, sy] = iso(o ? p.x - 25 : p.x - 55, o ? p.y - 55 : p.y - 25);
     car.el.setAttribute('transform', `translate(${r1(sx)} ${r1(sy)})`);
     car.orient.setAttribute('transform', o ? 'scale(-1 1)' : 'scale(1 1)');
     car.lift.setAttribute('transform', `translate(0 ${r1(-(p.z ?? 0))})`);
-    car.el.setAttribute('opacity', String(r1(p.op ?? 1)));
     car.fp = carFootprint(p);
   }
   applyTech() {

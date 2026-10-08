@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { route, placeOf, pointOf, carFootprint, overlaps, OBSTACLES, SLOTS, BAY_Y, techRoute, techPoint, depthOrder } from '../public/scene.js';
+import { route, placeOf, pointOf, carFootprint, overlaps, OBSTACLES, SLOTS, BAY_Y, techRoute, techPoint, depthOrder, turnClear, turnCorners } from '../public/scene.js';
 import { Workshop } from '../server/simulation.mjs';
 
 const places = [...Object.keys(BAY_Y).map(id => ({ kind: 'bay', id })), ...SLOTS.B2.map((_, index) => ({ kind: 'B2', index })), ...SLOTS.B3.map((_, index) => ({ kind: 'B3', index }))];
@@ -25,6 +25,24 @@ test('every vehicle path in the assembly scene avoids lift posts, benches, pump 
     for (let i = 1; i < path.length; i++) if (path[i - 1].o !== path[i].o) assert.equal(Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y), 0, 'cars turn only on the spot');
     for (const p of samples(path)) for (const o of OBSTACLES) assert.ok(!overlaps(carFootprint(p), o), `${JSON.stringify(a)} → ${JSON.stringify(b)} crosses ${o.name} at ${Math.round(p.x)},${Math.round(p.y)} (${p.o})`);
   }
+});
+
+test('a car turning on the spot sweeps its body clear of the equipment and ends in the next orientation', () => {
+  let turns = 0;
+  for (const [a, b] of moves) {
+    const path = route(a, b);
+    for (let i = 1; i < path.length; i++) {
+      const p = path[i - 1], q = path[i];
+      if (p.o === q.o) continue;
+      assert.ok(q.turn === 1 || q.turn === -1, `turn without a direction in ${JSON.stringify(a)} → ${JSON.stringify(b)}`);
+      assert.ok(turnClear(p, p.o, q.turn, 90), `turn at ${p.x},${p.y} (${p.o} → ${q.o}) hits equipment`);
+      const end = turnCorners(p, (p.o === 'y' ? 90 : 0) + q.turn * 90), xs = end.map(c => c.x), ys = end.map(c => c.y);
+      const fp = carFootprint(q);
+      assert.deepEqual([Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)].map(v => Math.round(v) + 0), [fp.x0, fp.x1, fp.y0, fp.y1]);
+      turns++;
+    }
+  }
+  assert.ok(turns > 0);
 });
 
 test('technician walks through the aisle without crossing equipment', () => {
