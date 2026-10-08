@@ -74,3 +74,39 @@ test('confirmed transfer preserves execution, remaining work and integrity; dupl
   assert.equal(w.events.filter(e => e.type === 'vehicle_transferred').length, 1);
   assert.deepEqual(w.checkIntegrity(), []);
 });
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+
+function renderCards(snapshot, source, vehicleId) {
+  const context = vm.createContext({
+    state: snapshot, post: id => snapshot.posts.find(p => p.id === id),
+    vehicle: id => snapshot.vehicles.find(v => v.id === id), problem: id => snapshot.problems.find(p => p.id === id),
+    esc: value => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;'),
+    VEHICLE_KIND: () => 'stop', POST_KIND: () => 'stop', runningJob: () => null,
+    ico: () => '', bar: () => '', clock: String, fmt: String, pct: String,
+    PRIORITY: { high: 'Высокий', normal: 'Обычный', low: 'Низкий' },
+    POST_STATES: { fault: 'Неисправность' }, POST_SHORT: { idle: 'Свободен', slow: 'Замедлен' },
+  });
+  vm.runInContext(readFileSync(new URL('../public/app/60-ribbon-side-panels.js', import.meta.url), 'utf8'), context);
+  return vm.runInContext(`({ post: panelPost(post('${source.id}')), vehicle: panelVehicle(vehicle('${vehicleId}')) })`, context);
+}
+
+test('post and vehicle cards use identical server transfer reasons and allowed destinations', () => {
+  for (const scenario of ['held', 'problem', 'available', 'finished']) {
+    const { w, source, target, v } = fixture();
+    w.injectIncident(source.id, 'breakdown');
+    if (scenario === 'held') w.setHold(target.id, true);
+    if (scenario === 'problem') w.injectIncident(target.id, 'slowdown');
+    if (scenario === 'finished') w.runToEnd();
+    const snapshot = w.snapshot(), transfer = snapshot.posts.find(p => p.id === source.id).transfer;
+    const targetOption = transfer.targets.find(t => t.postId === target.id);
+    for (const [card, html] of Object.entries(renderCards(snapshot, source, v))) {
+      if (scenario === 'available') assert.ok(html.includes(`data-transfer="${v}" data-to="${target.id}"`), card);
+      else {
+        assert.ok(!html.includes(`data-to="${target.id}"`), `${scenario}: ${card} must not offer a blocked target`);
+        assert.ok(html.includes(transfer.reason || targetOption.reason), `${scenario}: ${card} must explain the server reason`);
+        assert.match(html, /disabled aria-describedby=/);
+      }
+    }
+  }
+});

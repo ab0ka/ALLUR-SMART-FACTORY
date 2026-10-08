@@ -45,6 +45,20 @@ const tag = (t, cls = '') => `<span class="tagchip ${cls}">${t}</span>`;
 const chatBtn = (type, id) => `<button class="icon-btn small" data-open-chat="1" data-ctx-type="${type}" data-ctx-id="${esc(id)}" aria-label="Спросить в чате об этом объекте"><svg viewBox="0 0 20 20" aria-hidden="true"><path class="ico-chat" d="M3 4.5A2.5 2.5 0 0 1 5.5 2h9A2.5 2.5 0 0 1 17 4.5v6a2.5 2.5 0 0 1-2.5 2.5H9l-4 3.5V13a2.5 2.5 0 0 1-2-2.5z"/></svg></button>`;
 const lockNote = '<p class="lock">Проверки, ремонт, перевод и снятие поста с загрузки меняют производство — каждое такое действие запросит подтверждение.</p>';
 
+// Both cards display the server decision; no client-side availability rules.
+function transferActions(p, context) {
+  const transfer = p.transfer;
+  if (!transfer) return '';
+  const prefix = `${context}-transfer-${p.id}`;
+  if (transfer.reason) return `<button class="wide" disabled aria-describedby="${esc(prefix)}-reason">Перевести на соседний пост</button><p id="${esc(prefix)}-reason" class="why">Недоступно: ${esc(transfer.reason)}.</p>`;
+  return transfer.targets.map(target => {
+    const reasonId = `${prefix}-${target.postId}`;
+    return target.ok
+      ? `<button class="wide" data-transfer="${esc(p.vehicleId)}" data-to="${esc(target.postId)}">Перевести ${esc(p.vehicleId)} на ${esc(target.postCode)}…</button>`
+      : `<button class="wide" disabled aria-describedby="${esc(reasonId)}">Перевести на ${esc(target.postCode)}</button><p id="${esc(reasonId)}" class="why">Недоступно: ${esc(target.reason)}.</p>`;
+  }).join('');
+}
+
 function panelVehicle(v) {
   const op = v.currentOperation && v.currentOperation.completedAt === null ? v.currentOperation : null;
   const p = v.location.type === 'post' ? post(v.location.id) : null, order = state.orders.find(o => o.id === v.orderId);
@@ -63,12 +77,7 @@ function panelVehicle(v) {
   let actions = '';
   if (p?.problemId) actions += `<button class="primary wide" data-problem="${esc(p.problemId)}">Диагностика поста ${esc(p.code)} (${esc(p.problemId)})</button>`;
   actions += `<button class="secondary wide" data-open-chat="1" data-ctx-type="vehicle" data-ctx-id="${esc(v.id)}">Спросить в чате: «Почему ${esc(v.id)} задерживается?»</button>`;
-  if (p && op && !state.finished) {
-    const sib = state.posts.filter(q => q.stage === p.stage && q.id !== p.id);
-    const free = sib.filter(q => !q.vehicleId && !['fault', 'maintenance', 'shift_over'].includes(q.state) && !q.problemId && !q.hold);
-    if (['fault', 'maintenance', 'slow'].includes(p.state) && free.length) actions += free.map(q => `<button class="wide" data-transfer="${esc(v.id)}" data-to="${esc(q.id)}">Перевести на ${esc(q.code)}…</button>`).join('');
-    else if (sib.length) actions += `<button class="wide" disabled aria-describedby="why-transfer">Перевести на параллельный пост</button><p id="why-transfer" class="why">Недоступно: ${['fault', 'maintenance', 'slow'].includes(p.state) ? sib.map(q => q.vehicleId ? `${esc(q.code)} занят ${esc(q.vehicleId)} (${Math.round((q.progress ?? 0) * 100)}%)` : `${esc(q.code)} — ${esc(POST_SHORT[q.state].toLowerCase())}${q.problemId ? `, ${esc(q.problemId)}` : ''}`).join('; ') : 'пост работает без отклонений'}.</p>`;
-  }
+  if (p) actions += transferActions(p, 'vehicle');
   actions += `<button class="link" data-legacy="vehicles" data-legacy-id="${esc(v.id)}">Полный паспорт и история событий →</button>`;
   return sideHead('АВТОМОБИЛЬ · ПАСПОРТ', `<span class="mono">${esc(v.id)}</span>`, tag(esc(v.modelName), 'blue') + tag(`Задание ${esc(v.orderId)}${order ? ` · срок ${order.dueMinute > state.shift ? 'после смены' : clock(order.dueMinute)}` : ''}`) + tag(`Приоритет ${PRIORITY[v.priority].toLowerCase()}`), chatBtn('vehicle', v.id))
     + `<div class="side-body">${now}<h3>Пройденный маршрут</h3>${route}<h3>Проверки и ремонт</h3>${checks}<h3>Доступные действия</h3><div class="actions-col">${actions}</div>${lockNote}</div>`;
@@ -90,16 +99,7 @@ function panelPost(p) {
     if (state.posts.some(x => x.stage === p.stage && x.id !== p.id)) actions.push(`<button class="wide" data-hold="${esc(p.id)}" data-on="${p.hold ? '0' : '1'}">${p.hold ? 'Вернуть пост в загрузку…' : 'Не загружать пост новыми автомобилями…'}</button>`);
     if (!incident && !p.problemId) actions.push(`<details class="demo"><summary>Учебный сценарий неисправности</summary><button class="wide" data-fault="${esc(p.id)}" data-kind="breakdown">Создать неисправность…</button><button class="wide" data-fault="${esc(p.id)}" data-kind="slowdown">Создать снижение темпа…</button></details>`);
   }
-  const transfer = p.transfer;
-  if (transfer) {
-    if (transfer.reason) actions.push(`<button class="wide" disabled aria-describedby="post-transfer-reason">Перевести на соседний пост</button><p id="post-transfer-reason" class="why">Недоступно: ${esc(transfer.reason)}.</p>`);
-    else for (const target of transfer.targets) {
-      const reasonId = `post-transfer-${p.id}-${target.postId}`;
-      actions.push(target.ok
-        ? `<button class="wide" data-transfer="${esc(p.vehicleId)}" data-to="${esc(target.postId)}">Перевести ${esc(p.vehicleId)} на ${esc(target.postCode)}…</button>`
-        : `<button class="wide" disabled aria-describedby="${esc(reasonId)}">Перевести на ${esc(target.postCode)}</button><p id="${esc(reasonId)}" class="why">Недоступно: ${esc(target.reason)}.</p>`);
-    }
-  }
+  actions.push(transferActions(p, 'post'));
   const m = p.metrics;
   body += `<h3>Действия</h3><div class="actions-col">${actions.join('') || '<p class="muted">Действий нет.</p>'}</div>${lockNote}<p class="fine-print">A ${pct(m.availability)} · P ${pct(m.performance)} · Q ${pct(m.quality)} · OEE ${pct(m.oee)} · работа ${p.stats.run} мин · простой без входа ${p.stats.starved} мин</p>`;
   return sideHead(`ПОСТ · ${esc(p.stageName.toUpperCase())}`, esc(p.code), p.equipmentId ? tag(esc(state.equipment.find(e => e.id === p.equipmentId)?.name ?? '')) : '', chatBtn('post', p.id)) + `<div class="side-body">${body}</div>`;
