@@ -12,9 +12,10 @@ import { compareOptions, applyOption, decisionReport } from './decisions.mjs';
 import { saveState, loadState } from './store.mjs';
 import { answerChat, CHAT_LIMITS } from './chat.mjs';
 import { loadRiskModel, assessRisk, labSummary, loadPolicyReport } from './risk-model.mjs';
+import { stageKpis } from './kpi.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const assets = { '/': ['index.html', 'text/html; charset=utf-8'], '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/scene.js': ['scene.js', 'text/javascript; charset=utf-8'], '/viewer3d.js': ['viewer3d.js', 'text/javascript; charset=utf-8'], '/three.module.js': ['three.module.js', 'text/javascript; charset=utf-8'], '/three-orbit-controls.js': ['three-orbit-controls.js', 'text/javascript; charset=utf-8'], '/styles.css': ['styles.css', 'text/css; charset=utf-8'], '/favicon.svg': ['favicon.svg', 'image/svg+xml'], '/car-kia-a-done.webp': ['car-kia-a-done.webp', 'image/webp'], '/car-kia-a-body.webp': ['car-kia-a-body.webp', 'image/webp'], '/car-kia-b-done.webp': ['car-kia-b-done.webp', 'image/webp'], '/car-kia-b-body.webp': ['car-kia-b-body.webp', 'image/webp'], '/car-kia-c-done.webp': ['car-kia-c-done.webp', 'image/webp'], '/car-kia-c-body.webp': ['car-kia-c-body.webp', 'image/webp'] };
+const assets = { '/': ['index.html', 'text/html; charset=utf-8'], '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/scene.js': ['scene.js', 'text/javascript; charset=utf-8'], '/shop-scene.js': ['shop-scene.js', 'text/javascript; charset=utf-8'], '/viewer3d.js': ['viewer3d.js', 'text/javascript; charset=utf-8'], '/three.module.js': ['three.module.js', 'text/javascript; charset=utf-8'], '/three-orbit-controls.js': ['three-orbit-controls.js', 'text/javascript; charset=utf-8'], '/styles.css': ['styles.css', 'text/css; charset=utf-8'], '/favicon.svg': ['favicon.svg', 'image/svg+xml'], '/car-kia-a-done.webp': ['car-kia-a-done.webp', 'image/webp'], '/car-kia-a-body.webp': ['car-kia-a-body.webp', 'image/webp'], '/car-kia-b-done.webp': ['car-kia-b-done.webp', 'image/webp'], '/car-kia-b-body.webp': ['car-kia-b-body.webp', 'image/webp'], '/car-kia-c-done.webp': ['car-kia-c-done.webp', 'image/webp'], '/car-kia-c-body.webp': ['car-kia-c-body.webp', 'image/webp'] };
 // Optional exterior model downloaded by the user (CC BY 4.0, see docs/ASSETS.md). It is not in Git or dist: exactly two
 // files are served from assets-src/kia-sportage if they exist; nothing else in that folder is reachable.
 const MODEL_FILES = { '/models/kia-sportage/scene.gltf': ['scene.gltf', 'model/gltf+json'], '/models/kia-sportage/scene.bin': ['scene.bin', 'application/octet-stream'] };
@@ -34,6 +35,7 @@ export function fullState(sim, { aiOptions = {}, riskModel = null } = {}) {
   const s = sim.snapshot();
   s.decisions = s.decisions.map(d => ({ ...d, report: decisionReport(sim, sim.decisions.find(x => x.id === d.id)) }));
   s.risk = assessRisk(sim, riskModel);
+  s.kpi = stageKpis(sim);
   s.ai = { provider: aiOptions.provider || 'nvidia', configured: aiOptions.provider !== 'local' && Boolean(aiOptions.key?.trim()), chatLimits: CHAT_LIMITS };
   return s;
 }
