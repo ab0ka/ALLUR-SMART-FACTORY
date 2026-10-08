@@ -1,0 +1,31 @@
+# Ответственные за зоны проекта: GitHub автоматически зовёт их на проверку pull request.
+# Замените @ab0ka на логины участников, когда распределите зоны. Последнее совпадение в файле важнее.
+
+*                                   @ab0ka
+
+# Производственный движок и решения
+/server/simulation.mjs              @ab0ka
+/server/equipment.mjs               @ab0ka
+/server/decisions.mjs               @ab0ka
+
+# Сервер, безопасность, AI и чат
+/server/index.mjs                   @ab0ka
+/server/ai*.mjs                     @ab0ka
+/server/chat.mjs                    @ab0ka
+
+# Изометрическая сцена
+/public/scene.js                    @ab0ka
+
+# Интерфейс: части клиента и стили
+/public/app/                        @ab0ka
+/public/styles.css                  @ab0ka
+/public/index.html                  @ab0ka
+
+# ML и сравнение политик (этапы D и E)
+/scripts/                           @ab0ka
+/models/                            @ab0ka
+/reports/                           @ab0ka
+
+# Тесты и проверки
+/tests/                             @ab0ka
+/.github/                           @ab0ka
