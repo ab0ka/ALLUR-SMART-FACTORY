@@ -40,16 +40,23 @@ function openTask(id) {
   openCard(type, oid);
 }
 function sparkline(eq, channel, nominal, unit, detectedAt) {
-  const from = Math.max(0, state.elapsed - 150), rs = eq.readings.filter(r => r.minute >= from && r[channel] !== null);
+  const from = Math.max(0, state.elapsed - 150), shown = eq.readings.filter(r => Number.isFinite(r.minute) && r.minute >= from && r.minute <= state.elapsed);
+  const rs = shown.filter(r => Number.isFinite(r[channel]));
   const W = 300, H = 92, pad = 26;
-  if (rs.length < 2) return `<div class="spark"><span>${esc(channel)}</span><p class="muted">мало данных</p></div>`;
+  const names = { pressure: 'Давление', temperature: 'Температура масла', cycle: 'Время цикла' };
+  if (!rs.length) return `<figure class="spark"><figcaption>${names[channel]}, ${esc(unit)} <span>норма ${nominal}</span></figcaption><p class="muted">Нет измерений в показанном окне.</p></figure>`;
   const vals = rs.map(r => r[channel]), lo = Math.min(...vals, nominal) - 2, hi = Math.max(...vals, nominal) + 2;
   const x = m => pad + (m - from) / Math.max(1, state.elapsed - from) * (W - pad - 6), y = v => 8 + (hi - v) / (hi - lo) * (H - 26);
-  const names = { pressure: 'Давление', temperature: 'Температура масла', cycle: 'Время цикла' };
+  const segments = []; let segment = [];
+  for (const r of shown) {
+    if (Number.isFinite(r[channel])) segment.push(r);
+    else if (segment.length) { segments.push(segment); segment = []; }
+  }
+  if (segment.length) segments.push(segment);
   return `<figure class="spark"><figcaption>${names[channel]}, ${esc(unit)} <span>норма ${nominal}</span></figcaption><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${names[channel]}: последнее ${vals.at(-1)} ${esc(unit)}, норма ${nominal}">
     <line class="spark-nominal" x1="${pad}" x2="${W - 6}" y1="${y(nominal)}" y2="${y(nominal)}"/>
-    ${detectedAt !== null && detectedAt >= from ? `<line class="spark-mark" x1="${x(detectedAt)}" x2="${x(detectedAt)}" y1="4" y2="${H - 18}"/>` : ''}
-    <polyline class="spark-line" points="${rs.map(r => `${x(r.minute).toFixed(1)},${y(r[channel]).toFixed(1)}`).join(' ')}"/>
+    ${Number.isFinite(detectedAt) && detectedAt >= from && detectedAt <= state.elapsed ? `<line class="spark-mark" x1="${x(detectedAt)}" x2="${x(detectedAt)}" y1="4" y2="${H - 18}"/>` : ''}
+    ${segments.map(s => s.length === 1 ? `<circle class="spark-point" cx="${x(s[0].minute)}" cy="${y(s[0][channel])}" r="2.5"/>` : `<polyline class="spark-line" points="${s.map(r => `${x(r.minute).toFixed(1)},${y(r[channel]).toFixed(1)}`).join(' ')}"/>`).join('')}
     <text class="chart-axis" x="${pad}" y="${H - 4}">${clock(from)}</text><text class="chart-axis" x="${W - 6}" y="${H - 4}" text-anchor="end">${clock(state.elapsed)}</text>
     <text class="chart-axis" x="${pad - 4}" y="${y(hi - 2) + 4}" text-anchor="end">${fmt(hi - 2, 0)}</text><text class="chart-axis" x="${pad - 4}" y="${y(lo + 2) + 4}" text-anchor="end">${fmt(lo + 2, 0)}</text></svg></figure>`;
 }
