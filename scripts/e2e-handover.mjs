@@ -93,8 +93,10 @@ export async function main() {
   const { createApp } = await import('../server/index.mjs');
   const { Workshop } = await import('../server/simulation.mjs');
   await buildDist();
-  const output = path.join(root, 'screenshots', 'handover');
-  await mkdir(output, { recursive: true });
+  const outputRoot = path.join(root, 'screenshots', 'handover');
+  await mkdir(outputRoot, { recursive: true });
+  const output = await mkdtemp(path.join(outputRoot, 'run-'));
+  console.log(`Artifacts: ${output}`);
   const sim = new Workshop(); sim.running = false;
   // Only this fresh synthetic simulation is changed; no saved production state is loaded.
   sim.command({ action: 'fault', postId: 'A1', kind: 'breakdown', requestId: 'handover-fault' }, 'operator');
@@ -102,8 +104,13 @@ export async function main() {
   sim.advance(15);
   const profile = await mkdtemp(path.join(os.tmpdir(), 'allur-handover-'));
   const server = createApp({ simulation: sim, aiOptions: { provider: 'local' }, storePath: path.join(profile, 'synthetic-state.json') });
-  let child, cdp;
-  const deadline = setTimeout(() => { console.error('FAIL: overall E2E deadline'); child?.kill(); server.closeAllConnections(); server.close(); process.exitCode = 1; }, 180000);
+  let child, cdp, failure;
+  const deadline = setTimeout(() => {
+    console.error('FAIL: overall E2E deadline'); process.exitCode = 1;
+    cdp?.close();
+    try { child?.kill(); } catch (error) { console.error(`Deadline browser stop failed: ${error.message}`); }
+    server.closeAllConnections(); server.close();
+  }, 180000);
   const base = `http://127.0.0.1:${port}`;
   const get = url => fetch(base + url, { signal: AbortSignal.timeout(10000) });
   try {
@@ -166,47 +173,105 @@ export async function main() {
       for (const item of [...report.problems, ...report.jobs]) assert.ok(text.includes(item.title), `UI includes ${item.id}`);
       for (const item of report.resources.technicians) assert.ok(text.includes(item.name), `UI technician ${item.id}`);
       const metrics = await cdp.evaluate(`Array.from(document.querySelectorAll('#view-handover [data-handover-metric]')).map(e=>[e.dataset.handoverMetric,e.textContent])`);
-      assert.ok(metrics.length > 0, 'UI must expose stable metric hooks for exact assertions');
-      for (const [key, value] of metrics) { assert.ok(Object.hasOwn(report.metrics, key), key); const expected = report.metrics[key];
-        if (expected !== null) assert.ok(value.replace(/\s/g,'').includes(String(expected).replace('.', ',')) || value.includes(String(expected)), `UI metric ${key}=${expected}`); }
+      assert.equal(metrics.length, 9, 'all nine UI metrics have stable hooks');
+      for (const [key, value] of metrics) {
+        assert.ok(Object.hasOwn(report.metrics, key), key); const expected = report.metrics[key];
+        const formatted = expected === null ? '—' : new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 }).format(key === 'firstPassYield' ? expected * 100 : expected) + (key === 'firstPassYield' ? '%' : '');
+        assert.equal(value.replace(/\s/g, ''), formatted.replace(/\s/g, ''), `UI metric ${key}`);
+      }
       const capture = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
       await writeFile(path.join(output, `handover-${width}.png`), Buffer.from(capture.data, 'base64'));
       console.log(`PASS: UI ${width}px content and overflow`);
     }
-    const ref = '#view-handover [data-ref-type], #view-handover a[href^="#space/"]';
+    const ref = '#view-handover a.handover-items-link[href*="/problem/"]';
     assert.equal(await cdp.evaluate(`Boolean(document.querySelector(${JSON.stringify(ref)}))`), true, 'real entity reference');
     await cdp.evaluate(`document.querySelector(${JSON.stringify(ref)}).focus()`);
-    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+    const selectedProblem = await cdp.evaluate(`decodeURIComponent(document.querySelector(${JSON.stringify(ref)}).hash.split('/').at(-1))`);
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', text: '\r', windowsVirtualKeyCode: 13 });
     await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
     await until(() => cdp.evaluate(`location.hash !== '#handover'`), 'keyboard card navigation');
+    assert.equal(await cdp.evaluate(`!document.querySelector('#side').hidden && document.querySelector('#side h2').textContent.includes(${JSON.stringify(selectedProblem)})`), true, 'selected real problem card');
     await cdp.evaluate('history.back()'); await until(() => cdp.evaluate(`location.hash === '#handover' && ${visible}`), 'browser Back');
+    await until(() => cdp.evaluate(`(${content}).includes(${JSON.stringify(report.resources.stock[0].name)})`), 'report after Back');
+    const orderLink = '#view-handover a.handover-items-link[href*="/order/"]';
+    const selectedOrder = await cdp.evaluate(`decodeURIComponent(document.querySelector(${JSON.stringify(orderLink)}).hash.split('/').at(-1))`);
+    await cdp.evaluate(`document.querySelector(${JSON.stringify(orderLink)}).click()`);
+    await until(() => cdp.evaluate(`location.hash.includes('/order/') && document.activeElement.closest('#order-' + ${JSON.stringify(selectedOrder)}) !== null`), 'real focused order card');
+    await cdp.evaluate('history.back()');
+    await until(() => cdp.evaluate(`location.hash === '#handover' && (${content}).includes(${JSON.stringify(report.resources.stock[0].name)})`), 'report after order Back');
     await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
     assert.equal(await cdp.evaluate(`document.activeElement !== document.body && document.activeElement.getBoundingClientRect().width > 0`), true, 'visible keyboard focus');
 
     faultMode = true;
     await cdp.send('Fetch.enable', { patterns: [{ urlPattern: base + '/api/handover', requestStage: 'Request' }] });
-    await cdp.send('Page.navigate', { url: base + '/#handover' });
+    await cdp.evaluate(`document.querySelector('#handover-refresh').focus()`);
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', text: '\r', windowsVirtualKeyCode: 13 });
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
     await until(() => pausedRequest, 'intercepted report request');
     await until(() => cdp.evaluate(`/загруз/i.test(${content})`), 'loading state');
     await cdp.send('Fetch.fulfillRequest', { requestId: pausedRequest, responseCode: 503, responseHeaders: [{ name: 'Content-Type', value: 'application/json' }], body: Buffer.from('{"error":"Synthetic E2E failure"}').toString('base64') });
     await until(() => cdp.evaluate(`/ошиб|не удалось|недоступ/i.test(${content})`), 'error state');
+    assert.equal(await cdp.evaluate('document.activeElement.id'), 'handover-refresh', 'focus restored after error');
     await cdp.send('Fetch.disable'); pausedRequest = null;
     const retry = await cdp.evaluate(`(() => { const b = [...document.querySelectorAll('#view-handover button')].find(e=>/повтор|обнов/i.test(e.textContent)); if(!b)return false; b.focus(); return true; })()`);
     assert.equal(retry, true, 'retry control');
-    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', text: '\r', windowsVirtualKeyCode: 13 });
     await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
     await until(() => cdp.evaluate(`(${content}).includes(${JSON.stringify(report.resources.stock[0].name)})`), 'successful retry');
+    assert.equal(await cdp.evaluate('document.activeElement.id'), 'handover-refresh', 'focus restored after retry');
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+    assert.equal(await cdp.evaluate('document.activeElement.dataset.focusKey'), 'handover-json', 'Tab follows refresh to JSON');
+    pausedRequest = null;
+    await cdp.send('Fetch.enable', { patterns: [{ urlPattern: base + '/api/handover', requestStage: 'Request' }] });
+    await cdp.evaluate(`document.querySelector('#handover-refresh').focus()`);
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', text: '\r', windowsVirtualKeyCode: 13 });
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+    await until(() => pausedRequest, 'delayed refresh');
+    await cdp.evaluate(`document.querySelector('[data-focus-key="handover-json"]').focus()`);
+    await cdp.send('Fetch.continueRequest', { requestId: pausedRequest });
+    await until(() => cdp.evaluate(`(${content}).includes(${JSON.stringify(report.resources.stock[0].name)})`), 'refresh after focus movement');
+    assert.equal(await cdp.evaluate('document.activeElement.dataset.focusKey'), 'handover-json', 'refresh does not steal moved focus');
+    await cdp.send('Fetch.disable');
     faultMode = false;
     assert.deepEqual(errors, [], 'unexpected console/page errors');
     assert.deepEqual(sim.snapshot(), before, 'UI is read-only');
     console.log('PASS: keyboard/card/Back, loading/error/retry, no console/page errors; handover E2E complete');
-  } finally {
-    clearTimeout(deadline); cdp?.close();
-    if (child && child.exitCode === null) { const exited = once(child, 'exit'); child.kill(); await Promise.race([exited, delay(5000)]); }
-    if (server.listening) await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); });
-    // Delete only the exact temporary profile created by this invocation.
-    assert.equal(path.dirname(profile), path.resolve(os.tmpdir()));
-    await rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  } catch (error) { failure = error; throw error; }
+  finally {
+    clearTimeout(deadline);
+    const cleanupErrors = [];
+    let browserExited = !child?.pid;
+    try {
+      try {
+        if (cdp) { await cdp.send('Browser.close').catch(() => {}); cdp.close(); }
+        if (child?.pid && child.exitCode === null && child.signalCode === null) {
+          let timer;
+          const exited = once(child, 'exit');
+          try {
+            child.kill();
+            await Promise.race([exited, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Edge did not exit; profile retained')), 10000); })]);
+          } finally { clearTimeout(timer); }
+        }
+        browserExited = !child?.pid || child.exitCode !== null || child.signalCode !== null;
+        if (!browserExited) throw new Error('Edge exit was not confirmed');
+      } catch (error) { cleanupErrors.push(error); }
+    } finally {
+      try {
+        if (server.listening) await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); });
+      } catch (error) { cleanupErrors.push(error); }
+      finally {
+        try {
+          // Remove only this run's exact temporary directory, after confirmed browser exit.
+          assert.equal(path.dirname(profile), path.resolve(os.tmpdir()));
+          if (browserExited) await rm(profile, { recursive: true, force: true, maxRetries: 20, retryDelay: 300 });
+          else throw new Error(`Profile retained for live browser: ${profile}`);
+        } catch (error) { cleanupErrors.push(error); }
+      }
+    }
+    for (const error of cleanupErrors) console.error(`Cleanup: ${error.message}`);
+    if (!failure && cleanupErrors.length) throw new AggregateError(cleanupErrors, 'E2E cleanup failed');
   }
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
