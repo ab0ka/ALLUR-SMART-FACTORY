@@ -1,4 +1,31 @@
 // ---------- Shift and analytics ----------
+let shiftxSort = { key: 'code', direction: 1 };
+const SHIFTX_COLUMNS = [['code', 'Пост'], ['stageName', 'Участок'], ['state', 'Состояние'], ['availability', 'A'], ['performance', 'P'], ['quality', 'Q'], ['oee', 'OEE'], ['run', 'Работа, мин'], ['fault', 'Неисправность, мин'], ['maintenance', 'Техник, мин'], ['starved', 'Нет входа, мин'], ['blocked', 'Блокировка, мин'], ['completed', 'Операций']];
+function shiftxValue(p, key) {
+  const qualityDefined = ['quality', 'rework', 'shipping'].includes(p.stage) || p.stats.completed > 0;
+  const available = { availability: state.elapsed > 0, performance: p.stats.run > 0, quality: qualityDefined, oee: state.elapsed > 0 && p.stats.run > 0 && qualityDefined };
+  if (key in available) return available[key] ? p.metrics[key] : null;
+  return key === 'state' ? POST_SHORT[p.state] : p.stats[key] ?? p[key];
+}
+function shiftxMetric(p, key) { const value = shiftxValue(p, key); return value === null ? '<span title="Нет данных для расчёта" aria-label="Нет данных для расчёта">—</span>' : pct(value); }
+function shiftxPosts() {
+  const { key, direction } = shiftxSort;
+  return [...state.posts].sort((a, b) => {
+    const av = shiftxValue(a, key), bv = shiftxValue(b, key);
+    if (av === null || bv === null) return av === bv ? a.code.localeCompare(b.code, 'ru') : av === null ? 1 : -1;
+    return direction * (typeof av === 'number' ? av - bv : av.localeCompare(bv, 'ru', { numeric: true })) || a.code.localeCompare(b.code, 'ru', { numeric: true });
+  });
+}
+$('oee-table').addEventListener('click', e => {
+  const button = e.target.closest('[data-shiftx-sort]'); if (!button) return;
+  const key = button.dataset.shiftxSort;
+  shiftxSort = { key, direction: shiftxSort.key === key ? -shiftxSort.direction : 1 };
+  renderShift();
+  $('oee-table').querySelector(`[data-shiftx-sort="${key}"]`).focus({ preventScroll: true });
+  text('shiftx-sort-status', `${SHIFTX_COLUMNS.find(c => c[0] === key)[1]}: по ${shiftxSort.direction === 1 ? 'возрастанию' : 'убыванию'}. Нет данных — в конце.`);
+});
+$('shift-details').addEventListener('toggle', () => { if (state && $('shift-details').open) renderShift(); });
+window.addEventListener('resize', () => { if (state && view === 'shift' && $('shift-details').open) renderShift(); });
 // First screen of analytics: plan and fact, forecast, the main reason of the deviation, tasks and decision results.
 function mainDeviation() {
   const f = state.forecast, gap = f.projected - state.plan.target;
@@ -12,11 +39,15 @@ function mainDeviation() {
 function renderShiftFirst() {
   const t = state.totals, f = state.forecast, gap = f.projected - state.plan.target, main = mainDeviation(), d = state.decisions.at(-1);
   const riskItem = state.risk?.available ? [...state.risk.items].filter(r => r.probability !== null && r.probability !== undefined).sort((a, b) => b.probability - a.probability)[0] : null;
-  $('shift-first').innerHTML = `<div class="kpis">
-    <div class="kpi"><b>${t.accepted}</b><span>факт: принято к ${clock(state.elapsed)}</span></div>
-    <div class="kpi"><b>${state.plan.target}</b><span>план смены</span></div>
-    <div class="kpi"><b class="${gap < 0 ? 'warn-text' : 'ok-text'}">${f.projected}</b><span>прогноз к 16:00${f.low < f.high ? ` (${f.low}–${f.high})` : ''} · симуляция, не факт</span></div>
-    <div class="kpi"><b class="${gap < 0 ? 'warn-text' : 'ok-text'}">${gap > 0 ? '+' : ''}${gap}</b><span>прогноз к плану</span></div></div>
+  const ref = state.plan.reference;
+  const metrics = [
+    ['target', 'План смены (задан)', state.plan.target, 'Обязательство оператора к 16:00'],
+    ['reference', 'Эталонная мощность (симуляция)', ref?.total ?? '—', ref ? `Без отклонений оборудования · к сейчас ${ref.now}` : 'Эталон недоступен'],
+    ['forecast', 'Прогноз к 16:00', f.projected, `${f.low < f.high ? `Диапазон ${f.low}–${f.high} · ` : ''}без новых вмешательств`],
+    ['fact', 'Факт', t.accepted, `Принято к ${clock(state.elapsed)} · каждый автомобиль один раз`],
+  ];
+  $('shift-first').innerHTML = `<dl class="shiftx-metrics">${metrics.map(([key, label, value, note]) => `<div class="shiftx-metric shiftx-${key}"><dt>${label}</dt><dd>${esc(value)} <span>авт.</span><small>${esc(note)}</small></dd></div>`).join('')}</dl>
+    <p class="shiftx-gap">Прогноз к плану: <b>${gap > 0 ? '+' : ''}${gap} авт.</b> · ${gap < 0 ? '⚠ дефицит' : '✓ план достижим по прогнозу'}</p>
     <h3>${gap < 0 ? 'Главная причина отклонения' : 'Главный риск для плана'}</h3><p>${esc(main.text)} <span class="fine-print">· ${esc(main.basis)}</span>${main.ref ? ` <button class="link" data-ref-type="${main.ref[0]}" data-ref-id="${esc(main.ref[1])}">открыть</button>` : ''}</p>
     <h3>Задачи</h3><p>${state.tasks.length ? `${state.tasks.length}: ${TASK_GROUPS.map(([n, cats]) => [n, state.tasks.filter(x => cats.includes(x.category)).length]).filter(([, n]) => n).map(([n, k]) => `${n.toLowerCase()} — ${k}`).join('; ')}` : 'активных задач нет'} · <a href="#dispatcher">к списку задач</a></p>
     <h3>Результат решений</h3><p>${d ? `${esc(d.id)} «${esc(d.title)}»: ожидали ${fmt(d.expected.accepted)} принятых к 16:00, сейчас наблюдается ${d.report.observed.accepted}${d.report.observed.final ? '' : ' (смена идёт)'}.` : 'Решений в этой смене ещё не принималось.'}${state.decisions.length > 1 ? ` Всего решений: ${state.decisions.length}.` : ''}</p>
@@ -35,30 +66,30 @@ function renderCaseTargets() {
 function renderShift() {
   renderShiftFirst();
   const t = state.totals, f = state.forecast, ref = state.plan.reference, max = Math.max(state.plan.target, ref?.total ?? 0, t.created, 4);
-  const x = m => 50 + m / 480 * 690, y = v => 230 - v / max * 205;
+  const width = Math.max(280, Math.min(760, $('shift-chart').clientWidth || 760)), right = width - 18;
+  $('shift-chart').setAttribute('viewBox', `0 0 ${width} 270`);
+  const x = m => 40 + m / 480 * (right - 40), y = v => 230 - v / max * 205;
   const line = pts => pts.map(p => `${x(p.minute).toFixed(1)},${y(p.accepted).toFixed(1)}`).join(' ');
   const ticks = [0, Math.round(max / 2), max];
   const hist = [...state.history]; if (hist.at(-1).minute !== state.elapsed) hist.push({ minute: state.elapsed, accepted: t.accepted });
-  $('shift-chart').innerHTML = ticks.map(v => `<line class="chart-grid" x1="50" x2="740" y1="${y(v)}" y2="${y(v)}"/><text class="chart-axis" x="40" y="${y(v) + 4}" text-anchor="end">${v}</text>`).join('') +
-    [0, 120, 240, 360, 480].map(m => `<text class="chart-axis" x="${x(m)}" y="255" text-anchor="middle">${clock(m)}</text>`).join('') +
-    `<line class="chart-now" x1="${x(state.elapsed)}" x2="${x(state.elapsed)}" y1="20" y2="230"/><line class="chart-target" x1="50" x2="740" y1="${y(state.plan.target)}" y2="${y(state.plan.target)}"/>` +
+  $('shift-chart').innerHTML = ticks.map(v => `<line class="chart-grid" x1="40" x2="${right}" y1="${y(v)}" y2="${y(v)}"/><text class="chart-axis" x="30" y="${y(v) + 4}" text-anchor="end">${v}</text>`).join('') +
+    (width < 450 ? [0, 240, 480] : [0, 120, 240, 360, 480]).map(m => `<text class="chart-axis" x="${x(m)}" y="255" text-anchor="middle">${clock(m)}</text>`).join('') +
+    `<line class="chart-now" x1="${x(state.elapsed)}" x2="${x(state.elapsed)}" y1="20" y2="230"/><line class="chart-target" x1="40" x2="${right}" y1="${y(state.plan.target)}" y2="${y(state.plan.target)}"/>` +
     (ref ? `<polyline class="chart-plan" points="${line(ref.profile)}"/>` : '') + `<polyline class="chart-forecast" points="${line(f.trajectory)}"/><polyline class="chart-fact" points="${line(hist)}"/>` +
-    `<circle cx="${x(state.elapsed)}" cy="${y(t.accepted)}" r="4" class="chart-dot"/><text class="chart-label" x="736" y="${y(state.plan.target) - 6}" text-anchor="end">план ${state.plan.target}</text>`;
+    `<circle cx="${x(state.elapsed)}" cy="${y(t.accepted)}" r="4" class="chart-dot"/><text class="chart-label" x="${right}" y="${y(state.plan.target) - 6}" text-anchor="end">план ${state.plan.target}</text>`;
   if (document.activeElement !== $('plan-target')) $('plan-target').value = String(state.plan.target);
   $('plan-form').querySelector('button').disabled = false;
   $('shift-numbers').innerHTML = [
-    ['Факт: принято', t.accepted], ['План смены (задан)', state.plan.target], ['Эталонная мощность', ref ? `${ref.total} (к сейчас ${ref.now})` : '—'], ['Прогноз к 16:00', `${f.projected}${f.low < f.high ? ` (${f.low}–${f.high})` : ''}`],
     ['В работе (WIP)', t.inProcess], ['Из них на доработке', t.rework], ['Не начаты', t.notStarted], ['Готовы к отгрузке', t.ready], ['Отгружено', t.shipped],
     ['Создано всего', `${t.created} ${t.balanced ? '✓ баланс сходится' : '✗ баланс нарушен'}`], ['Среднее время прохождения', state.leadTime ? `${fmt(state.leadTime.average)} мин (${state.leadTime.count} авт.)` : '—'],
   ].map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('');
   $('forecast-box').innerHTML = `<p class="forecast-big"><strong>${f.projected}</strong> <span>принятых к 16:00 без новых вмешательств · ${f.gap >= 0 ? 'запас' : 'дефицит'} ${Math.abs(f.gap)} к плану ${state.plan.target}</span></p>
-    <ul class="scenarios">${f.scenarios.map(s => `<li>${esc(s.label)}: <b>${s.accepted}</b>${s.lateOrders.length ? ` · опоздают ${esc(s.lateOrders.join(', '))}` : ''}</li>`).join('')}</ul>
+    <ul class="scenarios">${f.scenarios.map(s => `<li>${esc(s.label)}: <b>${s.accepted}</b>${s.lateOrders.length ? ` · ${state.finished ? 'срок не выполнен' : 'риск срока'}: ${esc(s.lateOrders.join(', '))}` : ''}</li>`).join('')}</ul>
     ${f.limiting ? `<p>Ограничивающий участок до конца смены: <b>${esc(f.limiting.name)}</b>, загрузка ${pct(f.limiting.utilization)}.</p>` : '<p>Смена завершена — прогноз равен факту.</p>'}
     <p class="fine-print">${esc(f.method)} ${esc(f.assumption)}</p>`;
   const q = state.quality;
   $('quality-box').innerHTML = `<h3>Качество (из проверок контроля)</h3><dl class="numbers"><div><dt>С первого предъявления</dt><dd>${q.firstPassYield === null ? '—' : `${pct(q.firstPassYield)} (${q.firstPass}/${q.firstInspections})`}</dd></div><div><dt>Не прошли контроль</dt><dd>${q.failed}</dd></div><div><dt>Приняты после доработки</dt><dd>${q.reworkedAccepted}</dd></div><div><dt>Сейчас в доработке</dt><dd>${q.inRework}</dd></div></dl><p class="fine-print">Каждый автомобиль засчитывается в годный выпуск один раз — после успешного контроля. Дефекты синтетические (~15%).</p>`;
-  const cols = ['Пост', 'Участок', 'Состояние', 'A', 'P', 'Q', 'OEE', 'Работа', 'Неиспр.', 'Техник', 'Нет входа', 'Блок.', 'Операций'];
-  $('oee-table').innerHTML = `<thead><tr>${cols.map(c => `<th scope="col">${c}</th>`).join('')}</tr></thead><tbody>${state.posts.map(p => `<tr><th scope="row"><button class="link" data-post-link="${esc(p.id)}">${esc(p.code)}</button></th><td>${esc(p.stageName)}</td><td>${esc(POST_SHORT[p.state])}</td><td>${pct(p.metrics.availability)}</td><td>${pct(p.metrics.performance)}</td><td>${pct(p.metrics.quality)}</td><td><b>${pct(p.metrics.oee)}</b></td><td>${p.stats.run}</td><td>${p.stats.fault}</td><td>${p.stats.maintenance}</td><td>${p.stats.starved}</td><td>${p.stats.blocked}</td><td>${p.stats.completed}</td></tr>`).join('')}</tbody>`;
+  $('oee-table').innerHTML = `<caption>Показатели к ${clock(state.elapsed)} · синтетические данные</caption><thead><tr>${SHIFTX_COLUMNS.map(([key, label]) => `<th scope="col" aria-sort="${shiftxSort.key === key ? shiftxSort.direction === 1 ? 'ascending' : 'descending' : 'none'}"><button data-shiftx-sort="${key}" aria-label="Сортировать: ${label}">${label} <span aria-hidden="true">${shiftxSort.key === key ? shiftxSort.direction === 1 ? '↑' : '↓' : '↕'}</span></button></th>`).join('')}</tr></thead><tbody>${shiftxPosts().map(p => `<tr><th scope="row"><button class="link" data-post-link="${esc(p.id)}">${esc(p.code)}</button></th><td>${esc(p.stageName)}</td><td>${esc(POST_SHORT[p.state])}</td><td>${shiftxMetric(p, 'availability')}</td><td>${shiftxMetric(p, 'performance')}</td><td>${shiftxMetric(p, 'quality')}</td><td><b>${shiftxMetric(p, 'oee')}</b></td><td>${p.stats.run}</td><td>${p.stats.fault}</td><td>${p.stats.maintenance}</td><td>${p.stats.starved}</td><td>${p.stats.blocked}</td><td>${p.stats.completed}</td></tr>`).join('')}</tbody>`;
   const jobs = state.jobs.map(j => `<article class="incident ${j.status === 'done' ? 'resolved' : 'active'}"><div class="incident-head"><strong>${esc(j.id)} · ${esc(j.title)}</strong><span>${postLink(j.postId)} · ${clock(j.createdAt)}${j.completedAt !== null ? ` → ${clock(j.completedAt)}` : ''}</span></div><p class="fine-print">${esc(JOB_STATUS[j.status])}${j.status === 'running' ? `, осталось ${j.remaining} мин` : ''}${j.part ? ` · запчасть: ${esc(state.stock.find(s => s.id === j.part)?.name)}` : ''}${j.decisionId ? ` · по решению ${esc(j.decisionId)}` : ''}${j.result ? ` · ${esc(j.result.text)}` : ''}</p></article>`).join('');
   const incidents = state.incidents.map(i => `<article class="incident ${esc(i.status)}"><div class="incident-head"><strong>${i.severity === 'critical' ? '●' : '◇'} ${esc(i.title)}</strong><span>${clock(i.start)} → ${i.end !== null ? clock(i.end) : i.status === 'unresolved' ? 'не устранён' : '…'}</span></div><p class="fine-print">${postLink(i.postId)} · ${esc(i.cause)} · ${esc(i.status === 'active' ? 'активен — нужен ремонт' : i.resolution)}</p></article>`).join('');
   $('incident-log').innerHTML = (incidents + jobs) || '<p class="muted">Инцидентов и работ нет.</p>';
