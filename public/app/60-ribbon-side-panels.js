@@ -130,13 +130,13 @@ function panelCompare(pr) {
   const exp = [...state.experiments].reverse().find(e => e.problemId === pr.id);
   const head = sideHead(`РЕШЕНИЯ · ${esc(pr.id)} · ${esc(pr.postCode)}`, 'Сравнение решений', '', `<button class="link small-link" data-problem="${esc(pr.id)}">← к диагностике</button>`);
   if (!exp) return head + `<div class="side-body"><p class="muted">Сравнение ещё не рассчитано. Модель будет поставлена на паузу, каждый вариант прогоняется на отдельной копии текущего снимка до 16:00.</p></div><div class="side-foot"><button class="primary" data-compare="${esc(pr.id)}">Рассчитать варианты</button></div>`;
-  const stale = exp.baseRevision !== state.revision, decided = state.decisions.some(d => d.experimentId === exp.id);
+  const stale = rejectedComparisons.has(exp.id) || exp.baseRevision !== state.revision, decided = state.decisions.some(d => d.experimentId === exp.id);
   const choice = ui.choice[exp.id] ?? exp.options.filter(o => o.available).sort((a, b) => (b.expected?.accepted ?? 0) - (a.expected?.accepted ?? 0))[0]?.id;
   ui.choice[exp.id] = choice;
   const check = pr.checks?.at(-1);
   let body = check ? `<section class="result"><div class="eyebrow">${esc(check.jobId)} · ${esc(check.title.toUpperCase())} · ${clock(check.minute)}</div><div class="result-value mono">${fmt(check.value)} ${esc(check.unit)}</div><p><b>${esc(check.text)}</b></p></section>` : '';
   body += `<p class="fine-print">${esc(exp.id)} · снимок ${clock(exp.minute)}. Ожидаемые значения — расчёт на копиях модели до 16:00, а не факт. План — ${state.plan.target} принятых.</p>`;
-  if (stale && !decided) body += `<p class="stale">Смена изменилась после расчёта — пересчитайте варианты перед применением.</p>`;
+  if (stale && !decided) body += `<p class="stale">Снимок устарел — пересчитайте варианты перед применением.</p>`;
   if (decided) body += `<p class="ok-text">По этому сравнению решение уже принято — ход работ в карточке проблемы.</p>`;
   body += `<fieldset class="options-list"><legend class="sr-only">Варианты решения</legend>${exp.options.map(o => {
     if (!o.available) return `<div class="opt off"><b>${esc(o.title)} — недоступно</b><p>${esc(o.reason)}</p></div>`;
