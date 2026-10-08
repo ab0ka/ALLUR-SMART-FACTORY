@@ -3,11 +3,12 @@ const handover = { active: false, controller: null, generation: 0, report: null,
 function handoverStop() {
   handover.controller?.abort(); handover.controller = null; handover.focusOwner = null; handover.generation++;
 }
+const handoverEpoch = snapshot => typeof snapshot?.shiftEpoch === 'string' && snapshot.shiftEpoch ? snapshot.shiftEpoch : null;
 function handoverObserve() {
   const previous = handover.observed;
-  const next = state && { csrf: state.csrf, seed: state.seed, elapsed: state.elapsed, revision: state.revision, eventSeq: state.events?.at(-1)?.seq };
+  const next = state && { shiftEpoch: handoverEpoch(state), csrf: state.csrf, seed: state.seed, elapsed: state.elapsed, revision: state.revision, eventSeq: state.events?.at(-1)?.seq };
   handover.observed = next;
-  return previous && next && (previous.csrf !== next.csrf || previous.seed !== next.seed || next.elapsed < previous.elapsed || next.revision < previous.revision || (Number.isFinite(previous.eventSeq) && Number.isFinite(next.eventSeq) && next.eventSeq < previous.eventSeq));
+  return previous && next && ((previous.shiftEpoch !== null && next.shiftEpoch !== null && previous.shiftEpoch !== next.shiftEpoch) || previous.csrf !== next.csrf || previous.seed !== next.seed || next.elapsed < previous.elapsed || next.revision < previous.revision || (Number.isFinite(previous.eventSeq) && Number.isFinite(next.eventSeq) && next.eventSeq < previous.eventSeq));
 }
 function handoverRoute() {
   if (view !== 'handover') { handoverStop(); handover.active = false; return; }
@@ -76,6 +77,9 @@ async function loadHandover() {
     const report = await response.json();
     if (generation !== handover.generation || view !== 'handover') return;
     if (handoverObserve()) { invalidateHandover(); return; }
+    // A report from a different shift must not replace the currently observed shift, in either response order.
+    const reportEpoch = handoverEpoch(report), stateEpoch = handoverEpoch(state);
+    if (reportEpoch !== null && stateEpoch !== null && reportEpoch !== stateEpoch) { invalidateHandover(); return; }
     if (report?.schemaVersion !== 1 || report.synthetic !== true || !report.metrics || typeof report.metrics !== 'object') throw new Error('invalid handover');
     handover.report = report; handover.status = 'ready'; handoverPaint(report);
     for (const summary of $('view-handover').querySelectorAll('details > summary[data-focus-key]')) {
