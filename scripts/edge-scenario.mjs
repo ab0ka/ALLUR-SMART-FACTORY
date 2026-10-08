@@ -1,6 +1,6 @@
 // Real local server + installed Edge. Playwright is supplied externally, never installed by this script.
 import assert from 'node:assert/strict';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createApp } from '../server/index.mjs';
@@ -10,17 +10,25 @@ const port = Number(process.env.EDGE_PORT || 3033);
 assert.ok(Number.isInteger(port) && port >= 3027 && port <= 65535, 'Use a dedicated port >= 3027');
 const runtime = process.env.PLAYWRIGHT_MODULE;
 assert.ok(runtime, 'Set PLAYWRIGHT_MODULE to an existing Playwright index.mjs (no npm install required)');
-const { chromium } = await import(pathToFileURL(path.resolve(runtime)).href);
-const run = `edge-${Date.now()}`;
-const output = path.join(root, 'data', run);
-await mkdir(output, { recursive: true });
+let chromium;
+try {
+  ({ chromium } = await import(pathToFileURL(path.resolve(runtime)).href));
+  assert.equal(typeof chromium?.launch, 'function');
+} catch (cause) {
+  throw new Error('Cannot load Playwright. Set PLAYWRIGHT_MODULE to an existing Playwright index.mjs exporting chromium.launch; nothing was installed.', { cause });
+}
+const artifactRoot = path.resolve(process.env.EDGE_ARTIFACT_DIR || path.join(root, 'data'));
+await mkdir(artifactRoot, { recursive: true });
+// Atomic allocation: simultaneous runs and clocks with identical timestamps cannot reuse evidence.
+const output = await mkdtemp(path.join(artifactRoot, 'edge-'));
 const server = createApp({ aiOptions: { provider: 'local' }, storePath: path.join(output, 'state.json') });
 let browser, page;
 const issues = [], checkpoints = [];
 try {
   // Never attach to or terminate a server already using this port.
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); });
-  browser = await chromium.launch({ channel: 'msedge', headless: true });
+  try { browser = await chromium.launch({ channel: 'msedge', headless: true }); }
+  catch (cause) { throw new Error('Cannot start Microsoft Edge. Check that Edge is installed and accessible to Playwright; no browser was installed by this script.', { cause }); }
   page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
   page.setDefaultTimeout(15000);
   page.on('pageerror', e => issues.push(e.message));
@@ -34,8 +42,8 @@ try {
   };
   const clickResponse = async (selector, route) => {
     const pending = page.waitForResponse(r => new URL(r.url()).pathname === route && r.request().method() === 'POST');
-    await page.locator(selector).click();
-    const response = await pending;
+    // Attach handlers to both operations immediately, including when either one fails first.
+    const [response] = await Promise.all([pending, page.locator(selector).click()]);
     assert.equal(response.status(), 200, `${route} failed`);
     return response.json();
   };
@@ -131,7 +139,9 @@ try {
   console.error(`Edge scenario FAILED; evidence: ${output}`);
   throw error;
 } finally {
-  await browser?.close();
-  if (server.listening) await new Promise(resolve => server.close(resolve));
-  else server.emit('close');
+  try { await browser?.close(); }
+  finally {
+    if (server.listening) await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); });
+    else server.emit('close');
+  }
 }
