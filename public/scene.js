@@ -27,7 +27,13 @@ export const OBSTACLES = [
   { name: 'стеллаж', x0: 30, x1: 120, y0: 404, y1: 426 },
   { name: 'ворота 1', x0: 626, x1: 638, y0: 194, y1: 206 }, { name: 'ворота 2', x0: 626, x1: 638, y0: 314, y1: 326 },
 ];
-export const carFootprint = p => p.o === 'y' ? { x0: p.x - 25, x1: p.x + 25, y0: p.y - 55, y1: p.y + 55 } : { x0: p.x - 55, x1: p.x + 55, y0: p.y - 25, y1: p.y + 25 };
+// Lift arms: low parts (z 14…20) under the car on the lift. Cars drive over them, so they are not obstacles
+// and are drawn as separate low objects, always beneath a car whose footprint covers them.
+export const LIFT_ARMS = Object.entries(BAY_Y).flatMap(([post, y]) => [
+  { name: `${post}:задняя лапа`, def: 'sc-arm-back', bayY: y, fp: { x0: 305, x1: 315, y0: y - 6, y1: y + 8 }, h: 20, low: true },
+  { name: `${post}:передняя лапа`, def: 'sc-arm-front', bayY: y, fp: { x0: 305, x1: 315, y0: y + 42, y1: y + 56 }, h: 20, low: true },
+]);
+export const carFootprint =p => p.o === 'y' ? { x0: p.x - 25, x1: p.x + 25, y0: p.y - 55, y1: p.y + 55 } : { x0: p.x - 55, x1: p.x + 55, y0: p.y - 25, y1: p.y + 25 };
 export const overlaps = (a, b) => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
 
 // Where a snapshot puts a vehicle inside this shop (null = outside the shop).
@@ -100,6 +106,8 @@ ${carModel('sc-car-body', false)}
 ${carModel('sc-car-done', true)}
 <g id="sc-back">
   <g transform="${FACE_Y(5.2, -3)}">${rect(49, 0, 12, 76, 'sc-col')}</g><g transform="${FACE_X(52.83, 30.5)}">${rect(-18, 0, 12, 76, 'sc-col2')}</g><g transform="translate(0 -76) ${ISO}">${rect(49, -18, 12, 12, 'sc-colt')}</g>
+</g>
+<g id="sc-arm-back">
   <g transform="${FACE_Y(-6.93, 4)}">${rect(50, 14, 10, 6, 'sc-col')}</g><g transform="${FACE_X(51.96, 30)}">${rect(-6, 14, 14, 6, 'sc-col2')}</g><g transform="translate(0 -20) ${ISO}">${rect(50, -6, 10, 14, 'sc-colt')}</g>
 </g>
 <g id="sc-bench">
@@ -108,8 +116,10 @@ ${carModel('sc-car-done', true)}
   <g transform="translate(0 -24) ${ISO}">${rect(112, -28, 30, 18, 'sc-bencht')}${rect(115, -25, 9, 6, 'sc-tray')}</g>
   <g transform="${FACE_X(119.5, 69)}">${rect(-21, 24, 2, 5, 'sc-stand')}${rect(-26, 29, 12, 11, 'sc-screen', ' rx="1"')}${rect(-24.5, 31.5, 9, 2, 'sc-screenline')}</g>
 </g>
-<g id="sc-front">
+<g id="sc-arm-front">
   <g transform="${FACE_Y(-48.5, 28)}">${rect(50, 14, 10, 6, 'sc-col')}</g><g transform="${FACE_X(51.96, 30)}">${rect(42, 14, 14, 6, 'sc-col2')}</g><g transform="translate(0 -20) ${ISO}">${rect(50, 42, 10, 14, 'sc-colt')}</g>
+</g>
+<g id="sc-front">
   <g transform="${FACE_Y(-58.89, 34)}">${rect(49, 0, 12, 76, 'sc-col')}${rect(51, 40, 8, 12, 'sc-panel', ' rx="1"')}</g><g transform="${FACE_X(52.83, 30.5)}">${rect(56, 0, 12, 76, 'sc-col2')}</g><g transform="translate(0 -76) ${ISO}">${rect(49, 56, 12, 12, 'sc-colt')}</g>
   <g transform="${FACE_Y(-60.62, 35)}">${rect(64, 0, 16, 26, 'sc-unit', ' rx="1"')}${rect(67, 14, 10, 7, 'sc-unit2', ' rx="1"')}</g><g transform="${FACE_X(69.28, 40)}">${rect(56, 0, 14, 26, 'sc-unit2')}</g><g transform="translate(0 -26) ${ISO}">${rect(64, 56, 16, 14, 'sc-unitt')}</g>
 </g>
@@ -163,7 +173,11 @@ function behind(a, b) { // -1: a is drawn first
   const sx = a.fp.x1 <= b.fp.x0 ? -1 : b.fp.x1 <= a.fp.x0 ? 1 : 0, sy = a.fp.y1 <= b.fp.y0 ? -1 : b.fp.y1 <= a.fp.y0 ? 1 : 0;
   if (sx && sy && sx !== sy) return 0;
   if (sx || sy) return sx || sy;
-  return 0;
+  // Footprints overlap (a car over the lift arms, a car passing the technician in the aisle):
+  // low parts go beneath, otherwise the object whose centre is nearer to the viewer goes on top.
+  if (a.low !== b.low) return a.low ? -1 : 1;
+  const d = (a.fp.x0 + a.fp.x1 + a.fp.y0 + a.fp.y1) - (b.fp.x0 + b.fp.x1 + b.fp.y0 + b.fp.y1);
+  return d < 0 ? -1 : d > 0 ? 1 : 0;
 }
 export function depthOrder(objects) {
   const n = objects.length, boxes = objects.map(o => screenBox(o.fp, o.h)), indeg = new Array(n).fill(0), next = objects.map(() => []);
@@ -198,7 +212,8 @@ export class AssemblyScene {
     svg.innerHTML = `${DEFS}<g class="sc-cam">${floorLayer()}<g class="sc-rings"></g><g class="sc-objects"></g><g class="sc-overlay"></g></g>`;
     this.camEl = svg.querySelector('.sc-cam'); this.rings = svg.querySelector('.sc-rings'); this.objectsEl = svg.querySelector('.sc-objects'); this.overlay = svg.querySelector('.sc-overlay');
     this.statics = [];
-    const addStatic = (markup, fp, h) => { const g = document.createElementNS(NS, 'g'); g.innerHTML = markup; this.objectsEl.append(g); this.statics.push({ el: g, fp, h }); };
+    const addStatic = (markup, fp, h, low = false) => { const g = document.createElementNS(NS, 'g'); g.innerHTML = markup; this.objectsEl.append(g); this.statics.push({ el: g, fp, h, low }); };
+    for (const arm of LIFT_ARMS) { const [sx, sy] = iso(BAY_X, arm.bayY); addStatic(`<use href="#${arm.def}" transform="translate(${r1(sx)} ${r1(sy)})"/>`, arm.fp, arm.h, true); }
     for (const [post, y] of Object.entries(BAY_Y)) {
       const [sx, sy] = iso(BAY_X, y);
       addStatic(`<use href="#sc-back" transform="translate(${r1(sx)} ${r1(sy)})"/>`, { x0: 304, x1: 316, y0: y - 18, y1: y - 6 }, 76);
