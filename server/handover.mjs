@@ -24,6 +24,7 @@ export function createHandover(snapshot) {
   return {
     schemaVersion: 1,
     synthetic: true,
+    shiftEpoch: scalar(s.shiftEpoch),
     revision: scalar(s.revision), elapsed: scalar(s.elapsed), shift: scalar(s.shift),
     shiftStart: scalar(s.shiftStart), finished: scalar(s.finished),
     metrics: {
