@@ -78,7 +78,9 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 function renderCards(snapshot, source, vehicleId) {
+  const detail = { innerHTML: '' };
   const context = vm.createContext({
+    $: () => detail, selectedPost: source.id, problemLink: String, vehicleLink: String,
     state: snapshot, post: id => snapshot.posts.find(p => p.id === id),
     vehicle: id => snapshot.vehicles.find(v => v.id === id), problem: id => snapshot.problems.find(p => p.id === id),
     esc: value => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;'),
@@ -88,10 +90,11 @@ function renderCards(snapshot, source, vehicleId) {
     POST_STATES: { fault: 'Неисправность' }, POST_SHORT: { idle: 'Свободен', slow: 'Замедлен' },
   });
   vm.runInContext(readFileSync(new URL('../public/app/60-ribbon-side-panels.js', import.meta.url), 'utf8'), context);
-  return vm.runInContext(`({ post: panelPost(post('${source.id}')), vehicle: panelVehicle(vehicle('${vehicleId}')) })`, context);
+  vm.runInContext(readFileSync(new URL('../public/app/20-workshop-map.js', import.meta.url), 'utf8') + '\nrenderPostDetail();', context);
+  return { legacy: detail.innerHTML, ...vm.runInContext(`({ post: panelPost(post('${source.id}')), vehicle: panelVehicle(vehicle('${vehicleId}')) })`, context) };
 }
 
-test('post and vehicle cards use identical server transfer reasons and allowed destinations', () => {
+test('post, vehicle and legacy workshop cards share server transfer reasons and destinations', () => {
   for (const scenario of ['held', 'problem', 'available', 'finished']) {
     const { w, source, target, v } = fixture();
     w.injectIncident(source.id, 'breakdown');
