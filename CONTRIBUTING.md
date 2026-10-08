@@ -35,10 +35,11 @@
 
 | Зона | Файлы |
 |---|---|
-| Производственный движок | `server/simulation.mjs`, `server/equipment.mjs`, `server/decisions.mjs` |
+| Производственный движок | `server/simulation.mjs`, `server/equipment.mjs`, `server/decisions.mjs`, `server/components.mjs` (узлы машины и синтетические проверки) |
 | Сервер и безопасность | `server/index.mjs`, `server/store.mjs` |
 | AI и чат | `server/ai.mjs`, `server/ai-config.mjs`, `server/chat.mjs` |
 | Изометрическая сцена | `public/scene.js` |
+| 3D-карточка автомобиля | `public/viewer3d.js` (Three.js, учебная модель), `public/app/65-car3d.js` (панель узлов); библиотеки `public/three.module.js`, `public/three-orbit-controls.js` не правим — см. `docs/ASSETS.md` |
 | Интерфейс | `public/app/*.js`, `public/index.html`, `public/styles.css` |
 | ML и сравнение политик | `scripts/`, `models/`, `reports/` |
 | Тесты | `tests/` |
@@ -70,6 +71,7 @@
 | `40-shift-lab.js` | смена и аналитика, лаборатория моделей |
 | `50-spaces.js` | пространства: сцена, карта предприятия, карточки цехов, таблица |
 | `60-ribbon-side-panels.js` | лента событий и боковые карточки (паспорт, пост, проблема, сравнение, чат) |
+| `65-car3d.js` | 3D-карточка автомобиля: капот, узлы, проверки, снятие и установка, история |
 | `70-space-navigation.js` | выбор объектов, переходы, камера, клавиатура |
 | `90-routing-startup.js` | маршрутизация, обработчики событий, запуск |
 

@@ -21,7 +21,7 @@ export function predictProbability(model, f) {
 export const baselineAlarm = (model, f) => f[model.baseline.feature] >= model.baseline.threshold;
 // Risk for every lift from readings available now. The working variant is whatever was better on held-out shifts.
 export function assessRisk(sim, model) {
-  if (!model) return { available: false, reason: 'Модель риска не обучена: выполните npm.cmd run train', items: [] };
+  if (!model) return { available: false, reason: 'Обученная модель риска не подключена; прогноз выпуска рассчитывается симуляцией. Обучить: npm.cmd run train', items: [] };
   const items = LIFTS.map(l => {
     const eq = sim.equipment[l.id];
     if (eq.failed) return { equipmentId: l.id, postId: l.postId, failed: true, text: 'Подъёмник в отказе — прогноз отказа не применяется' };
@@ -34,7 +34,7 @@ export function assessRisk(sim, model) {
   return { available: true, modelVersion: model.modelVersion, selected: model.selected, horizon: model.horizon, threshold: model.threshold, baseline: model.baseline, items };
 }
 export function labSummary(model) {
-  if (!model) return { available: false, reason: 'Модель не обучена. Выполните npm.cmd run train — скрипт сгенерирует синтетические смены, обучит модель и сохранит models/lift-risk-v1.json.' };
+  if (!model) return { available: false, reason: 'Обученная модель не подключена; прогноз выпуска рассчитывается симуляцией. Чтобы обучить модель риска отказа подъёмника на синтетических сменах, выполните npm.cmd run train (около 10 с): скрипт сохранит models/lift-risk-v1.json и отчёт reports/lift-risk-v1.md, затем перезапустите сервер.' };
   const { weights, mean, std, ...meta } = model;
   return { available: true, ...meta, coefficients: FEATURES.map((k, i) => ({ feature: k, weight: Math.round(weights[i] * 1000) / 1000, mean: Math.round(mean[i] * 1000) / 1000, std: Math.round(std[i] * 1000) / 1000 })) };
 }

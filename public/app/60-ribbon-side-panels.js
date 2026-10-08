@@ -1,5 +1,5 @@
 // ---------- Ribbon ----------
-const EVENT_KIND = { problem_detected: 'warn', incident_started: 'stop', inspection_failed: 'warn', job_started: 'check', check_completed: 'check', repair_completed: 'ok', verify_completed: 'ok', problem_resolved: 'ok', vehicle_accepted: 'ok', vehicle_shipped: 'ok', decision_applied: 'check', operation_started: 'ok', vehicle_moved: 'wait', follow_up_skipped: 'warn', incident_resolved: 'ok' };
+const EVENT_KIND = { component_checked: 'check', component_removed: 'wait', component_installed: 'ok', start_test: 'check', problem_detected: 'warn', incident_started: 'stop', inspection_failed: 'warn', job_started: 'check', check_completed: 'check', repair_completed: 'ok', verify_completed: 'ok', problem_resolved: 'ok', vehicle_accepted: 'ok', vehicle_shipped: 'ok', decision_applied: 'check', operation_started: 'ok', vehicle_moved: 'wait', follow_up_skipped: 'warn', incident_resolved: 'ok' };
 function eventMatches(e, sel) {
   if (!sel) return true;
   if (sel.type === 'vehicle') return e.vehicleId === sel.id;
@@ -32,7 +32,7 @@ function renderSide() {
   if (p.type === 'chat') { if (lastPanelKey !== key) side.innerHTML = chatPanelShell(); lastPanelKey = key; updateSideChat(); return; }
   const body = side.querySelector('.side-body'), scroll = body && lastPanelKey === key ? body.scrollTop : 0;
   let html = '';
-  if (p.type === 'vehicle') html = vehicle(p.id) ? panelVehicle(vehicle(p.id)) : '';
+  if (p.type === 'vehicle') html = vehicle(p.id) ? vehiclePanel(vehicle(p.id)) : '';
   else if (p.type === 'post') html = post(p.id) ? panelPost(post(p.id)) : '';
   else if (p.type === 'problem') html = problem(p.id) ? panelProblem(problem(p.id)) : '';
   else if (p.type === 'compare') html = problem(p.id) ? panelCompare(problem(p.id)) : '';
@@ -45,35 +45,12 @@ const tag = (t, cls = '') => `<span class="tagchip ${cls}">${t}</span>`;
 const chatBtn = (type, id) => `<button class="icon-btn small" data-open-chat="1" data-ctx-type="${type}" data-ctx-id="${esc(id)}" aria-label="Спросить в чате об этом объекте"><svg viewBox="0 0 20 20" aria-hidden="true"><path class="ico-chat" d="M3 4.5A2.5 2.5 0 0 1 5.5 2h9A2.5 2.5 0 0 1 17 4.5v6a2.5 2.5 0 0 1-2.5 2.5H9l-4 3.5V13a2.5 2.5 0 0 1-2-2.5z"/></svg></button>`;
 const lockNote = '<p class="lock">Проверки, ремонт, перевод и снятие поста с загрузки меняют производство — каждое такое действие запросит подтверждение.</p>';
 
-function panelVehicle(v) {
-  const op = v.currentOperation && v.currentOperation.completedAt === null ? v.currentOperation : null;
-  const p = v.location.type === 'post' ? post(v.location.id) : null, order = state.orders.find(o => o.id === v.orderId);
-  let kind = VEHICLE_KIND(v); if (p?.state === 'slow') kind = 'warn';
-  const head = { ok: 'СЕЙЧАС · В РАБОТЕ', warn: 'СЕЙЧАС · ТЕМП СНИЖЕН', stop: 'СЕЙЧАС · ПАУЗА', wait: 'СЕЙЧАС · ОЖИДАЕТ', idle: 'СЕЙЧАС' }[kind];
-  let now = `<section class="now ${kind}"><div class="now-head">${ico(kind, head)}</div><div class="now-title">${esc(op ? `${op.operation} · ${op.postCode}` : v.status)}</div>`;
-  if (op) now += `${bar(op.progress, `wide ${kind}`)}<div class="now-line">${Math.round(op.progress * 100)}% · начата в ${clock(op.startedAt)} · норматив ${op.norm} мин${v.state === 'paused' && op.pauseReason ? ` · пауза: ${esc(op.pauseReason.toLowerCase())}` : ''}</div>`;
-  if (p?.problemId) now += `<p>Причина: проблема <b>${esc(p.problemId)}</b> на посту — ${esc(problem(p.problemId)?.title ?? '')}. Дефектов у самого автомобиля это не означает.</p>`;
-  else if (op && v.state !== 'processing') now += `<p>${esc(v.status)}</p>`;
-  now += '</section>';
-  const route = `<ol class="vroute">${v.route.map(r => `<li class="${r.status}${r.result === 'fail' ? ' failed' : ''}">${r.status === 'done' ? ico(r.result === 'fail' ? 'warn' : 'ok', '') : r.status === 'current' ? ico(kind === 'ok' ? 'check' : kind, '') : '<span class="pend" aria-hidden="true"></span>'}<span class="vr-name">${esc(r.stageName)}${r.postCode ? ` · ${esc(r.postCode)}` : ''}${r.status === 'current' ? ' — сейчас' : ''}</span><span class="vr-time mono">${r.status === 'done' ? `${clock(r.startedAt)}–${clock(r.completedAt)}` : r.status === 'current' ? `с ${clock(r.startedAt)}` : `норматив ${r.norm} мин`}</span></li>`).join('')}</ol>`;
-  const insp = v.inspections, fails = insp.filter(i => i.result === 'fail');
-  const probs = state.problems.filter(x => x.vehicleIds.includes(v.id));
-  const diagRows = probs.length ? probs.map(x => `<button class="link" data-problem="${esc(x.id)}">${esc(x.id)}</button> на ${esc(x.postCode)} — ${x.status === 'open' ? 'открыта' : x.status === 'resolved' ? `закрыта ${clock(x.resolvedAt)}` : 'не устранена'}${x.jobs.length ? `: ${x.jobs.map(j => `${esc(j.title.toLowerCase())}${j.result ? ` (${esc(j.result.text)})` : j.status === 'running' ? ' (идёт)' : ''}`).join('; ')}` : ''}`).join('<br>') : 'нет записей';
-  const checks = `<dl class="kv"><div><dt>Контроль</dt><dd>${insp.length ? insp.map(i => `${clock(i.minute)} ${esc(i.postCode)}: ${i.result === 'pass' ? 'принят' : 'не пройден'}`).join('; ') : 'ещё не предъявлялся'}</dd></div><div><dt>Дефекты</dt><dd>${fails.length ? fails.map(i => esc(i.defect)).join('; ') + (v.reworked ? ' · доработан' : '') : 'нет записей'}</dd></div><div><dt>Диагностика и ремонт</dt><dd>${diagRows}</dd></div></dl>`;
-  let actions = '';
-  if (p?.problemId) actions += `<button class="primary wide" data-problem="${esc(p.problemId)}">Диагностика поста ${esc(p.code)} (${esc(p.problemId)})</button>`;
-  actions += `<button class="secondary wide" data-open-chat="1" data-ctx-type="vehicle" data-ctx-id="${esc(v.id)}">Спросить в чате: «Почему ${esc(v.id)} задерживается?»</button>`;
-  if (p && op && !state.finished) {
-    const sib = state.posts.filter(q => q.stage === p.stage && q.id !== p.id);
-    const free = sib.filter(q => !q.vehicleId && !['fault', 'maintenance', 'shift_over'].includes(q.state) && !q.problemId && !q.hold);
-    if (['fault', 'maintenance', 'slow'].includes(p.state) && free.length) actions += free.map(q => `<button class="wide" data-transfer="${esc(v.id)}" data-to="${esc(q.id)}">Перевести на ${esc(q.code)}…</button>`).join('');
-    else if (sib.length) actions += `<button class="wide" disabled aria-describedby="why-transfer">Перевести на параллельный пост</button><p id="why-transfer" class="why">Недоступно: ${['fault', 'maintenance', 'slow'].includes(p.state) ? sib.map(q => q.vehicleId ? `${esc(q.code)} занят ${esc(q.vehicleId)} (${Math.round((q.progress ?? 0) * 100)}%)` : `${esc(q.code)} — ${esc(POST_SHORT[q.state].toLowerCase())}${q.problemId ? `, ${esc(q.problemId)}` : ''}`).join('; ') : 'пост работает без отклонений'}.</p>`;
-  }
-  actions += `<button class="link" data-legacy="vehicles" data-legacy-id="${esc(v.id)}">Полный паспорт и история событий →</button>`;
-  return sideHead('АВТОМОБИЛЬ · ПАСПОРТ', `<span class="mono">${esc(v.id)}</span>`, tag(esc(v.modelName), 'blue') + tag(`Задание ${esc(v.orderId)}${order ? ` · срок ${order.dueMinute > state.shift ? 'после смены' : clock(order.dueMinute)}` : ''}`) + tag(`Приоритет ${PRIORITY[v.priority].toLowerCase()}`), chatBtn('vehicle', v.id))
-    + `<div class="side-body">${now}<h3>Пройденный маршрут</h3>${route}<h3>Проверки и ремонт</h3>${checks}<h3>Доступные действия</h3><div class="actions-col">${actions}</div>${lockNote}</div>`;
+// Tasks of this post: equipment problems of the post and vehicles that wait on it, from the same server list.
+function postTasks(p) {
+  const list = state.tasks.filter(t => t.postId === p.id || (t.object.type === 'post' && t.object.id === p.id));
+  const rel = p.stage === 'rework' ? '<p class="fine-print">Пост ремонта автомобилей. Обслуживание подъёмников сборки — отдельный раздел «Обслуживание оборудования».</p>' : p.equipmentId ? '<p class="fine-print">Неисправность подъёмника — задача обслуживания оборудования, а не дефект автомобиля на посту.</p>' : '';
+  return (list.length ? `<h3>Задачи поста · ${list.length}</h3><ul class="plain">${list.map(t => `<li>${ico(TASK_ICON[t.category] ?? 'warn', '')} <button class="link" data-task="${esc(t.id)}">${esc(t.title)}</button> <span class="fine-print">${esc(t.certaintyText)}</span></li>`).join('')}</ul>` : '') + rel;
 }
-
 function panelPost(p) {
   const kind = POST_KIND(p), v = p.vehicleId ? vehicle(p.vehicleId) : null, job = runningJob(p.id);
   const stage = p.stage === 'rework' ? { name: 'Доработка', buffer: state.rework.buffer } : state.stages.find(s => s.id === p.stage);
@@ -92,7 +69,7 @@ function panelPost(p) {
   }
   const m = p.metrics;
   body += `<h3>Действия</h3><div class="actions-col">${actions.join('') || '<p class="muted">Действий нет.</p>'}</div>${lockNote}<p class="fine-print">A ${pct(m.availability)} · P ${pct(m.performance)} · Q ${pct(m.quality)} · OEE ${pct(m.oee)} · работа ${p.stats.run} мин · простой без входа ${p.stats.starved} мин</p>`;
-  return sideHead(`ПОСТ · ${esc(p.stageName.toUpperCase())}`, esc(p.code), p.equipmentId ? tag(esc(state.equipment.find(e => e.id === p.equipmentId)?.name ?? '')) : '', chatBtn('post', p.id)) + `<div class="side-body">${body}</div>`;
+  return sideHead(`ПОСТ · ${esc(p.stageName.toUpperCase())}`, esc(p.code), p.equipmentId ? tag(esc(state.equipment.find(e => e.id === p.equipmentId)?.name ?? '')) : '', chatBtn('post', p.id)) + `<div class="side-body">${history.state?.ret ? backLink() : ''}${postTasks(p)}${body}</div>`;
 }
 
 function panelProblem(pr) {
@@ -112,6 +89,8 @@ function panelProblem(pr) {
     body += `<h3>Ход работ</h3><ol class="timeline">${items.sort((x, y) => x[0] - y[0] || x[1] - y[1]).map(x => x[2]).join('')}</ol>`;
     if (pr.status === 'open' && jobs.some(j => j.status !== 'done')) body += '<p class="fine-print">Работы идут в модельном времени; ускорение меняет только темп показа. После ремонта проверка запускается автоматически.</p>';
   }
+  const eqFull = pr.equipmentId ? state.equipment.find(e => e.id === pr.equipmentId) : null;
+  if (eqFull) body += `<details class="more"><summary>Графики измерений ${esc(eqFull.name)}</summary><div class="sparks">${['pressure', 'temperature', 'cycle'].map(c => sparkline(eqFull, c, pr.latest?.[c]?.nominal ?? { pressure: 180, temperature: 45, cycle: 42 }[c], { pressure: 'бар', temperature: '°C', cycle: 'с' }[c], pr.detectedAt)).join('')}</div></details>`;
   if (pr.latest) {
     body += `<h3>Симптом</h3><p>Отклонение ${fmt(pr.anomalyScore)} при пороге 4,5${pr.status === 'open' ? '' : ' (на момент закрытия)'}. Средние за 30 мин против нормы:</p>
       <table class="mini-table"><thead><tr><th scope="col">Параметр</th><th scope="col">30 мин</th><th scope="col">Норма</th><th scope="col">${last ? clock(last.minute) : 'последнее'}</th></tr></thead><tbody>${Object.entries(pr.latest).map(([c, x]) => { const dev = Math.abs(x.mean - x.nominal) >= (c === 'pressure' ? 2 : 1.5); return `<tr><th scope="row">${esc(x.name)}, ${esc(x.unit)}</th><td class="${dev ? 'warn-text' : ''}">${dev ? (x.mean > x.nominal ? '↑ ' : '↓ ') : ''}${fmt(x.mean)}</td><td>${x.nominal}</td><td>${last?.[c] !== undefined && last?.[c] !== null ? fmt(last[c]) : '—'}</td></tr>`; }).join('')}</tbody></table>`;
@@ -124,7 +103,7 @@ function panelProblem(pr) {
   }
   const foot = pr.status === 'open' && !state.finished ? `<button class="primary" data-compare="${esc(pr.id)}">Сравнить решения</button>` : '';
   return sideHead(`ПРОБЛЕМА · ${pr.kind === 'equipment' ? 'ОБОРУДОВАНИЕ' : 'РУЧНОЙ СЦЕНАРИЙ'}`, `<span class="mono">${esc(pr.id)}</span> · ${esc(pr.title)}`, statusTag + tag(`Затронуты: ${pr.vehicleIds.map(id => `<button class="link mono" data-vehicle="${esc(id)}">${esc(id)}</button>`).join(', ') || '—'}`), chatBtn('problem', pr.id))
-    + `<div class="side-body">${body}${lockNote}<p><button class="link" data-legacy="dispatcher" data-legacy-id="${esc(pr.id)}">Графики измерений и журнал решений в диспетчере →</button></p></div>${foot ? `<div class="side-foot">${foot}<button class="secondary" data-open-chat="1" data-ctx-type="problem" data-ctx-id="${esc(pr.id)}">Обсудить в чате</button></div>` : ''}`;
+    + `<div class="side-body">${history.state?.ret ? backLink() : ''}${body}${lockNote}<p class="fine-print">Это неисправность оборудования (пост ${esc(pr.postCode)}), а не дефект автомобиля. Ремонт машин — в цехе «Ремонт автомобилей».</p></div>${foot ? `<div class="side-foot">${foot}<button class="secondary" data-open-chat="1" data-ctx-type="problem" data-ctx-id="${esc(pr.id)}">Обсудить в чате</button></div>` : ''}`;
 }
 
 function panelCompare(pr) {
@@ -149,21 +128,31 @@ function panelCompare(pr) {
   return head + `<div class="side-body">${body}</div><div class="side-foot">${foot}<button class="secondary" data-open-chat="1" data-ctx-type="problem" data-ctx-id="${esc(pr.id)}">Обсудить в чате</button></div>`;
 }
 
+// One chat: the visible context can be reset; a change of object is announced, the unsent draft is kept.
+let chatDraft = '', chatPrevContext = null;
+const sameCtx = (a, b) => (a?.type ?? null) === (b?.type ?? null) && (a?.id ?? null) === (b?.id ?? null);
+function setChatContext(ctx) {
+  if (sameCtx(ctx, chatContext)) return;
+  if (chatContext && (chatDraft.trim() || state?.chat.length)) chatPrevContext = chatContext;
+  chatContext = ctx;
+}
 function chatPanelShell() {
-  return `<div class="side-head"><div class="side-top"><span class="eyebrow">ЧАТ ПО СМЕНЕ</span><span class="side-tools"><button class="icon-btn small" data-close-panel="1" aria-label="Закрыть чат">✕</button></span></div><h2>Чат</h2><div class="chipline" id="side-chat-context"></div><p class="fine-print" id="side-chat-mode"></p></div>
+  return `<div class="side-head"><div class="side-top"><span class="eyebrow">ЧАТ ПО СМЕНЕ</span><span class="side-tools"><button class="icon-btn small" data-close-panel="1" aria-label="Закрыть чат">✕</button></span></div><h2>Чат</h2><div class="chipline" id="side-chat-context"></div><div id="side-chat-switch"></div><p class="fine-print" id="side-chat-mode"></p></div>
   <div class="side-body chat-body"><ol id="side-chat-log" class="chat-log" aria-live="polite"></ol></div>
   <div class="side-foot chat-foot"><div class="chips small" id="side-chat-suggest" role="group" aria-label="Предложенные вопросы"></div>
-  <form id="side-chat-form" class="chat-form"><label for="side-chat-input" class="sr-only">Вопрос о выбранном объекте</label><textarea id="side-chat-input" rows="2" maxlength="500" placeholder="Вопрос о посте, автомобиле, событии…"></textarea><div class="chat-send"><span id="side-chat-count" class="fine-print">0/500</span><button class="primary" type="submit" id="side-chat-send">Спросить</button></div></form></div>`;
+  <form id="side-chat-form" class="chat-form"><label for="side-chat-input" class="sr-only">Вопрос о выбранном объекте</label><textarea id="side-chat-input" rows="2" maxlength="500" placeholder="Вопрос о посте, автомобиле, задаче…"></textarea><div class="chat-send"><span id="side-chat-count" class="fine-print">0/500</span><button class="primary" type="submit" id="side-chat-send">Спросить</button></div></form></div>`;
 }
 function updateSideChat() {
-  const ai = state.ai;
+  const ai = state.ai, input = $('side-chat-input');
+  if (input && input.value !== chatDraft && document.activeElement !== input) { input.value = chatDraft; text('side-chat-count', `${chatDraft.length}/500`); }
   $('side-chat-mode').textContent = ai.configured ? 'Модель формулирует ответ только из фактов движка; числа проверяет сервер. Чат ничего не меняет сам.' : 'Модель не подключена: работают локальные ответы на типовые вопросы. Чат ничего не меняет сам.';
-  $('side-chat-context').innerHTML = chatContext ? `${tag(`Контекст: ${esc(contextLabel(chatContext))}`, 'blue')}<button class="link small-link" data-chat-clear="1">убрать</button>` : tag('без контекста');
-  $('side-chat-suggest').innerHTML = SUGGESTED.slice(0, 4).map(q => `<button data-ask="${esc(q)}" data-ask-side="1">${esc(q)}</button>`).join('');
+  $('side-chat-context').innerHTML = chatContext ? `${tag(`Контекст: ${esc(contextLabel(chatContext))}`, 'blue')}<button class="link small-link" data-chat-clear="1">сбросить</button>` : tag('без контекста — вопросы о смене в целом');
+  $('side-chat-switch').innerHTML = chatPrevContext && !sameCtx(chatPrevContext, chatContext) ? `<p class="chat-switch">${ico('warn', '')} Контекст сменился: было «${esc(contextLabel(chatPrevContext))}», теперь «${esc(contextLabel(chatContext))}». Новые вопросы — о новом объекте.<button class="link small-link" data-chat-restore="1">Вернуть прежний</button><button class="link small-link" data-chat-ok="1">Понятно</button></p>` : '';
+  $('side-chat-suggest').innerHTML = (chatContext?.type === 'vehicle' ? ['Что делать с этой машиной?', 'Почему задерживается этот автомобиль?'] : chatContext?.type === 'problem' ? ['На чём основана гипотеза неисправности?', 'Какую проверку выполнить?', 'Сравни ремонт сейчас и продолжение работы'] : ['Что сейчас угрожает плану?', 'Что делать дальше?', 'Почему результат отличается от прогноза?']).map(q => `<button data-ask="${esc(q)}">${esc(q)}</button>`).join('');
   const log = $('side-chat-log'), host = log.parentElement, atBottom = host.scrollHeight - host.scrollTop - host.clientHeight < 40;
   log.innerHTML = state.chat.map(m => `<li class="msg ${m.role}"><div class="msg-meta">${m.role === 'user' ? 'Вы' : m.source === 'local' ? 'Локальная логика' : m.source === 'openai' ? 'OpenAI' : 'NVIDIA'} · ${clock(m.minute)}${m.context ? ` · ${esc(contextLabel(m.context))}` : ''}</div><div class="msg-text">${esc(m.text)}</div>
+    ${m.note ? `<p class="fine-print">${esc(m.note)}</p>` : ''}
     ${m.refs?.length ? `<div class="refs">${m.refs.map(r => `<button class="ref" data-ref-type="${esc(r.type)}" data-ref-id="${esc(r.id)}">${esc(r.label)}</button>`).join('')}</div>` : ''}
-    ${m.proposal ? `<div class="proposal"><span>Предложение: ${esc(m.proposal.title)}</span><button class="primary" data-proposal="${esc(m.id)}" ${state.finished ? 'disabled' : ''}>Подтвердить…</button></div>` : ''}</li>`).join('') || '<li class="muted">Спросите о выбранном объекте. Ссылки в ответах ведут к автомобилю, посту, событию или сравнению.</li>';
+    ${m.proposal ? `<div class="proposal"><span>Предложение: ${esc(m.proposal.title)}</span><button class="primary" data-proposal="${esc(m.id)}" ${state.finished ? 'disabled' : ''}>Подтвердить…</button></div>` : ''}</li>`).join('') || '<li class="muted">Спросите о выбранном объекте. Ссылки в ответах ведут к автомобилю, посту, задаче или сравнению.</li>';
   if (atBottom) host.scrollTop = host.scrollHeight;
 }
-

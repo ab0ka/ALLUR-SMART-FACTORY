@@ -1,55 +1,118 @@
-// ---------- Selection and navigation inside spaces ----------
+// ---------- Cards, selection and history on every screen ----------
+// Address: #<screen>[/<vehicle|post|problem|compare|chat|car3d>/<id>], where <screen> is a view or space/<shop>.
+// Opening a card or the 3D view from a screen is one history step; switching between cards replaces it.
+function currentHash() {
+  const p = ui.car3d ? { type: 'car3d', id: ui.car3d } : ui.panel;
+  let tail = '';
+  if (p) { const id = p.type === 'chat' ? (chatContext ? `${chatContext.type}:${chatContext.id}` : '') : p.id; tail = `/${p.type}${id ? `/${encodeURIComponent(id)}` : ''}`; }
+  else if (view === 'vehicles' && selectedVehicle) tail = `/vehicle/${encodeURIComponent(selectedVehicle)}`;
+  return baseHash() + tail;
+}
+function syncHash() { const h = `#${currentHash()}`; if (location.hash !== h) history.replaceState(history.state, '', h); }
+function showPanel(panel) {
+  const fresh = !ui.panel && !ui.car3d;
+  ui.car3d = null; ui.panel = panel;
+  if (fresh) pushHash(currentHash()); else syncHash();
+  render();
+}
 function openPanel(panel, selected, ctx) {
-  ui.panel = panel; if (selected !== undefined) ui.selected = selected; if (ctx) chatContext = ctx;
-  if (view !== 'space') { location.hash = `space/${['assembly', 'diag'].includes(space) ? space : 'assembly'}`; return; }
-  syncHash(); render();
-  if (narrow() && scene && ui.selected) { if (ui.selected.type === 'vehicle') scene.focusVehicle(ui.selected.id, 1.6); else if (ui.selected.type === 'post') scene.focusPost(ui.selected.id, 1.6); }
+  if (selected !== undefined) ui.selected = selected;
+  if (ctx) setChatContext(ctx);
+  showPanel(panel);
+  if (view === 'space' && narrow() && scene && ui.selected) { if (ui.selected.type === 'vehicle') scene.focusVehicle(ui.selected.id, 1.6); else if (ui.selected.type === 'post') scene.focusPost(ui.selected.id, 1.6); }
   requestAnimationFrame(() => $('side').querySelector('h2')?.focus?.());
 }
 const selectVehicle = id => openPanel({ type: 'vehicle', id }, { type: 'vehicle', id }, { type: 'vehicle', id });
 const selectPost = id => openPanel({ type: 'post', id }, { type: 'post', id }, { type: 'post', id });
 const selectProblem = id => { const p = problem(id); openPanel({ type: 'problem', id }, p ? { type: 'post', id: p.postId } : null, { type: 'problem', id }); };
-function closePanel() { ui.panel = null; ui.selected = null; ui.ribbonOnlySelected = false; syncHash(); render(); }
-// The address bar follows the open card, so a link can be shared or opened again; replaceState does not fire hashchange.
-function syncHash() { if (view !== 'space') return; const p = ui.panel; history.replaceState(null, '', `#space/${space}${p ? `/${p.type}${p.id ? `/${encodeURIComponent(p.id)}` : ''}` : ''}`); }
-function goSpace(id) { location.hash = `space/${id}`; }
-function openRefSpace(type, id) {
-  if (type === 'vehicle') return selectVehicle(id);
-  if (type === 'post') return selectPost(id);
+function closePanel() {
+  ui.panel = null; ui.selected = null; ui.ribbonOnlySelected = false;
+  if (history.state?.ret) { render(); history.back(); return; }
+  syncHash(); render();
+}
+function selectInList(id) {
+  selectedVehicle = id; setChatContext({ type: 'vehicle', id });
+  if (!filterOf[vehicleFilter](vehicle(id))) vehicleFilter = 'all';
+  syncHash(); renderVehicles();
+  if (matchMedia('(max-width: 1099px)').matches) $('vehicle-passport').scrollIntoView({ block: 'start' });
+}
+// One entry point for an object reference: a click on the map, a list row, a task, an event or a chat link.
+function openCard(type, id) {
+  if (type === 'vehicle') return view === 'vehicles' ? selectInList(id) : selectVehicle(id);
+  if (type === 'post') { if (view === 'workshop') { selectedPost = id; setChatContext({ type: 'post', id }); render(); return; } return selectPost(id); }
   if (type === 'problem') return selectProblem(id);
   if (type === 'order') return openOrder(id);
-  if (type === 'experiment') { const e = state.experiments.find(x => x.id === id); if (e) return openPanel({ type: 'compare', id: e.problemId }); return; }
-  if (type === 'decision') { const d = state.decisions.find(x => x.id === id); if (d) return selectProblem(d.problemId); return; }
-  if (type === 'job') { const j = state.jobs.find(x => x.id === id); if (j?.problemId) return selectProblem(j.problemId); if (j) return selectPost(j.postId); return; }
+}
+function openOrder(id) {
+  setChatContext({ type: 'order', id });
+  if (view !== 'orders') navPush('orders');
+  requestAnimationFrame(() => document.getElementById(`order-${id}`)?.scrollIntoView({ block: 'start' }));
+}
+function goSpace(id) { location.hash = `space/${id}`; }
+function openRef(type, id) {
+  if (['vehicle', 'post', 'problem', 'order'].includes(type)) return openCard(type, id);
+  if (type === 'experiment') { const e = state.experiments.find(x => x.id === id); if (e) openPanel({ type: 'compare', id: e.problemId }); return; }
+  if (type === 'decision') { const d = state.decisions.find(x => x.id === id); if (d) selectProblem(d.problemId); return; }
+  if (type === 'job') { const j = state.jobs.find(x => x.id === id); if (j?.problemId) return selectProblem(j.problemId); if (j) return openCard('post', j.postId); return; }
+  if (type === 'task') return openTask(id);
   if (type === 'event') { const e = state.events.find(x => String(x.seq) === String(id)); if (e) return openEvent(e); }
 }
 function openEvent(e) {
   if (e.problemId && ['problem_detected', 'problem_resolved', 'decision_applied', 'check_completed', 'verify_completed'].includes(e.type)) return selectProblem(e.problemId);
-  if (e.vehicleId) return selectVehicle(e.vehicleId);
+  if (e.vehicleId) return openCard('vehicle', e.vehicleId);
   if (e.problemId) return selectProblem(e.problemId);
-  if (e.postId) return selectPost(e.postId);
+  if (e.postId) return openCard('post', e.postId);
 }
-// Returns true when the click was handled by the space UI.
-async function spaceClick(t, d) {
-  if (d.closePanel) { closePanel(); return true; }
+// The chat takes the object the user is looking at; a different object is announced in the chat.
+function currentObjectCtx() {
+  if (ui.car3d) return { type: 'vehicle', id: ui.car3d };
+  const p = ui.panel;
+  if (p && p.type !== 'chat') return { type: p.type === 'compare' ? 'problem' : p.type, id: p.id };
+  if (view === 'vehicles' && selectedVehicle) return { type: 'vehicle', id: selectedVehicle };
+  if (view === 'dispatcher' && currentTask) { const t = state.tasks.find(x => x.id === currentTask); if (t) return { type: t.object.type, id: t.object.id }; }
+  return undefined;
+}
+function openChat(d) {
+  const ctx = d.ctxType ? { type: d.ctxType, id: d.ctxId } : currentObjectCtx();
+  if (ctx) setChatContext(ctx);
+  showPanel({ type: 'chat' });
+  requestAnimationFrame(() => $('side-chat-input')?.focus());
+}
+// Clicks that only exist inside shops (scene, camera, ribbon). Returns true when handled.
+function spaceClick(d) {
   if (d.mode) { ui.table = d.mode === 'table'; render(); return true; }
   if (d.cam) { if (scene) { if (d.cam === 'home') scene.home(); else scene.zoom(d.cam === 'in' ? 1.2 : 1 / 1.2); } return true; }
   if (d.space) { goSpace(d.space); return true; }
   if (d.ribbon) { if (d.ribbon === 'open') ui.ribbonOpen = true; else if (d.ribbon === 'close') ui.ribbonOpen = false; else ui.ribbonOnlySelected = !ui.ribbonOnlySelected; renderRibbon(); return true; }
-  if (d.event) { const e = state.events.find(x => String(x.seq) === d.event); if (e) openEvent(e); return true; }
-  if (d.vehicle || d.vehicleSelect) { selectVehicle(d.vehicle || d.vehicleSelect); return true; }
-  if (d.post || d.postLink) { selectPost(d.post || d.postLink); return true; }
-  if (d.problem) { selectProblem(d.problem); return true; }
   if (d.table) { ui.table = true; render(); return true; }
-  if (d.openChat) { if (d.ctxType) chatContext = { type: d.ctxType, id: d.ctxId }; else if (ui.selected) chatContext = ui.selected.type === 'vehicle' ? { type: 'vehicle', id: ui.selected.id } : ui.panel?.type === 'problem' ? { type: 'problem', id: ui.panel.id } : { type: 'post', id: ui.selected.id }; ui.panel = { type: 'chat' }; syncHash(); render(); requestAnimationFrame(() => $('side-chat-input')?.focus()); return true; }
-  if (d.refType) { openRefSpace(d.refType, d.refId); return true; }
-  if (d.ask) { const input = $('side-chat-input'); if (input) input.value = d.ask; ask(d.ask, SIDE_CHAT); return true; }
-  if (d.chatClear) { chatContext = null; updateSideChat(); return true; }
-  if (d.applyChoice) { const id = ui.choice[d.applyChoice]; if (id) await applyDecision(d.applyChoice, id); return true; }
-  if (d.legacy) { if (d.legacy === 'vehicles') openVehicle(d.legacyId); else if (d.legacy === 'dispatcher') openProblem(d.legacyId); return true; }
   return false;
 }
-const SIDE_CHAT = { input: 'side-chat-input', send: 'side-chat-send', count: 'side-chat-count' };
+// Clicks shared by all screens: cards, 3D, chat, tasks and vehicle operations.
+async function cardClick(d) {
+  if (car3dClick(d)) return true;
+  if (d.closePanel) { closePanel(); return true; }
+  if (d.back) { if (ui.panel) closePanel(); else navBack(); return true; }
+  if (d.vop) { vehicleOp(d.vid, d.vop, d.comp); return true; }
+  if (d.histAll !== undefined) { ui.histAll = d.histAll || null; render(); return true; }
+  if (d.fullCard) { selectedVehicle = d.fullCard; vehicleFilter = filterOf[vehicleFilter](vehicle(d.fullCard)) ? vehicleFilter : 'all'; navPush(`vehicles/vehicle/${encodeURIComponent(d.fullCard)}`); return true; }
+  if (d.showInShop) { const v = vehicle(d.showInShop); if (v) navPush(`space/${vehicleShop(v) === 'enterprise' ? 'weld' : vehicleShop(v)}/vehicle/${encodeURIComponent(v.id)}`); return true; }
+  if (d.event) { const e = state.events.find(x => String(x.seq) === d.event); if (e) openEvent(e); return true; }
+  if (d.vehicleSelect) { selectInList(d.vehicleSelect); return true; }
+  if (d.vehicle) { openCard('vehicle', d.vehicle); return true; }
+  if (d.post || d.postLink) { openCard('post', d.post || d.postLink); return true; }
+  if (d.problem) { selectProblem(d.problem); return true; }
+  if (d.orderLink) { openOrder(d.orderLink); return true; }
+  if (d.task) { openTask(d.task); return true; }
+  if (d.taskFilter) { taskFilter = d.taskFilter; renderTasks(); return true; }
+  if (d.openChat) { openChat(d); return true; }
+  if (d.refType) { openRef(d.refType, d.refId); return true; }
+  if (d.ask) { const input = $('side-chat-input'); if (input) input.value = d.ask; ask(d.ask); return true; }
+  if (d.chatClear) { setChatContext(null); chatPrevContext = null; syncHash(); updateSideChat(); return true; }
+  if (d.chatRestore) { const prev = chatPrevContext; chatPrevContext = null; chatContext = prev; syncHash(); updateSideChat(); return true; }
+  if (d.chatOk) { chatPrevContext = null; updateSideChat(); return true; }
+  if (d.applyChoice) { const id = ui.choice[d.applyChoice]; if (id) await applyDecision(d.applyChoice, id); return true; }
+  return false;
+}
 
 // Camera: drag to pan, wheel to zoom, keyboard activation of scene objects.
 let drag = null, suppressClick = false;
@@ -67,14 +130,17 @@ $('scene-wrap').addEventListener('pointerup', endDrag); $('scene-wrap').addEvent
 $('scene-wrap').addEventListener('click', e => { if (suppressClick) { e.stopPropagation(); e.preventDefault(); suppressClick = false; } }, true);
 $('scene-wrap').addEventListener('wheel', e => { if (!scene) return; e.preventDefault(); scene.zoom(e.deltaY < 0 ? 1.1 : 1 / 1.1); }, { passive: false });
 for (const id of ['scene', 'enterprise']) $(id).addEventListener('keydown', e => { const t = e.target.closest?.('[role=button]'); if ((e.key === 'Enter' || e.key === ' ') && t) { e.preventDefault(); t.dispatchEvent(new MouseEvent('click', { bubbles: true })); } });
+// Keep the overview framed when the window is resized, unless the user moved the camera.
+addEventListener('resize', () => { if (scene?.atHome && !narrow()) scene.home(); });
 $('diag-toggle').addEventListener('change', e => { ui.diag = e.target.checked; render(); });
 document.addEventListener('change', e => { const c = e.target.dataset?.choice; if (c) { ui.choice[c] = e.target.value; renderSide(); } });
-document.addEventListener('submit', e => { if (e.target.id === 'side-chat-form') { e.preventDefault(); ask($('side-chat-input').value, SIDE_CHAT); } });
-document.addEventListener('input', e => { if (e.target.id === 'side-chat-input') text('side-chat-count', `${e.target.value.length}/500`); });
+document.addEventListener('submit', e => { if (e.target.id === 'side-chat-form') { e.preventDefault(); ask($('side-chat-input').value); } });
+document.addEventListener('input', e => { if (e.target.id === 'side-chat-input') { chatDraft = e.target.value; text('side-chat-count', `${e.target.value.length}/500`); } });
 document.addEventListener('keydown', e => {
-  if (e.target.id === 'side-chat-input' && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(e.target.value, SIDE_CHAT); return; }
+  if (e.target.id === 'side-chat-input' && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(e.target.value); return; }
   if (e.ctrlKey || e.metaKey || e.altKey || $('confirm').open || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
-  if (e.key === 'Escape') { if ($('menu').open) { $('menu').open = false; return; } if (view === 'space' && ui.panel) { closePanel(); } return; }
+  if (e.key === 'Escape') { if ($('menu').open) { $('menu').open = false; return; } if (ui.car3d) { closeCar3d(); return; } if (ui.panel) closePanel(); return; }
+  if (ui.car3d) return; // keyboard shortcuts of the shop scene are off while the 3D view is open
   if (view !== 'space') return;
   const n = Number(e.key);
   if (Number.isInteger(n) && n >= 1 && n <= 6) { goSpace(SPACE_KEYS[n - 1]); return; }
@@ -83,4 +149,3 @@ document.addEventListener('keydown', e => {
   if (e.key === '-') { scene?.zoom(1 / 1.2); return; }
   if (e.key.toLowerCase() === 't' || e.key.toLowerCase() === 'е') { ui.table = !ui.table; render(); }
 });
-

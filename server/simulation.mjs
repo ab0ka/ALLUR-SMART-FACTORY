@@ -1,8 +1,11 @@
 // Allur Smart Factory — single authoritative workshop engine. Vehicles, posts, buffers, orders, quality inspection
 // with rework, equipment degradation with diagnostics and repair, problems, plan and belief-based forecasts.
 // Every vehicle, order, post, norm, measurement, part, tariff and layout here is SYNTHETIC, not Allur data.
+import { COMPONENTS, COMPONENT_IDS, SCRIPTED_FAULTS, START_SYMPTOM, START_HYPOTHESIS, measure, startTest } from './components.mjs';
+import { installWorkflow, PROCEDURES } from './workflow.mjs';
 import { LIFT_MODEL_VERSION, HYPOTHESES, CHECKS, CHANNELS, NOMINAL, UNITS, CHANNEL_NAMES, degradationAt, reading, liftSpeed, features, anomalyScore, hypothesisEvidence, hashUniform, hashNormal } from './equipment.mjs';
 
+export { COMPONENTS } from './components.mjs';
 export const SHIFT = 480;
 export const SHIFT_START = 8 * 60;
 export const WARMUP = 180;
@@ -26,10 +29,12 @@ export const POSTS = [
   ['A1', 'СБ-1', 'assembly'], ['A2', 'СБ-2', 'assembly'], ['A3', 'СБ-3', 'assembly'],
   ['Q1', 'КК-1', 'quality'], ['Q2', 'КК-2', 'quality'], ['S1', 'ОТ-1', 'shipping'], ['R1', 'ДР-1', 'rework'],
 ].map(([id, code, stage]) => ({ id, code, stage, capacity: 1 }));
-export const DEFECTS = { weld: 'Сварной шов: непровар', paint: 'Покрытие: включения', assembly: 'Зазор двери вне допуска' };
+export const DEFECTS = { weld: 'Сварной шов: непровар', paint: 'Покрытие: включения', assembly: 'Зазор двери вне допуска', start: 'Не запускается: проверка запуска не пройдена' };
+// Post where vehicle components are diagnosed, removed and installed (rework and diagnostics).
+export const DIAG_POST = 'R1';
 export const LIFTS = ['A1', 'A2', 'A3'].map(postId => ({ id: `LIFT-${postId}`, postId, name: `Гидроподъёмник ${POSTS.find(p => p.id === postId).code}` }));
 export const TECHNICIANS = [{ id: 'T1', name: 'ТЕХ-1 (синтетический ремонтник)' }];
-export const STOCK_ITEMS = { seal_kit: { name: 'Ремкомплект уплотнений гидроцилиндра', onHand: 2, cost: 4000 }, pump: { name: 'Гидронасос подъёмника', onHand: 1, cost: 26000 } };
+export const STOCK_ITEMS = { seal_kit: { name: 'Ремкомплект уплотнений гидроцилиндра', onHand: 2, cost: 4000 }, pump: { name: 'Гидронасос подъёмника', onHand: 1, cost: 26000 }, battery: { name: 'Аккумулятор 12 В', onHand: 2, cost: 9000 } };
 export const TARIFFS = { technicianPerMinute: 25, currency: 'усл. ед.', note: 'Синтетические тарифы демо: работа техника и стоимость запчастей. Стоимость потерянного выпуска не оценивается.' };
 export const JOB_KINDS = {
   pressure_hold: { title: 'Тест удержания давления', type: 'check', duration: 15, stopsPost: true, lift: true },
@@ -74,14 +79,17 @@ export function postOee({ run, nominal }, elapsed, quality = 1) {
 }
 
 export class Workshop {
-  constructor({ seed = 42, warmup = WARMUP, plan = true, episode = 'default', beliefDefects = false } = {}) { this.reset(seed, warmup, plan, episode, beliefDefects); }
-  reset(seed = 42, warmup = WARMUP, plan = true, episode = 'default', beliefDefects = false) {
+  constructor({ seed = 42, warmup = WARMUP, plan = true, episode = 'default', beliefDefects = false, manualRework = episode === 'default' } = {}) { this.reset(seed, warmup, plan, episode, beliefDefects, manualRework); }
+  // manualRework: in the demo shift the door gap and the start diagnosis are done by the operator on ДР-1;
+  // with false (reference capacity, forecast copies, batch runs) every rework is done by the post in its norm time.
+  reset(seed = 42, warmup = WARMUP, plan = true, episode = 'default', beliefDefects = false, manualRework = episode === 'default') {
     Object.assign(this, {
       seed: seed >>> 0, rng: seed >>> 0, minute: 0, running: false, speed: 5, finished: false, beliefDefects,
       revision: (this.revision || 0) + 1, recordVersion: (this.recordVersion || 0) + 1,
       eventSeq: 0, orderSeq: 100, vehicleSeq: 0, executionSeq: 0, incidentSeq: 0, problemSeq: 0, jobSeq: 0, inspectionSeq: 0, experimentSeq: 0, decisionSeq: 0,
       orders: [], vehicles: [], executions: [], incidents: [], events: [], shipped: [], history: [{ minute: 0, accepted: 0 }],
       jobs: [], problems: [], inspections: [], experiments: [], decisions: [], chat: [], requests: {}, holds: {}, planTarget: DEFAULT_PLAN_TARGET,
+      componentCheckSeq: 0, scriptedFaults: episode === 'default' ? SCRIPTED_FAULTS : [], manualRework,
     });
     this.buffers = Object.fromEntries([...STAGES.map(s => [s.buffer.id, []]), [REWORK.buffer.id, []]]);
     this.posts = Object.fromEntries(POSTS.map(p => [p.id, { vehicleId: null, executionId: null, stats: { run: 0, fault: 0, maintenance: 0, starved: 0, blocked: 0, nominal: 0, completed: 0 } }]));
@@ -134,8 +142,9 @@ export class Workshop {
       const seq = ++this.vehicleSeq, id = `DEMO-${String(seq).padStart(3, '0')}`;
       const work = Object.fromEntries(STAGES.map(s => [s.id, s.id === 'shipping' ? s.norms[modelId] : Math.max(1, Math.round(s.norms[modelId] * (.95 + .15 * this.random())))]));
       const r1 = this.random(), r2 = this.random();
-      const defect = this.beliefDefects ? beliefDefect(this.seed, id) : r1 < DEFECT_RATE ? ['weld', 'paint', 'assembly'][Math.floor(r2 * 3)] : null;
-      this.vehicles.push({ id, seq, orderId: order.id, modelId, routeVersion: 'R2-synthetic', createdAt: this.minute, readyAt: this.minute, stageIndex: 0, location: { type: 'buffer', id: 'BACKLOG' }, currentExecutionId: null, startedAt: null, accepted: false, acceptedAt: null, shipped: false, shippedAt: null, reworked: false, work, executionIds: [], hidden: { defect } });
+      const scripted = (this.scriptedFaults || []).find(f => f.seq === seq);
+      const defect = scripted ? 'start' : this.beliefDefects ? beliefDefect(this.seed, id) : r1 < DEFECT_RATE ? ['weld', 'paint', 'assembly'][Math.floor(r2 * 3)] : null;
+      this.vehicles.push({ id, seq, orderId: order.id, modelId, routeVersion: 'R2-synthetic', createdAt: this.minute, readyAt: this.minute, stageIndex: 0, location: { type: 'buffer', id: 'BACKLOG' }, currentExecutionId: null, startedAt: null, accepted: false, acceptedAt: null, shipped: false, shippedAt: null, reworked: false, work, executionIds: [], hidden: { defect, componentHealth: scripted ? { [scripted.component]: 'faulty' } : {} } });
       this.buffers.BACKLOG.push(id); order.vehicleIds.push(id);
       this.log('vehicle_created', `Автомобиль ${id} создан по заданию ${order.id}`, { vehicleId: id, orderId: order.id }, actor);
     }
@@ -354,6 +363,12 @@ export class Workshop {
       case 'transfer': this.transfer(cmd.vehicleId, cmd.postId, actor); break;
       case 'hold': this.setHold(cmd.postId, cmd.on, actor); break;
       case 'plan': this.setPlanTarget(cmd.target, actor); break;
+      case 'component_check': result = this.checkComponent(cmd.vehicleId, cmd.component, actor); break;
+      case 'component_remove': this.removeComponent(cmd.vehicleId, cmd.component, actor); break;
+      case 'component_install': this.installComponent(cmd.vehicleId, cmd.component, actor); break;
+      case 'start_test': result = this.runStartTest(cmd.vehicleId, actor); break;
+      case 'door_measure': result = this.measureDoor(cmd.vehicleId, actor); break;
+      case 'door_adjust': this.adjustDoor(cmd.vehicleId, actor); break;
       default: throw new SimulationError('Неизвестное действие');
     }
     if (rid) {
@@ -361,6 +376,61 @@ export class Workshop {
       const keys = Object.keys(this.requests); if (keys.length > 300) delete this.requests[keys[0]];
     }
     return { duplicate: false, result };
+  }
+
+  // ---------------- Vehicle components (diagnostics post) ----------------
+  // Components exist once assembly is complete; before that every node is "отсутствует".
+  ensureComponents(v) {
+    if (v.components) return v.components;
+    if (!v.executionIds.some(id => { const e = this.execution(id); return e.stage === 'assembly' && e.completedAt !== null; })) return null;
+    v.components = Object.fromEntries(COMPONENT_IDS.map(id => [id, { status: 'installed', health: v.hidden.componentHealth?.[id] ?? 'ok', installSeq: 1, removed: null }]));
+    v.componentChecks ??= []; v.startTests ??= [];
+    return v.components;
+  }
+  awaitingDiagnosis(v) { return Boolean(v && this.manualRework && v.hidden.defect === 'start' && !v.startPassed); }
+  checkComponent(vehicleId, id, actor = 'operator') {
+    const v = this.requireOp(vehicleId, 'component_check', id), c = v.components[id], spec = COMPONENTS[id];
+    const n = ++this.componentCheckSeq, m = measure(id, c.health, this.seed, v.id, n);
+    const check = { id: `CHK-${n}`, component: id, minute: this.minute, installSeq: c.installSeq, ...m };
+    v.componentChecks.push(check);
+    this.log('component_checked', `${v.id}: проверка — ${spec.name.toLowerCase()}: ${m.text}`, { vehicleId: v.id, postId: DIAG_POST, component: id }, actor);
+    this.touch();
+    return check.id;
+  }
+  lastCheckOf(v, id) { const c = v.components?.[id]; return [...(v.componentChecks ?? [])].reverse().find(k => k.component === id && k.installSeq === c?.installSeq) ?? null; }
+  removeComponent(vehicleId, id, actor = 'operator') {
+    const v = this.requireOp(vehicleId, 'component_remove', id), c = v.components[id], spec = COMPONENTS[id];
+    const confirmedFault = this.lastCheckOf(v, id)?.result === 'fault';
+    Object.assign(c, { status: 'missing', removed: { health: c.health, scrapped: confirmedFault } });
+    v.startPassed = false;
+    this.log('component_removed', `${v.id}: снят узел «${spec.name}»${confirmedFault ? ' — неисправный, в утиль' : ' — отложен для установки обратно'}`, { vehicleId: v.id, postId: DIAG_POST, component: id }, actor);
+    this.touch();
+  }
+  installComponent(vehicleId, id, actor = 'operator') {
+    const v = this.requireOp(vehicleId, 'component_install', id), c = v.components[id], spec = COMPONENTS[id];
+    let source;
+    if (c.removed && !c.removed.scrapped) { c.health = c.removed.health; source = 'снятый ранее'; }
+    else if (spec.stockItem) {
+      const st = this.stock[spec.stockItem];
+      st.onHand--; st.used++; c.health = 'ok'; source = 'новый со склада';
+    } else { c.health = 'ok'; source = 'новый'; }
+    Object.assign(c, { status: 'installed', installSeq: c.installSeq + 1, removed: null });
+    this.log('component_installed', `${v.id}: установлен узел «${spec.name}» (${source}); требуется проверка`, { vehicleId: v.id, postId: DIAG_POST, component: id }, actor);
+    this.touch();
+  }
+  runStartTest(vehicleId, actor = 'operator') {
+    const v = this.requireOp(vehicleId, 'start_test');
+    const n = ++this.componentCheckSeq, t = startTest(v.components, this.seed, v.id, n);
+    const test = { id: `ST-${n}`, minute: this.minute, ...t };
+    v.startTests.push(test);
+    if (t.result === 'pass') {
+      const exec = this.execution(v.currentExecutionId), wasWaiting = v.hidden.defect === 'start' && !v.startPassed;
+      v.startPassed = true;
+      if (wasWaiting) exec.remaining = Math.min(exec.remaining, 5);
+      this.log('start_test', `${v.id}: проверка запуска пройдена${wasWaiting ? ' — доработка завершается, затем повторный контроль' : ''}`, { vehicleId: v.id, postId: DIAG_POST }, actor);
+    } else this.log('start_test', `${v.id}: проверка запуска не пройдена — ${t.text}`, { vehicleId: v.id, postId: DIAG_POST }, actor);
+    this.touch();
+    return test.id;
   }
 
   // ---------------- Flow ----------------
@@ -432,6 +502,7 @@ export class Workshop {
       if (this.isBroken(def.id)) { post.stats.fault++; if (exec && exec.completedAt === null) exec.pauseReason = `Неисправность ${def.code}`; continue; }
       if (!exec) { post.stats.starved++; continue; }
       if (exec.completedAt !== null) { post.stats.blocked++; continue; }
+      if (exec.stage === 'rework' && this.awaitingManual(this.vehicle(exec.vehicleId))) { const mv = this.vehicle(exec.vehicleId); post.stats.maintenance++; exec.pauseReason = mv.hidden.defect === 'start' ? 'Ожидает диагностики: автомобиль не запускается' : 'Ожидает оператора: замер и регулировка зазора двери'; continue; }
       const speed = (incident ? INCIDENT_KINDS[incident.kind].speed : 1) * (lift ? liftSpeed(degradationAt(lift.hidden, this.minute)) : 1);
       const step = Math.min(speed, exec.remaining);
       exec.pauseReason = null; exec.remaining = round(exec.remaining - step, 6);
@@ -449,6 +520,7 @@ export class Workshop {
       const v = this.vehicle(exec.vehicleId), def = POST[exec.postId];
       exec.completedAt = this.minute; this.posts[def.id].stats.completed++;
       this.log('operation_completed', `${v.id}: завершена операция «${exec.operation}» на ${def.code}`, { vehicleId: v.id, postId: def.id, orderId: v.orderId, executionId: exec.id });
+      if (exec.stage === 'assembly') this.ensureComponents(v);
       if (exec.stage === 'quality') this.inspect(v, exec, def);
       if (exec.stage === 'rework') { v.reworked = true; v.hidden.defect = null; }
     }
@@ -461,6 +533,7 @@ export class Workshop {
     const inspection = { id: `QI-${++this.inspectionSeq}`, vehicleId: v.id, executionId: exec.id, postId: def.id, minute: this.minute, first, result: defect ? 'fail' : 'pass', defect: defect ? DEFECTS[defect] : null, origin: defect };
     if (defect) inspection.originPostId = v.executionIds.map(id => this.execution(id)).find(e => e.stage === defect)?.postId ?? null;
     this.inspections.push(inspection); exec.result = inspection.result; exec.defect = inspection.defect;
+    if (defect === 'assembly') this.ensureDoor(v);
     if (defect) this.log('inspection_failed', `${v.id}: контроль не пройден — ${DEFECTS[defect]}; направлен на доработку`, { vehicleId: v.id, postId: def.id, orderId: v.orderId });
     else {
       v.accepted = true; v.acceptedAt = this.minute;
@@ -531,7 +604,16 @@ export class Workshop {
 
   // ---------------- Copies, beliefs and forecast ----------------
   serialize() { const { _forecast, planProfile, ...data } = this; return structuredClone(data); }
-  static restore(data) { const w = Object.assign(Object.create(Workshop.prototype), structuredClone(data)); w.planProfile = Workshop.planProfile(w.seed); return w; }
+  static restore(data) {
+    const w = Object.assign(Object.create(Workshop.prototype), structuredClone(data)); w.planProfile = Workshop.planProfile(w.seed);
+    // States saved before vehicle components existed: add the new stock items and counters, keep everything else as saved.
+    for (const [id, item] of Object.entries(STOCK_ITEMS)) w.stock[id] ??= { onHand: item.onHand, reserved: 0, used: 0 };
+    w.componentCheckSeq ??= 0; w.scriptedFaults ??= [];
+    // Saves made before defect-specific rework: the demo shift (with scripted faults) gets manual rework, door data on demand.
+    w.manualRework ??= w.scriptedFaults.length > 0;
+    for (const v of w.vehicles) { v.hidden.componentHealth ??= {}; if (!v.accepted) w.ensureDoor(v); }
+    return w;
+  }
   clone() { const { _forecast, planProfile, ...data } = this; return Object.assign(Object.create(Workshop.prototype), structuredClone(data), { planProfile }); }
   // What the dispatcher may assume: undetected equipment is healthy; a detected problem is one of the hypotheses with
   // degradation and rate estimated from readings; uninspected vehicles have the typical defect rate. Hidden truth is not used.
@@ -552,6 +634,7 @@ export class Workshop {
   }
   beliefScenarios() {
     const base = this.clone();
+    base.manualRework = false; // forecast assumption: manual rework steps are done in the post's norm time
     for (const v of base.vehicles) if (!v.accepted && !v.reworked && !base.inspections.some(i => i.vehicleId === v.id)) v.hidden.defect = beliefDefect(this.seed, v.id);
     const open = this.problems.filter(p => p.status === 'open' && p.kind === 'equipment');
     for (const l of LIFTS) if (!open.some(p => p.equipmentId === l.id)) { const eq = base.equipment[l.id]; if (!eq.failed) eq.hidden = { cause: null, base: 0, t0: 0, rate: 0 }; }
@@ -593,7 +676,7 @@ export class Workshop {
       limiting: this.minute < SHIFT ? main.load.reduce((a, b) => b.utilization > a.utilization ? b : a) : null,
       scenarios: runs.map(r => ({ label: r.label, weight: round(r.weight, 3), accepted: r.outcome.accepted, lateOrders: r.outcome.lateOrders })),
       lateOrders: main.outcome.lateOrders,
-      method: 'Копии текущего состояния прогоняются тем же движком до 16:00 без новых вмешательств: те же очереди, работы и приоритеты. Скрытая причина неисправности не используется — по каждой гипотезе берётся оценка износа по измерениям, итог взвешивается. Для непроверенных автомобилей — типовая доля брака 15%.',
+      method: 'Копии текущего состояния прогоняются тем же движком до 16:00 без новых вмешательств: те же очереди, работы и приоритеты. Ручные операции доработки (диагностика запуска, регулировка двери) считаются выполненными за нормативное время. Скрытая причина неисправности не используется — по каждой гипотезе берётся оценка износа по измерениям, итог взвешивается. Для непроверенных автомобилей — типовая доля брака 15%.',
       assumption: 'Сценарный расчёт, не статистический интервал и не ML-модель. Новые инциденты не предполагаются.',
     };
     this._forecast = { revision: this.revision, value };
@@ -619,6 +702,10 @@ export class Workshop {
       else if (this.finished) { state = 'stopped'; status = `Смена завершена: «${exec.operation}» на ${code} выполнена на ${Math.round((1 - exec.remaining / exec.work) * 100)}%`; }
       else if (this.runningStopJob(v.location.id)) { state = 'paused'; status = `Пауза: работы на ${code} (${this.runningStopJob(v.location.id).title.toLowerCase()})`; }
       else if (this.isBroken(v.location.id)) { state = 'paused'; status = `Пауза: неисправность ${code}`; }
+      else if (exec.stage === 'rework' && this.awaitingDiagnosis(v)) { state = 'paused'; status = `${START_SYMPTOM}: ожидает диагностики на ${code}`; }
+      else if (exec.stage === 'rework' && this.awaitingManual(v)) { state = 'paused'; status = `Зазор двери вне допуска: ждёт замера и регулировки на ${code}`; }
+      else if (exec.stage === 'rework' && v.doorOk) { state = 'rework'; status = `Зазор в допуске · завершение доработки на ${code}`; }
+      else if (exec.stage === 'rework' && v.startPassed) { state = 'rework'; status = `Проверка запуска пройдена · завершение доработки на ${code}`; }
       else { state = exec.stage === 'rework' ? 'rework' : 'processing'; status = `${exec.operation} · ${code}`; }
     }
     const inspections = this.inspections.filter(i => i.vehicleId === v.id).map(({ id, minute, result, defect, first, postId }) => ({ id, minute, result, defect, first, postCode: POST[postId].code }));
@@ -627,7 +714,25 @@ export class Workshop {
       state, status, accepted: v.accepted, acceptedAt: v.acceptedAt, shipped: v.shipped, shippedAt: v.shippedAt, createdAt: v.createdAt, startedAt: v.startedAt, reworked: v.reworked, inspections,
       location: { ...v.location }, currentOperation: exec ? { executionId: exec.id, stage: exec.stage, operation: exec.operation, postId: exec.postId, postCode: POST[exec.postId].code, progress: round(1 - exec.remaining / exec.work), remaining: round(exec.remaining, 1), norm: exec.norm, work: exec.work, startedAt: exec.startedAt, completedAt: exec.completedAt, pauseReason: exec.pauseReason, posts: exec.posts.map(p => ({ ...p, postCode: POST[p.postId].code })) } : null,
       route: steps,
+      components: this.componentsView(v),
+      diagnosis: this.inspections.some(i => i.vehicleId === v.id && i.origin === 'start') ? { symptom: START_SYMPTOM, hypothesis: START_HYPOTHESIS, awaiting: this.awaitingDiagnosis(v), passed: Boolean(v.startPassed), atPost: v.location.type === 'post' && v.location.id === DIAG_POST, startTests: (v.startTests ?? []).map(t => ({ ...t })) } : null,
+      componentChecks: (v.componentChecks ?? []).map(c => ({ ...c, name: COMPONENTS[c.component].name })),
+      atDiagPost: v.location.type === 'post' && v.location.id === DIAG_POST && Boolean(v.currentExecutionId) && this.execution(v.currentExecutionId)?.completedAt === null,
+      procedure: this.procedureView(v),
+      nextAction: this.nextAction(v),
+      startTestAction: this.opView(v, 'start_test'),
+      doorActions: v.door ? { measure: this.opView(v, 'door_measure'), adjust: this.opView(v, 'door_adjust') } : null,
     };
+  }
+  // Displayed state: отсутствует / установлен / неисправен (подтверждено проверкой) / проверен. Hidden health is never sent.
+  componentsView(v) {
+    const comps = this.ensureComponents(v);
+    return COMPONENT_IDS.map(id => {
+      const spec = COMPONENTS[id], c = comps?.[id], last = comps ? this.lastCheckOf(v, id) : null;
+      const state = !c || c.status === 'missing' ? 'missing' : last?.result === 'fault' ? 'faulty' : last ? 'checked' : 'installed';
+      const actions = comps ? { check: this.opView(v, 'component_check', id), remove: this.opView(v, 'component_remove', id), install: this.opView(v, 'component_install', id) } : null;
+      return { id, name: spec.name, removable: spec.removable, required: spec.required, state, lastCheck: last ? { ...last } : null, removedScrapped: Boolean(c?.removed?.scrapped), actions };
+    });
   }
   postQuality(postId) {
     const completed = this.posts[postId].stats.completed, stage = POST[postId].stage;
@@ -643,6 +748,7 @@ export class Workshop {
     if (job) { state = 'maintenance'; reason = `${job.title} (${job.id}), осталось ${job.remaining} мин${exec && exec.completedAt === null ? `; операция ${exec.vehicleId} на паузе` : ''}`; }
     else if (this.isBroken(def.id)) { state = 'fault'; reason = `${incident ? incident.cause : 'Отказ оборудования'}${exec && exec.completedAt === null ? `; операция ${exec.vehicleId} на паузе` : ''}`; }
     else if (exec && exec.completedAt !== null) { const next = def.stage === 'quality' ? (this.vehicle(exec.vehicleId).accepted ? STAGES[4].buffer : REWORK.buffer) : def.stage === 'rework' ? STAGES[3].buffer : STAGES[stage.index + 1].buffer; state = 'blocked'; reason = `Операция завершена, «${next.name}» заполнен (${this.buffers[next.id].length}/${next.capacity})`; }
+    else if (exec && exec.stage === 'rework' && this.awaitingManual(this.vehicle(exec.vehicleId))) { const mv = this.vehicle(exec.vehicleId); state = 'diagnosis'; reason = mv.hidden.defect === 'start' ? `${exec.vehicleId}: ${START_SYMPTOM.toLowerCase()} — ожидает диагностики узлов` : `${exec.vehicleId}: зазор двери вне допуска — ждёт замера и регулировки`; }
     else if (exec) { state = incident || problem ? 'slow' : 'working'; if (incident) reason = `${incident.cause}`; else if (problem) reason = `${problem.id}: ${problem.title}`; }
     else { state = 'idle'; reason = this.holds[def.id] ? 'Снят с загрузки оператором' : `Нет автомобилей в очереди «${stage.buffer.name}»`; }
     if (this.finished) { state = 'shift_over'; reason = !exec ? 'Смена завершена' : exec.completedAt !== null ? `Смена завершена; ${exec.vehicleId} ждёт перемещения` : `Смена завершена; ${exec.vehicleId} остаётся на посту, операция не завершена`; }
@@ -709,8 +815,11 @@ export class Workshop {
       history: this.history.map(h => ({ ...h })),
       leadTime: leads.length ? { average: round(leads.reduce((a, b) => a + b, 0) / leads.length, 1), count: leads.length } : null,
       forecast: this.forecast(),
+      tasks: this.tasks(),
+      manualRework: this.manualRework,
     };
   }
+  opView(v, op, componentId) { const a = this.opAvailability(v, op, componentId); return a.ok ? { ok: true } : { ok: false, reason: a.reason }; }
   totals() {
     const notStarted = this.vehicles.filter(v => v.startedAt === null).length;
     const inProcess = this.vehicles.filter(v => v.startedAt !== null && !v.accepted).length;
@@ -721,3 +830,5 @@ export class Workshop {
     return { created, notStarted, inProcess, rework, ready, shipped, accepted: ready + shipped, wip: inProcess, balanced: created === notStarted + inProcess + ready + shipped };
   }
 }
+installWorkflow(Workshop, { POST, DIAG_POST, REWORK, STAGES, SHIFT, clock, SimulationError, MODELS });
+export { PROCEDURES };

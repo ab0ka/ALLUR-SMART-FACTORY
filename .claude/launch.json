@@ -1,0 +1,33 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "allur-check-3027",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "server/index.mjs"
+      ],
+      "port": 3027,
+      "url": "http://127.0.0.1:3027",
+      "env": {
+        "PORT": "3027",
+        "AI_PROVIDER": "local",
+        "ALLUR_STATE_FILE": "check-3027.json"
+      }
+    },
+    {
+      "name": "allur-check-3028",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "server/index.mjs"
+      ],
+      "port": 3028,
+      "url": "http://127.0.0.1:3028",
+      "env": {
+        "PORT": "3028",
+        "AI_PROVIDER": "local",
+        "ALLUR_STATE_FILE": "check-3028.json"
+      }
+    }
+  ]
+}
