@@ -749,6 +749,64 @@ details.more>summary{cursor:pointer;font-weight:700;color:var(--link);min-height
 .c3-badge a{color:inherit}
 .c3-badge .short{display:none}
 @media(max-width:760px){.c3-badge .long{display:none}.c3-badge .short{display:inline}.c3-badge{left:6px;bottom:6px;padding:3px 7px;font-size:10.5px}}
+
+/* T2: shared mobile sheet and readable controls, scoped away from desktop cards. */
+.sheet-bar,.mobile-tool-label{display:none}
+.sheet-content{display:contents}
+@media(max-width:1100px){
+  .side{overflow:auto;overscroll-behavior:contain;overflow-wrap:anywhere}
+  .sheet-content{display:block;overflow:auto;min-height:0;flex:1 1 auto}
+  .side-head,.side-foot{flex:none}
+  .side-body{overflow:visible}
+  .side .tagchip{max-width:100%;flex-wrap:wrap}
+  .side .st,.side .mini-table th,.side .mini-table td{white-space:normal}
+  .side-tools{flex:none}
+  .side-top>.eyebrow{min-width:0}
+  .menu-list{max-height:calc(100dvh - 90px);overflow-y:auto;overscroll-behavior:contain}
+}
+@media(max-width:760px){
+  .topbar{grid-template-columns:40px auto minmax(0,1fr) 40px;gap:6px;padding:6px 8px;flex:none}
+  .topbar .brand,.topbar .brand-mark{width:40px;height:40px}
+  .topbar .timebox{grid-column:2;grid-row:1}
+  .topbar .synthetic{grid-column:3;grid-row:1;justify-self:stretch;margin:0;min-width:0;height:40px;font-size:12px;white-space:normal;line-height:1.2;justify-content:center;text-align:center;padding:0 4px}
+  .topbar .menu{grid-column:4;grid-row:1;position:static}
+  .topbar .menu summary{width:40px;height:40px}
+  .topbar #play{width:40px;height:40px}
+  .clockbox span{font-size:12px}
+  .topbar .menu-list{left:8px;right:8px;top:calc(100% + 4px);width:auto}
+  .topbar .menu .mobile-speed{height:40px}
+  .topbar .menu .speed button{min-width:40px;min-height:40px;font-size:12px}
+  .topbar .menu #chat-toggle,.topbar .menu .alerts{width:auto;height:auto;min-height:40px;display:flex;justify-content:flex-start;gap:8px;padding:8px 12px;font-size:12px}
+  .topbar .menu .primary-nav{display:flex;flex-direction:column;width:auto;flex:none;order:0}
+  .topbar .menu .primary-nav a{flex:none;justify-content:flex-start;min-height:40px;font-size:12px}
+  .mobile-tool-label{display:inline}
+  .workarea{--sheet-height:60vh;--sheet-height:60dvh}
+  .workarea:has(>.side.sheet-collapsed){--sheet-height:66px}
+  #legacy:not([hidden])~.side,.side{height:var(--sheet-height);max-height:var(--sheet-height);display:flex;overflow:hidden}
+  .sheet-bar{display:flex;align-items:center;justify-content:flex-end;gap:8px;position:relative;padding:16px 12px 8px;flex:none;border-bottom:1px solid var(--line);background:#fff}
+  .sheet-grip{position:absolute;top:5px;left:calc(50% - 20px);width:40px;height:4px;border-radius:2px;background:#9AAABA}
+  .sheet-bar button{min-width:40px;min-height:40px;font-size:12px}
+  .side.sheet-collapsed .sheet-content{display:none}
+  .sheet-content [data-close-panel]{display:none}
+  .side button,.side .icon-btn.small,.side .ref,.cam button,.seg button,.ribbon button,.context-link,.context-tabs a,.shop-picker select{min-width:40px;min-height:40px}
+  .side .icon-btn.small{width:40px;height:40px}
+  .side .fine-print,.side .eyebrow,.side .lock,.side .st,.side .tagchip{font-size:12px}
+  .side .side-top{flex-wrap:wrap}
+  .workarea:has(>.side:not([hidden])) .ribbon{bottom:calc(var(--sheet-height) + 8px)}
+  .workarea:has(>.side:not([hidden])) .scene-wrap,.workarea:has(>.side:not([hidden])) .enterprise-wrap{bottom:calc(var(--sheet-height) + 64px)}
+  .workarea:has(>.side:not([hidden])) .space-stage:has(.ribbon:not(.collapsed)) .scene-wrap{bottom:calc(var(--sheet-height) + 112px)}
+  .workarea:has(>.side:not([hidden]):not(.sheet-collapsed)) .hud,.workarea:has(>.side:not([hidden]):not(.sheet-collapsed)) .cam{display:none}
+  .ribbon.collapsed{gap:6px;padding:0 8px}
+  .ribbon.collapsed>b{font-size:12px}.ev-last{min-width:0}
+  .ribbon:not(.collapsed){height:96px}
+}
+/* Low landscape: keep a usable strip of the selected scene above the card. */
+@media(max-width:760px) and (max-height:500px){
+  .workarea{--sheet-height:50dvh}
+  body:has(.side:not([hidden]):not(.sheet-collapsed)) .workspace-bar{display:none}
+  .workarea:has(>.side:not([hidden]):not(.sheet-collapsed)) .ribbon{display:none}
+  .workarea:has(>.side:not([hidden]):not(.sheet-collapsed)) .scene-wrap,.workarea:has(>.side:not([hidden]):not(.sheet-collapsed)) .enterprise-wrap{bottom:calc(var(--sheet-height) + 8px)}
+}
 .bad-text{color:var(--red);font-weight:700}
 .case-targets td small{color:var(--muted)}
 /* Shop scenes (shop-scene.js): simplified training equipment */
