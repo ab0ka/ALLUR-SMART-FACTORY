@@ -138,12 +138,9 @@ function nextActionBlock(v) {
 }
 // A vehicle on a faulty or slow post can move to a free parallel post; otherwise the reason is shown.
 function transferRow(v) {
-  const p = v.location.type === 'post' ? post(v.location.id) : null, op = v.currentOperation && v.currentOperation.completedAt === null;
-  if (!p || !op || state.finished) return '';
-  const sib = state.posts.filter(q => q.stage === p.stage && q.id !== p.id), bad = ['fault', 'maintenance', 'slow'].includes(p.state);
-  if (!sib.length || !bad) return '';
-  const free = sib.filter(q => !q.vehicleId && !['fault', 'maintenance', 'shift_over'].includes(q.state) && !q.problemId && !q.hold);
-  return `<div><dt>Перевод</dt><dd>${free.length ? free.map(q => `<button class="secondary" data-transfer="${esc(v.id)}" data-to="${esc(q.id)}">Перевести на ${esc(q.code)}…</button>`).join(' ') : `<span class="why">Недоступно: ${sib.map(q => q.vehicleId ? `${esc(q.code)} занят ${esc(q.vehicleId)}` : `${esc(q.code)} — ${esc(POST_SHORT[q.state].toLowerCase())}`).join('; ')}</span>`}</dd></div>`;
+  const p = v.location.type === 'post' ? post(v.location.id) : null;
+  if (!p || !p.actions?.some(a => a.kind === 'transfer')) return '';
+  return `<div><dt>Перевод</dt><dd>${postActionButtons(p, 'vehicle', 'transfer')}</dd></div>`;
 }
 function overviewBody(v) {
   const order = state.orders.find(o => o.id === v.orderId), op = v.currentOperation && v.currentOperation.completedAt === null ? v.currentOperation : null;

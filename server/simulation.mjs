@@ -169,16 +169,20 @@ export class Workshop {
     this.log('plan_changed', `План смены изменён оператором: ${before} → ${target} принятых автомобилей`, {}, actor);
     this.touch();
   }
+  holdAvailability(postId, on) {
+    if (this.finished) return { ok: false, status: 409, reason: 'Смена завершена. Сбросьте демо.' };
+    if (typeof postId !== 'string' || !Object.hasOwn(POST, postId)) return { ok: false, status: 404, reason: 'Пост не найден' };
+    if (typeof on !== 'boolean') return { ok: false, status: 400, reason: 'Укажите on: true или false' };
+    if (Boolean(this.holds[postId]) === on) return { ok: true };
+    if (on && !postsOf(POST[postId].stage).some(p => p.id !== postId && !this.holds[p.id])) return { ok: false, status: 409, reason: 'Нельзя снять нагрузку с последнего поста участка' };
+    return { ok: true };
+  }
   setHold(postId, on, actor = 'operator') {
-    this.requireOpenShift();
-    if (typeof postId !== 'string' || !Object.hasOwn(POST, postId)) throw new SimulationError('Пост не найден', 404);
-    if (typeof on !== 'boolean') throw new SimulationError('Укажите on: true или false');
+    const a = this.holdAvailability(postId, on);
+    if (!a.ok) throw new SimulationError(a.reason, a.status);
     if (Boolean(this.holds[postId]) === on) return;
-    if (on) {
-      const free = postsOf(POST[postId].stage).filter(p => p.id !== postId && !this.holds[p.id]);
-      if (!free.length) throw new SimulationError('Нельзя снять нагрузку с последнего поста участка', 409);
-      this.holds[postId] = true;
-    } else delete this.holds[postId];
+    if (on) this.holds[postId] = true;
+    else delete this.holds[postId];
     this.log('hold_changed', on ? `${POST[postId].code}: новые автомобили на пост не направляются (текущая операция продолжается)` : `${POST[postId].code}: пост снова принимает автомобили`, { postId }, actor);
     this.flow(); this.touch();
   }
@@ -740,6 +744,22 @@ export class Workshop {
     const bad = this.inspections.filter(i => i.result === 'fail' && i.origin === stage && i.originPostId === postId).length;
     return (completed - bad) / completed;
   }
+  postActions(postId) {
+    const def = POST[postId], vehicleId = this.posts[postId].vehicleId;
+    const actions = [], incident = this.postIncident(postId);
+    const add = (kind, label, payload, availability) => actions.push({ kind, label, payload, reason: null, ...availability });
+    const jobs = this.liftOf(postId) ? ['pump_check', 'pressure_hold', 'repair_seal', 'repair_pump'] : [];
+    if (incident?.kind === 'breakdown') jobs.push('repair_generic');
+    if (incident?.kind === 'slowdown') jobs.push('adjust');
+    for (const kind of jobs) add('job', `${JOB_KINDS[kind].title} · ${JOB_KINDS[kind].duration} мин…`, { action: 'job', postId, kind }, this.jobAvailability(postId, kind));
+    for (const target of postsOf(def.stage).filter(p => p.id !== postId)) {
+      const availability = vehicleId ? this.transferAvailability(vehicleId, target.id) : { ok: false, status: 409, reason: this.finished ? 'Смена завершена' : `${def.code}: на посту нет автомобиля` };
+      add('transfer', `Перевести ${vehicleId ?? 'автомобиль'} на ${target.code}…`, { action: 'transfer', vehicleId, postId: target.id }, availability);
+    }
+    const on = !this.holds[postId];
+    add('hold', on ? 'Не загружать пост новыми автомобилями…' : 'Вернуть пост в загрузку…', { action: 'hold', postId, on }, this.holdAvailability(postId, on));
+    return actions;
+  }
   postView(def) {
     const post = this.posts[def.id], incident = this.postIncident(def.id) ?? null, job = this.runningStopJob(def.id);
     const exec = post.executionId ? this.execution(post.executionId) : null, stage = STAGE[def.stage];
@@ -756,6 +776,7 @@ export class Workshop {
     return {
       id: def.id, code: def.code, stage: def.stage, stageName: stage.name, capacity: def.capacity, state, reason, incidentId: incident?.id ?? null, problemId: problem?.id ?? null, hold: Boolean(this.holds[def.id]), equipmentId: LIFT_BY_POST[def.id]?.id ?? null,
       vehicleId: post.vehicleId, operation: exec ? exec.operation : null, progress: exec ? round(1 - exec.remaining / exec.work) : null, remaining: exec ? round(exec.remaining, 1) : null,
+      actions: this.postActions(def.id),
       stats: { ...post.stats, nominal: round(post.stats.nominal, 2) }, metrics: postOee(post.stats, this.minute, quality),
     };
   }

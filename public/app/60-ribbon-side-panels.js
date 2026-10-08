@@ -55,6 +55,25 @@ function postTasks(p) {
   const rel = p.stage === 'rework' ? '<p class="fine-print">Пост ремонта автомобилей. Обслуживание подъёмников сборки — отдельный раздел «Обслуживание оборудования».</p>' : p.equipmentId ? '<p class="fine-print">Неисправность подъёмника — задача обслуживания оборудования, а не дефект автомобиля на посту.</p>' : '';
   return (list.length ? `<h3>Задачи поста · ${list.length}</h3><ul class="plain">${list.map(t => `<li>${ico(TASK_ICON[t.category] ?? 'warn', '')} <button class="link" data-task="${esc(t.id)}">${esc(t.title)}</button> <span class="fine-print">${esc(t.certaintyText)}</span></li>`).join('')}</ul>` : '') + rel;
 }
+// Stable action attributes are shared with the production confirmation/busy handlers.
+function postActionButtons(p, context, kind = null) {
+  return (p.actions ?? []).filter(a => !kind || a.kind === kind).map((a, i) => {
+    const payload = a.payload, reasonId = `${context}-action-${p.id}-${i}`;
+    const attrs = a.kind === 'job' ? `data-job="${esc(payload.kind)}" data-post-id="${esc(payload.postId)}"`
+      : a.kind === 'transfer' ? `data-transfer="${esc(payload.vehicleId)}" data-to="${esc(payload.postId)}"`
+      : `data-hold="${esc(payload.postId)}" data-on="${payload.on ? '1' : '0'}"`;
+    return `<div class="post-action"><button class="wide" ${a.ok ? attrs : `disabled aria-describedby="${esc(reasonId)}"`}>${esc(a.label)}</button>${a.ok ? '' : `<p id="${esc(reasonId)}" class="why">Недоступно: ${esc(a.reason)}</p>`}</div>`;
+  }).join('');
+}
+function postResources(p) {
+  const technicians = state.technicians.map(t => {
+    const job = state.jobs.find(j => j.id === t.jobId);
+    return `<li>${esc(t.name)} — ${job ? `занят: ${esc(job.id)} · ${esc(job.title)} на ${esc(post(job.postId)?.code ?? job.postId)}, осталось ${fmt(job.remaining)} мин` : 'свободен'}</li>`;
+  }).join('');
+  const queue = state.jobs.filter(j => j.postId === p.id && j.status === 'queued');
+  return `<h3>Техник</h3><ul class="plain">${technicians}</ul><h3>Очередь работ на ${esc(p.code)}</h3>${queue.length ? `<ol class="queue">${queue.map(j => `<li>${esc(j.id)} · ${esc(j.title)} · ${fmt(j.remaining)} мин</li>`).join('')}</ol>` : '<p class="muted">Очередь работ пуста.</p>'}${p.equipmentId ? `<h3>Склад</h3><ul class="plain">${state.stock.filter(s => ['seal_kit', 'pump'].includes(s.id)).map(s => `<li>${esc(s.name)}: доступно ${s.available}, резерв ${s.reserved}, на складе ${s.onHand}</li>`).join('')}</ul>` : ''}`;
+}
+
 function panelPost(p) {
   const kind = POST_KIND(p), v = p.vehicleId ? vehicle(p.vehicleId) : null, job = runningJob(p.id);
   const stage = p.stage === 'rework' ? { name: 'Доработка', buffer: state.rework.buffer } : state.stages.find(s => s.id === p.stage);
@@ -64,13 +83,11 @@ function panelPost(p) {
   if (p.problemId) body += `<p><button class="primary wide" data-problem="${esc(p.problemId)}">Открыть ${esc(p.problemId)}: диагностика и решения</button></p>`;
   const q = stage.buffer.vehicleIds;
   body += `<h3>Очередь · ${esc(stage.buffer.name)} ${q.length}${stage.buffer.capacity !== null ? ` из ${stage.buffer.capacity}` : ''}</h3>${q.length ? `<ol class="queue">${q.slice(0, 6).map(id => `<li><button class="link mono" data-vehicle="${esc(id)}">${esc(id)}</button> <span>${esc(vehicle(id).modelName)} · ${esc(vehicle(id).orderId)}</span></li>`).join('')}</ol>` : '<p class="muted">Очередь пуста.</p>'}`;
-  const actions = [];
+  const actions = [postActionButtons(p, 'post')];
   if (!state.finished) {
-    if (incident?.kind === 'breakdown') actions.push(`<button class="primary wide" data-job="repair_generic" data-post-id="${esc(p.id)}">Аварийный ремонт · 30 мин…</button>`);
-    else if (incident?.kind === 'slowdown') actions.push(`<button class="primary wide" data-job="adjust" data-post-id="${esc(p.id)}">Наладка · 10 мин…</button>`);
-    if (state.posts.some(x => x.stage === p.stage && x.id !== p.id)) actions.push(`<button class="wide" data-hold="${esc(p.id)}" data-on="${p.hold ? '0' : '1'}">${p.hold ? 'Вернуть пост в загрузку…' : 'Не загружать пост новыми автомобилями…'}</button>`);
     if (!incident && !p.problemId) actions.push(`<details class="demo"><summary>Учебный сценарий неисправности</summary><button class="wide" data-fault="${esc(p.id)}" data-kind="breakdown">Создать неисправность…</button><button class="wide" data-fault="${esc(p.id)}" data-kind="slowdown">Создать снижение темпа…</button></details>`);
   }
+  body += postResources(p);
   const m = p.metrics;
   body += `<h3>Действия</h3><div class="actions-col">${actions.join('') || '<p class="muted">Действий нет.</p>'}</div>${lockNote}<p class="fine-print">A ${pct(m.availability)} · P ${pct(m.performance)} · Q ${pct(m.quality)} · OEE ${pct(m.oee)} · работа ${p.stats.run} мин · простой без входа ${p.stats.starved} мин</p>`;
   return sideHead(`ПОСТ · ${esc(p.stageName.toUpperCase())}`, esc(p.code), p.equipmentId ? tag(esc(state.equipment.find(e => e.id === p.equipmentId)?.name ?? '')) : '', chatBtn('post', p.id)) + `<div class="side-body">${history.state?.ret ? backLink() : ''}${postTasks(p)}${body}</div>`;
