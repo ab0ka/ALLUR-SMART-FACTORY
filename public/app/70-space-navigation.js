@@ -9,14 +9,14 @@ function openPanel(panel, selected, ctx) {
 const selectVehicle = id => openPanel({ type: 'vehicle', id }, { type: 'vehicle', id }, { type: 'vehicle', id });
 const selectPost = id => openPanel({ type: 'post', id }, { type: 'post', id }, { type: 'post', id });
 const selectProblem = id => { const p = problem(id); openPanel({ type: 'problem', id }, p ? { type: 'post', id: p.postId } : null, { type: 'problem', id }); };
-function closePanel() { ui.panel = null; ui.selected = null; ui.ribbonOnlySelected = false; syncHash(); render(); }
-// The address bar follows the open card, so a link can be shared or opened again; replaceState does not fire hashchange.
+function closePanel() { ui.panel = null; ui.selected = null; chatContext = null; ui.ribbonOnlySelected = false; syncHash(); render(); }
+// Card navigation gets a history entry; pushState avoids rerendering the same card via hashchange.
 function panelHash() {
   const p = ui.panel;
   const suffix = p?.type === 'chat' && chatContext ? `/${chatContext.type}/${encodeURIComponent(chatContext.id)}` : p?.id ? `/${encodeURIComponent(p.id)}` : '';
   return `space/${space}${p ? `/${p.type}${suffix}` : ''}`;
 }
-function syncHash() { if (view === 'space') history.replaceState(null, '', `#${panelHash()}`); }
+function syncHash() { const hash = `#${panelHash()}`; if (view === 'space' && location.hash !== hash) history.pushState(null, '', hash); }
 function goSpace(id) { location.hash = `space/${id}`; }
 function openRefSpace(type, id) {
   if (type === 'vehicle') return selectVehicle(id);
@@ -29,8 +29,19 @@ function openRefSpace(type, id) {
     if (item) openPanel({ type, id }, null, referenceContext(item));
   }
 }
+function validChatContext(type, id) {
+  const rows = { vehicle: state.vehicles, post: state.posts, problem: state.problems, order: state.orders };
+  return Object.hasOwn(rows, type) && rows[type].some(x => x.id === id) ? { type, id } : null;
+}
+function panelChatContext(panel) {
+  if (!panel) return null;
+  if (panel.type === 'chat') return chatContext && validChatContext(chatContext.type, chatContext.id);
+  const rows = { experiment: state.experiments, decision: state.decisions, job: state.jobs, event: state.events };
+  if (Object.hasOwn(rows, panel.type)) return referenceContext(rows[panel.type].find(x => String(panel.type === 'event' ? x.seq : x.id) === panel.id));
+  return validChatContext(panel.type === 'compare' ? 'problem' : panel.type, panel.id);
+}
 function referenceContext(item) {
-  for (const type of ['problem', 'vehicle', 'post']) if (item?.[`${type}Id`]) return { type, id: item[`${type}Id`] };
+  for (const type of ['problem', 'vehicle', 'post']) if (item?.[`${type}Id`]) return validChatContext(type, item[`${type}Id`]);
   return null;
 }
 function openEvent(e) {
@@ -51,7 +62,7 @@ async function spaceClick(t, d) {
   if (d.post || d.postLink) { selectPost(d.post || d.postLink); return true; }
   if (d.problem) { selectProblem(d.problem); return true; }
   if (d.table) { ui.table = true; render(); return true; }
-  if (d.openChat) { if (d.ctxType) chatContext = { type: d.ctxType, id: d.ctxId }; else if (ui.selected) chatContext = ui.selected.type === 'vehicle' ? { type: 'vehicle', id: ui.selected.id } : ui.panel?.type === 'problem' ? { type: 'problem', id: ui.panel.id } : { type: 'post', id: ui.selected.id }; ui.panel = { type: 'chat' }; syncHash(); render(); requestAnimationFrame(() => $('side-chat-input')?.focus()); return true; }
+  if (d.openChat) { chatContext = d.ctxType ? validChatContext(d.ctxType, d.ctxId) : panelChatContext(ui.panel); ui.panel = { type: 'chat' }; syncHash(); render(); requestAnimationFrame(() => $('side-chat-input')?.focus()); return true; }
   if (d.refType) { openRefSpace(d.refType, d.refId); return true; }
   if (d.ask) { const input = $('side-chat-input'); if (input) input.value = d.ask; ask(d.ask, SIDE_CHAT); return true; }
   if (d.chatClear) { chatContext = null; ui.selected = null; syncHash(); updateSideChat(); return true; }

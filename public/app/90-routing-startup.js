@@ -1,28 +1,25 @@
 // ---------- Routing and render ----------
 function setView(hash) {
-  const [name, arg, type, id, contextId] = hash.split('/');
+  const [name, arg, type, id, contextId, ...extra] = hash.split('/');
   if (VIEWS.includes(name)) view = name;
   else {
     view = 'space'; space = SPACES[arg] ? arg : 'assembly';
-    // Chat links include /chat/<context type>/<id>; entity links open the exact referenced record.
+    ui.panel = null; ui.selected = null; chatContext = null;
+    // New chat links use /chat/<type>/<id>; old /chat/<id> links resolve only unique existing IDs.
+    const decode = value => { try { return value ? decodeURIComponent(value) : undefined; } catch { return undefined; } };
     if (['vehicle', 'post', 'problem', 'compare', 'chat', 'experiment', 'decision', 'job', 'event'].includes(type)) {
-      let objId;
-      try { objId = id ? decodeURIComponent(id) : undefined; } catch { objId = undefined; }
-      ui.panel = { type, id: objId };
-      ui.selected = ['vehicle', 'post'].includes(type) && objId ? { type, id: objId } : null;
+      ui.panel = { type, id: decode(id) };
       if (type === 'chat') {
-        let decoded;
-        try { decoded = contextId ? decodeURIComponent(contextId) : undefined; } catch { decoded = undefined; }
-        const collections = { vehicle: state.vehicles, post: state.posts, problem: state.problems, order: state.orders };
-        chatContext = decoded && Object.hasOwn(collections, id) && collections[id].some(x => x.id === decoded) ? { type: id, id: decoded } : null;
+        if (!extra.length) {
+          if (contextId !== undefined) chatContext = validChatContext(id, decode(contextId));
+          else if (id) {
+            const matches = ['vehicle', 'post', 'problem', 'order'].map(kind => validChatContext(kind, decode(id))).filter(Boolean);
+            if (matches.length === 1) chatContext = matches[0];
+          }
+        }
         ui.panel = { type: 'chat' };
-        ui.selected = chatContext && ['vehicle', 'post'].includes(chatContext.type) ? { ...chatContext } : null;
-      }
-      if (['experiment', 'decision', 'job', 'event'].includes(type)) {
-        const rows = { experiment: state.experiments, decision: state.decisions, job: state.jobs, event: state.events }[type];
-        chatContext = referenceContext(rows.find(x => String(type === 'event' ? x.seq : x.id) === objId));
-      }
-      if (['vehicle', 'post', 'problem', 'compare'].includes(type) && objId) chatContext = { type: type === 'compare' ? 'problem' : type, id: objId };
+      } else chatContext = panelChatContext(ui.panel);
+      if (chatContext && ['vehicle', 'post'].includes(chatContext.type)) ui.selected = { ...chatContext };
     }
   }
   $('view-space').hidden = view !== 'space'; $('legacy').hidden = view === 'space';
