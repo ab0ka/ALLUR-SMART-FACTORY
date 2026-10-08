@@ -1,7 +1,7 @@
 import http from 'node:http';
 import { createHandover } from './handover.mjs';
 import { formatHandover } from './handover-export.mjs';
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -39,6 +39,8 @@ export function fullState(sim, { aiOptions = {}, riskModel = null } = {}) {
 }
 export function createApp({ simulation = new Workshop(), aiOptions = {}, tickMs = 1200, publicDir = path.join(root, 'dist'), modelDir = path.join(root, 'assets-src', 'kia-sportage'), storePath = null, riskModel = null, policyReport = null, chatMinIntervalMs = 1000 } = {}) {
   let sim = simulation;
+  // Public lifetime marker for clients; independent of engine persistence and CSRF.
+  let shiftEpoch = randomUUID();
   const token = randomBytes(32).toString('hex'), llm = { busy: false, last: 0 };
   let lastChat = 0, ticksSinceSave = 0;
   const persist = () => {
@@ -46,7 +48,7 @@ export function createApp({ simulation = new Workshop(), aiOptions = {}, tickMs 
     try { saveState(storePath, sim, [aiOptions.key]); ticksSinceSave = 0; }
     catch { console.error('Не удалось сохранить состояние смены (подробности скрыты).'); }
   };
-  const state = () => ({ ...fullState(sim, { aiOptions, riskModel }), csrf: token });
+  const state = () => ({ ...fullState(sim, { aiOptions, riskModel }), shiftEpoch, csrf: token });
   const server = http.createServer(async (req, res) => {
     const send = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(body)); };
     res.setHeader('Cache-Control', 'no-store'); res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -66,7 +68,9 @@ export function createApp({ simulation = new Workshop(), aiOptions = {}, tickMs 
       if (req.method === 'GET' && url.pathname === '/api/handover') {
         const format = url.searchParams.get('format');
         if (format !== null && format !== 'json' && format !== 'csv') throw clientError('Неизвестный формат передачи смены');
-        const output = formatHandover(createHandover(sim.snapshot()), format);
+        const snapshot = sim.snapshot();
+        snapshot.shiftEpoch = shiftEpoch;
+        const output = formatHandover(createHandover(snapshot), format);
         res.writeHead(200, output.headers); return res.end(output.body);
       }
       if (req.method === 'GET' && url.pathname === '/api/state') return send(200, state());
@@ -103,7 +107,7 @@ export function createApp({ simulation = new Workshop(), aiOptions = {}, tickMs 
           case 'pause': sim.running = false; break;
           case 'step': sim.advance(5); break;
           case 'speed': if (![1, 5, 15].includes(body.value)) throw clientError('Неизвестная скорость'); sim.speed = body.value; break;
-          case 'reset': sim.reset(42); break;
+          case 'reset': sim.reset(42); shiftEpoch = randomUUID(); break;
           default: { const r = sim.command(body, 'operator'); if (r.duplicate) { const s = state(); return send(200, { ...s, duplicate: true }); } }
         }
         persist();

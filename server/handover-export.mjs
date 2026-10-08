@@ -11,7 +11,7 @@ export function csvCell(value) {
   return '"' + text.replaceAll('"', '""') + '"';
 }
 const sections = [
-  ['report', ['schemaVersion', 'synthetic', 'revision', 'elapsed', 'shift', 'shiftStart', 'finished']],
+  ['report', ['schemaVersion', 'synthetic', 'shiftEpoch', 'revision', 'elapsed', 'shift', 'shiftStart', 'finished']],
   ['metrics', ['planTarget', 'referenceTotal', 'forecast', 'forecastLow', 'forecastHigh', 'accepted', 'shipped', 'wip', 'firstPassYield']],
   ['counts', ['problems', 'jobs', 'tasks', 'orders']],
   ['problems', ['id', 'title', 'postId', 'postCode', 'vehicleIds', 'status', 'detectedAt']],
