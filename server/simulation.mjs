@@ -15,7 +15,8 @@ export const DEFAULT_PLAN_TARGET = 16;
 export const DEFECT_RATE = .15;
 export const ANOMALY_THRESHOLD = 4.5;
 export const PRIORITIES = { high: { rank: 0, name: 'Высокий' }, normal: { rank: 1, name: 'Обычный' }, low: { rank: 2, name: 'Низкий' } };
-export const MODELS = { A: { name: 'Модель A' }, B: { name: 'Модель B' }, C: { name: 'Модель C' } };
+// Model names follow the organiser's test data (case #2: Chevrolet Onix, Chevrolet Cobalt, JAC J7); norms stay synthetic.
+export const MODELS = { A: { name: 'Chevrolet Onix' }, B: { name: 'Chevrolet Cobalt' }, C: { name: 'JAC J7' } };
 export const STAGES = [
   { id: 'weld', name: 'Сварка', operation: 'Сварка кузова', norms: { A: 28, B: 30, C: 33 }, buffer: { id: 'BACKLOG', name: 'Входной буфер кузовов', capacity: null } },
   { id: 'paint', name: 'Окраска', operation: 'Окраска кузова', norms: { A: 30, B: 33, C: 35 }, buffer: { id: 'B1', name: 'Буфер перед окраской', capacity: 3 } },

@@ -882,3 +882,13 @@ details.more>summary{cursor:pointer;font-weight:700;color:var(--link);min-height
 @media(max-width:1100px){.shiftx-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.shiftx-metrics{grid-template-columns:1fr}.orders-view .order-list{grid-template-columns:minmax(0,1fr)}.shiftx-view .shift-grid,.shiftx-view .split{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:760px){#analytics-navigation>a{min-width:0;white-space:normal;min-height:40px}}
+.bad-text{color:var(--red);font-weight:700}
+.case-targets td small{color:var(--muted)}
+/* Shop scenes (shop-scene.js): simplified training equipment */
+.ss-glass{fill:#CFE3F5;opacity:.55;stroke:#8DB4E6;stroke-width:.6}.ss-glass2{fill:#B7D2EC;opacity:.55;stroke:#8DB4E6;stroke-width:.6}
+.ss-arm{fill:#F2A900;stroke:#B07A00;stroke-width:.6}.ss-arm2{fill:#D89400;stroke:#B07A00;stroke-width:.6}
+.ss-fence{fill:#F4D35E;stroke:#B07A00;stroke-width:.5}.ss-fence2{fill:#E3BE45;stroke:#B07A00;stroke-width:.5}
+.ss-light{fill:#B8E62E;stroke:#7DA51C;stroke-width:.6}.ss-light2{fill:#A3CF22;stroke:#7DA51C;stroke-width:.6}
+/* Live enterprise map: car markers move with a CSS transition (position set through CSSOM) */
+.em-car{cursor:pointer;transition:transform .9s ease;outline:none}.em-car.reduced{transition:none}
+.em-car:hover,.em-car:focus-visible{filter:drop-shadow(0 0 3px #1F6FD1)}.em-car.selected{filter:drop-shadow(0 0 4px #1F6FD1) drop-shadow(0 0 2px #1F6FD1)}

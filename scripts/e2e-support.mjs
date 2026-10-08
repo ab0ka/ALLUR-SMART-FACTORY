@@ -110,4 +110,3 @@ export class CDP {
   rejectAll(error) { for (const item of this.pending.values()) { clearTimeout(item.timer); item.reject(error); } this.pending.clear(); }
   close() { this.rejectAll(new Error('CDP закрыт')); this.socket.close(); }
 }
-

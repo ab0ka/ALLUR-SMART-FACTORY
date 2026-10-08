@@ -151,7 +151,7 @@ function overviewBody(v) {
 ${transferRow(v)}    <div><dt>Синтетический ID</dt><dd class="mono">${esc(v.id)} · не VIN · маршрут ${esc(v.routeVersion)}</dd></div></dl><h4>Маршрут</h4>${route}`;
 }
 function inspectBody(v) {
-  return `<p>Кузов — любительская модель «Kia Sportage» (karaman.arman, CC BY 4.0), не CAD Kia/Allur. Капот вырезан из кузова для показа и открывается на шарнире; узлы под капотом — условные учебные, не устройство Sportage. Двери не открываются и не регулируются.</p>
+  return `<p>Кузов в 3D — условный: любительская модель «Kia Sportage» (karaman.arman, CC BY 4.0) для всех моделей завода; 3D-моделей Chevrolet Onix, Cobalt и JAC J7 в проекте пока нет. Не CAD. Капот вырезан из кузова для показа и открывается на шарнире; узлы под капотом — условные учебные, не устройство Sportage. Двери не открываются и не регулируются.</p>
     <button class="secondary" data-car3d="${esc(v.id)}">Открыть 3D-осмотр ${esc(v.id)}</button>${v.procedure?.type === 'door' ? '<p class="honest">Дефект двери в 3D не показывается: замер и регулировка выполняются в блоке «Проверки и ремонт», результат — синтетическое измерение.</p>' : ''}`;
 }
 function procedureBody(v, mode) {
