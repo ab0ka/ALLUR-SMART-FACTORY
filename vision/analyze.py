@@ -1,5 +1,6 @@
 """Analyse a recorded video: detect cars (YOLOX ONNX), track them (ByteTrack-style), measure time in a zone,
 export analysis.json (schemaVersion 1). This is analysis of a recording, not live video.
+Only the validity window from the config (validFromSec..validUntilSec, while the camera stands still) is measured.
 
   python vision/analyze.py --config vision/config/clip-01.json --out vision/out/analysis.json
   python vision/analyze.py --config vision/config/clip-01.json --check 6     # detections on 6 frames -> contact sheet
@@ -79,16 +80,24 @@ def analyse(cfg: dict) -> dict:
     cap, fps, n, w, h = open_video(cfg["videoPath"])
     duration = n / fps
     step = max(1, round(fps / cfg.get("sampleFps", 5)))
-    frames, known, i = [], set(), 0
+    # Validity window: the zone is a fixed place on the road only while the camera stands still. Outside the window
+    # frames are not analysed at all and are not written to `frames`, so they contribute no zone membership.
+    valid_from = float(cfg.get("validFromSec", 0) or 0)
+    valid_until = cfg.get("validUntilSec")
+    truncated = valid_until is not None and float(valid_until) < duration
+    valid_until = float(valid_until) if truncated else duration
+    frames, i = [], 0
     while True:
+        t = i / fps  # time in the recording, independent of playback speed
+        if truncated and t > valid_until + 1e-6:
+            break
         ok = cap.grab()
         if not ok:
             break
-        if i % step == 0:
+        if i % step == 0 and t >= valid_from - 1e-6:
             ok, img = cap.retrieve()
             if not ok:
                 break
-            t = i / fps  # time in the recording, independent of playback speed
             tracks = trk.step(det(img), t)
             objs = []
             for tr in tracks:
@@ -96,7 +105,6 @@ def analyse(cfg: dict) -> dict:
                 cx, cy = (x1 + x2) / 2 / w, min(y2 / h, 0.999)  # bottom-centre: where the car touches the ground
                 inside = point_in_polygon(cx, cy, zone["polygon"])
                 log.observe(tr.id, t, inside)
-                known.add(tr.id)
                 objs.append({"trackId": tr.id, "className": "car", "confidence": round(tr.score, 3),
                              "bbox": [round(x1 / w, 4), round(y1 / h, 4), round((x2 - x1) / w, 4), round((y2 - y1) / h, 4)],
                              "zoneId": zone["id"] if inside else None})
@@ -106,17 +114,20 @@ def analyse(cfg: dict) -> dict:
             frames.append({"t": round(t, 2), "objects": objs})
         i += 1
     cap.release()
-    end_t = (i - 1) / fps if i else 0.0
-    for tr in trk.tracks:  # tracks still alive at the end: visits inside stay open, not "lost"
-        pass
-    visits = log.finish(end_t)
+    # Tracks still alive at the end are not "lost": their visits stay open. With a validity window that ends before the
+    # recording, the measurement stops at valid_until and visits inside at that moment are marked truncated.
+    end_t = valid_until if truncated else ((i - 1) / fps if i else 0.0)
+    visits = log.finish(end_t, truncated=truncated)
     src = cfg["source"]
     return {
         "schemaVersion": 1,
         "source": {**src, "fileName": Path(cfg["videoPath"]).name, "durationSec": round(duration, 2), "width": w, "height": h},
         "analysis": {"mode": "model", "model": cfg.get("modelName", "YOLOX-S ONNX"), "tracker": "ByteTrack-style IoU tracker (vision/tracker.py)",
                      "sampleFps": round(fps / step, 2), "processingSec": round(time.perf_counter() - t0, 1),
-                     "zonePoint": "bottom-centre of the box", "hysteresisSec": {"enter": log.enter_sec, "exit": log.exit_sec}, "maxLostSec": trk.max_lost_sec},
+                     "zonePoint": "bottom-centre of the box", "hysteresisSec": {"enter": log.enter_sec, "exit": log.exit_sec}, "maxLostSec": trk.max_lost_sec,
+                     "validInterval": {"fromSec": round(valid_from, 2), "untilSec": round(valid_until, 2),
+                                       "reason": cfg.get("validReason") or "вся запись", "note": cfg.get("validNote"),
+                                       "outside": "кадры вне окна не анализируются и не входят в frames; посещения, не завершённые к концу окна, обрезаны (truncated)"}},
         "zones": [{k: zone[k] for k in ("id", "name", "polygon", "thresholdSec", "thresholdSource")}],
         "frames": frames,
         "visits": visits,
@@ -134,11 +145,11 @@ def main():
         return check(cfg, a.check, HERE / "out" / "check-frames.jpg")
     res = analyse(cfg)
     out = Path(a.out); out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
-    v = res["visits"]
-    print(f"Готово за {res['analysis']['processingSec']} с: {len(res['frames'])} кадров по {res['analysis']['sampleFps']} к/с, треков {len({o['trackId'] for f in res['frames'] for o in f['objects']})}, посещений зоны {len(v)} -> {out}")
+    out.write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8", newline="\n")  # LF, as in .gitattributes
+    v, win = res["visits"], res["analysis"]["validInterval"]
+    print(f"Готово за {res['analysis']['processingSec']} с: окно измерения {win['fromSec']}–{win['untilSec']} с, {len(res['frames'])} кадров по {res['analysis']['sampleFps']} к/с, треков {len({o['trackId'] for f in res['frames'] for o in f['objects']})}, посещений зоны {len(v)} -> {out}")
     for x in v:
-        print(f"  {x['id']} {x['trackId']} {x['startSec']}–{x['endSec']} ({x['observedSec']} с, {x['status']}){' — превышен порог: возможная задержка' if x['overThreshold'] else ''}")
+        print(f"  {x['id']} {x['trackId']} {x['startSec']}–{x['endSec']} ({x['observedSec']} с, {x['status']}{', обрезано на ' + str(x['truncatedAt']) + ' с' if x['truncated'] else ''}){' — превышен демонстрационный порог' if x['overThreshold'] else ''}")
 
 
 if __name__ == "__main__":

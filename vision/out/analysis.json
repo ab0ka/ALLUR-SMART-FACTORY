@@ -2,7 +2,7 @@
  "schemaVersion": 1,
  "source": {
   "id": "clip-01",
-  "title": "Машины ждут сигнала светофора: съёмка из машины, стоящей на перекрёстке (камера почти неподвижна). Иллюстрация метода — не производство и не Allur",
+  "title": "Машины ждут сигнала светофора: съёмка из машины, стоящей на перекрёстке (камера почти неподвижна до ~21,8 с). Иллюстрация метода — не производство и не Allur",
   "url": "https://www.pexels.com/video/cars-waiting-in-a-traffic-light-5675618/",
   "license": "Pexels License (https://www.pexels.com/license/): бесплатно, атрибуция не обязательна",
   "synthetic": false,
@@ -16,13 +16,20 @@
   "model": "YOLOX-S (Megvii, Apache-2.0), ONNX opset 11, COCO; onnxruntime 1.30 CPU",
   "tracker": "ByteTrack-style IoU tracker (vision/tracker.py)",
   "sampleFps": 5.0,
-  "processingSec": 12.0,
+  "processingSec": 16.6,
   "zonePoint": "bottom-centre of the box",
   "hysteresisSec": {
    "enter": 0.4,
    "exit": 0.8
   },
-  "maxLostSec": 1.5
+  "maxLostSec": 1.5,
+  "validInterval": {
+   "fromSec": 0.0,
+   "untilSec": 21.8,
+   "reason": "камера неподвижна до ~21,8 с; дальше машина с камерой трогается и камера движется, зона в координатах кадра перестаёт быть местом на дороге",
+   "note": "дальше камера движется",
+   "outside": "кадры вне окна не анализируются и не входят в frames; посещения, не завершённые к концу окна, обрезаны (truncated)"
+  }
  },
  "zones": [
   {
@@ -9462,697 +9469,6 @@
      "zoneId": null
     }
    ]
-  },
-  {
-   "t": 21.82,
-   "objects": [
-    {
-     "trackId": "car-1",
-     "className": "car",
-     "confidence": 0.942,
-     "bbox": [
-      0.2828,
-      0.6032,
-      0.2156,
-      0.2517
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-3",
-     "className": "car",
-     "confidence": 0.907,
-     "bbox": [
-      0.57,
-      0.716,
-      0.3483,
-      0.2812
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-35",
-     "className": "car",
-     "confidence": 0.937,
-     "bbox": [
-      0.0003,
-      0.6264,
-      0.2679,
-      0.263
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-58",
-     "className": "car",
-     "confidence": 0.768,
-     "bbox": [
-      0.4297,
-      0.5704,
-      0.041,
-      0.0416
-     ],
-     "zoneId": null
-    },
-    {
-     "trackId": "car-62",
-     "className": "car",
-     "confidence": 0.867,
-     "bbox": [
-      0.4866,
-      0.5672,
-      0.037,
-      0.0446
-     ],
-     "zoneId": null
-    }
-   ]
-  },
-  {
-   "t": 22.02,
-   "objects": [
-    {
-     "trackId": "car-1",
-     "className": "car",
-     "confidence": 0.935,
-     "bbox": [
-      0.3067,
-      0.5975,
-      0.2011,
-      0.2391
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-3",
-     "className": "car",
-     "confidence": 0.894,
-     "bbox": [
-      0.569,
-      0.7108,
-      0.347,
-      0.2855
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-35",
-     "className": "car",
-     "confidence": 0.938,
-     "bbox": [
-      0.0004,
-      0.619,
-      0.2922,
-      0.2433
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-58",
-     "className": "car",
-     "confidence": 0.71,
-     "bbox": [
-      0.4296,
-      0.568,
-      0.0401,
-      0.0381
-     ],
-     "zoneId": null
-    },
-    {
-     "trackId": "car-62",
-     "className": "car",
-     "confidence": 0.865,
-     "bbox": [
-      0.4864,
-      0.5654,
-      0.0361,
-      0.0443
-     ],
-     "zoneId": null
-    }
-   ]
-  },
-  {
-   "t": 22.22,
-   "objects": [
-    {
-     "trackId": "car-1",
-     "className": "car",
-     "confidence": 0.927,
-     "bbox": [
-      0.3298,
-      0.5893,
-      0.1861,
-      0.2232
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-3",
-     "className": "car",
-     "confidence": 0.898,
-     "bbox": [
-      0.5667,
-      0.7048,
-      0.3484,
-      0.2932
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-35",
-     "className": "car",
-     "confidence": 0.932,
-     "bbox": [
-      0.0456,
-      0.6125,
-      0.2698,
-      0.2244
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-58",
-     "className": "car",
-     "confidence": 0.727,
-     "bbox": [
-      0.4282,
-      0.566,
-      0.0392,
-      0.0312
-     ],
-     "zoneId": null
-    },
-    {
-     "trackId": "car-62",
-     "className": "car",
-     "confidence": 0.848,
-     "bbox": [
-      0.485,
-      0.5651,
-      0.0366,
-      0.0424
-     ],
-     "zoneId": null
-    }
-   ]
-  },
-  {
-   "t": 22.42,
-   "objects": [
-    {
-     "trackId": "car-1",
-     "className": "car",
-     "confidence": 0.923,
-     "bbox": [
-      0.3526,
-      0.5867,
-      0.1715,
-      0.2099
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-3",
-     "className": "car",
-     "confidence": 0.921,
-     "bbox": [
-      0.5731,
-      0.696,
-      0.3412,
-      0.2991
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-35",
-     "className": "car",
-     "confidence": 0.932,
-     "bbox": [
-      0.0922,
-      0.6069,
-      0.2456,
-      0.1986
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-58",
-     "className": "car",
-     "confidence": 0.486,
-     "bbox": [
-      0.4261,
-      0.5654,
-      0.043,
-      0.0262
-     ],
-     "zoneId": null
-    },
-    {
-     "trackId": "car-62",
-     "className": "car",
-     "confidence": 0.861,
-     "bbox": [
-      0.4841,
-      0.5642,
-      0.0359,
-      0.0409
-     ],
-     "zoneId": null
-    }
-   ]
-  },
-  {
-   "t": 22.62,
-   "objects": [
-    {
-     "trackId": "car-1",
-     "className": "car",
-     "confidence": 0.933,
-     "bbox": [
-      0.3726,
-      0.5779,
-      0.158,
-      0.1999
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-3",
-     "className": "car",
-     "confidence": 0.923,
-     "bbox": [
-      0.5774,
-      0.6982,
-      0.3315,
-      0.2955
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-35",
-     "className": "car",
-     "confidence": 0.933,
-     "bbox": [
-      0.1345,
-      0.6015,
-      0.2207,
-      0.1876
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-58",
-     "className": "car",
-     "confidence": 0.136,
-     "bbox": [
-      0.4257,
-      0.5645,
-      0.0389,
-      0.0234
-     ],
-     "zoneId": null
-    },
-    {
-     "trackId": "car-62",
-     "className": "car",
-     "confidence": 0.732,
-     "bbox": [
-      0.4818,
-      0.5644,
-      0.0364,
-      0.0409
-     ],
-     "zoneId": null
-    }
-   ]
-  },
-  {
-   "t": 22.82,
-   "objects": [
-    {
-     "trackId": "car-1",
-     "className": "car",
-     "confidence": 0.929,
-     "bbox": [
-      0.3902,
-      0.5738,
-      0.1476,
-      0.1882
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-3",
-     "className": "car",
-     "confidence": 0.927,
-     "bbox": [
-      0.5797,
-      0.6918,
-      0.3138,
-      0.3068
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-35",
-     "className": "car",
-     "confidence": 0.934,
-     "bbox": [
-      0.169,
-      0.5955,
-      0.201,
-      0.1822
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-58",
-     "className": "car",
-     "confidence": 0.288,
-     "bbox": [
-      0.4254,
-      0.562,
-      0.0371,
-      0.0248
-     ],
-     "zoneId": null
-    },
-    {
-     "trackId": "car-62",
-     "className": "car",
-     "confidence": 0.205,
-     "bbox": [
-      0.4796,
-      0.5659,
-      0.042,
-      0.0393
-     ],
-     "zoneId": null
-    }
-   ]
-  },
-  {
-   "t": 23.02,
-   "objects": [
-    {
-     "trackId": "car-1",
-     "className": "car",
-     "confidence": 0.828,
-     "bbox": [
-      0.4078,
-      0.5688,
-      0.1372,
-      0.18
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-3",
-     "className": "car",
-     "confidence": 0.927,
-     "bbox": [
-      0.5861,
-      0.6767,
-      0.2916,
-      0.3197
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-35",
-     "className": "car",
-     "confidence": 0.924,
-     "bbox": [
-      0.1985,
-      0.5882,
-      0.1859,
-      0.1704
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-58",
-     "className": "car",
-     "confidence": 0.212,
-     "bbox": [
-      0.4172,
-      0.5642,
-      0.041,
-      0.0421
-     ],
-     "zoneId": null
-    }
-   ]
-  },
-  {
-   "t": 23.22,
-   "objects": [
-    {
-     "trackId": "car-1",
-     "className": "car",
-     "confidence": 0.914,
-     "bbox": [
-      0.4233,
-      0.5717,
-      0.1272,
-      0.1608
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-3",
-     "className": "car",
-     "confidence": 0.932,
-     "bbox": [
-      0.5926,
-      0.669,
-      0.2798,
-      0.3245
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-35",
-     "className": "car",
-     "confidence": 0.915,
-     "bbox": [
-      0.2243,
-      0.5828,
-      0.173,
-      0.1604
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-58",
-     "className": "car",
-     "confidence": 0.762,
-     "bbox": [
-      0.4143,
-      0.5611,
-      0.0406,
-      0.0457
-     ],
-     "zoneId": null
-    }
-   ]
-  },
-  {
-   "t": 23.42,
-   "objects": [
-    {
-     "trackId": "car-1",
-     "className": "car",
-     "confidence": 0.903,
-     "bbox": [
-      0.437,
-      0.564,
-      0.1194,
-      0.1586
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-3",
-     "className": "car",
-     "confidence": 0.936,
-     "bbox": [
-      0.5951,
-      0.6663,
-      0.2636,
-      0.3337
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-35",
-     "className": "car",
-     "confidence": 0.917,
-     "bbox": [
-      0.2504,
-      0.58,
-      0.158,
-      0.1493
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-58",
-     "className": "car",
-     "confidence": 0.787,
-     "bbox": [
-      0.4129,
-      0.5637,
-      0.0409,
-      0.042
-     ],
-     "zoneId": null
-    },
-    {
-     "trackId": "car-63",
-     "className": "car",
-     "confidence": 0.938,
-     "bbox": [
-      0.0,
-      0.7633,
-      0.2598,
-      0.235
-     ],
-     "zoneId": "zone-1"
-    }
-   ]
-  },
-  {
-   "t": 23.62,
-   "objects": [
-    {
-     "trackId": "car-1",
-     "className": "car",
-     "confidence": 0.881,
-     "bbox": [
-      0.4473,
-      0.5606,
-      0.1117,
-      0.1489
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-3",
-     "className": "car",
-     "confidence": 0.927,
-     "bbox": [
-      0.6018,
-      0.6567,
-      0.2497,
-      0.3372
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-35",
-     "className": "car",
-     "confidence": 0.895,
-     "bbox": [
-      0.2718,
-      0.5768,
-      0.1431,
-      0.1396
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-58",
-     "className": "car",
-     "confidence": 0.76,
-     "bbox": [
-      0.4111,
-      0.5627,
-      0.0425,
-      0.0433
-     ],
-     "zoneId": null
-    },
-    {
-     "trackId": "car-63",
-     "className": "car",
-     "confidence": 0.924,
-     "bbox": [
-      0.0009,
-      0.7444,
-      0.2847,
-      0.2548
-     ],
-     "zoneId": "zone-1"
-    }
-   ]
-  },
-  {
-   "t": 23.82,
-   "objects": [
-    {
-     "trackId": "car-1",
-     "className": "car",
-     "confidence": 0.84,
-     "bbox": [
-      0.4594,
-      0.5586,
-      0.1028,
-      0.1441
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-3",
-     "className": "car",
-     "confidence": 0.936,
-     "bbox": [
-      0.6043,
-      0.6453,
-      0.2391,
-      0.3498
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-35",
-     "className": "car",
-     "confidence": 0.864,
-     "bbox": [
-      0.2883,
-      0.5715,
-      0.1306,
-      0.1326
-     ],
-     "zoneId": "zone-1"
-    },
-    {
-     "trackId": "car-58",
-     "className": "car",
-     "confidence": 0.743,
-     "bbox": [
-      0.41,
-      0.5614,
-      0.0404,
-      0.0432
-     ],
-     "zoneId": null
-    },
-    {
-     "trackId": "car-63",
-     "className": "car",
-     "confidence": 0.927,
-     "bbox": [
-      0.0,
-      0.717,
-      0.3136,
-      0.2793
-     ],
-     "zoneId": "zone-1"
-    }
-   ]
   }
  ],
  "visits": [
@@ -10162,8 +9478,10 @@
    "zoneId": "zone-1",
    "startSec": 0.2,
    "endSec": null,
-   "observedSec": 23.76,
+   "observedSec": 21.6,
    "status": "open_at_end",
+   "truncated": true,
+   "truncatedAt": 21.8,
    "overThreshold": true
   },
   {
@@ -10172,8 +9490,10 @@
    "zoneId": "zone-1",
    "startSec": 0.2,
    "endSec": null,
-   "observedSec": 23.76,
+   "observedSec": 21.6,
    "status": "open_at_end",
+   "truncated": true,
+   "truncatedAt": 21.8,
    "overThreshold": true
   },
   {
@@ -10184,6 +9504,8 @@
    "endSec": null,
    "observedSec": 0.6,
    "status": "lost",
+   "truncated": false,
+   "truncatedAt": null,
    "overThreshold": false
   },
   {
@@ -10194,6 +9516,8 @@
    "endSec": null,
    "observedSec": 0.8,
    "status": "lost",
+   "truncated": false,
+   "truncatedAt": null,
    "overThreshold": false
   },
   {
@@ -10204,6 +9528,8 @@
    "endSec": null,
    "observedSec": 2.8,
    "status": "lost",
+   "truncated": false,
+   "truncatedAt": null,
    "overThreshold": false
   },
   {
@@ -10214,6 +9540,8 @@
    "endSec": null,
    "observedSec": 2.4,
    "status": "lost",
+   "truncated": false,
+   "truncatedAt": null,
    "overThreshold": false
   },
   {
@@ -10222,8 +9550,10 @@
    "zoneId": "zone-1",
    "startSec": 8.81,
    "endSec": null,
-   "observedSec": 15.15,
+   "observedSec": 12.99,
    "status": "open_at_end",
+   "truncated": true,
+   "truncatedAt": 21.8,
    "overThreshold": true
   },
   {
@@ -10234,16 +9564,8 @@
    "endSec": null,
    "observedSec": 1.2,
    "status": "lost",
-   "overThreshold": false
-  },
-  {
-   "id": "visit-9",
-   "trackId": "car-63",
-   "zoneId": "zone-1",
-   "startSec": 23.42,
-   "endSec": null,
-   "observedSec": 0.54,
-   "status": "open_at_end",
+   "truncated": false,
+   "truncatedAt": null,
    "overThreshold": false
   }
  ]

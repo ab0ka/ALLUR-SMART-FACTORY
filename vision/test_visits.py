@@ -52,6 +52,27 @@ class Visits(unittest.TestCase):
         self.assertEqual(v[0]["status"], "open_at_end")
         self.assertIsNone(v[0]["endSec"])
         self.assertAlmostEqual(v[0]["observedSec"], t, places=1)
+        self.assertFalse(v[0]["truncated"])
+        self.assertIsNone(v[0]["truncatedAt"])
+
+    def test_truncated_at_end_of_validity_window(self):
+        # camera moves from 3.0 s: the measurement stops there; car-5 still inside, car-6 already left, car-7 leaving
+        log = VisitLog(ZONE, enter_sec=0.4, exit_sec=0.8)
+        feed(log, "car-5", [True] * 15)                     # 0.0..2.8 inside
+        feed(log, "car-6", [True] * 5 + [False] * 10)       # 0.0..0.8 inside, then outside for good
+        feed(log, "car-7", [True] * 13 + [False] * 2)       # inside until 2.4, outside 2.6..2.8 (exit not yet confirmed)
+        v = {x["trackId"]: x for x in log.finish(3.0, truncated=True)}
+        self.assertEqual(v["car-5"]["status"], "open_at_end")
+        self.assertTrue(v["car-5"]["truncated"])
+        self.assertEqual(v["car-5"]["truncatedAt"], 3.0)
+        self.assertIsNone(v["car-5"]["endSec"])
+        self.assertAlmostEqual(v["car-5"]["observedSec"], 3.0, places=2, msg="measured only up to the end of the window")
+        self.assertAlmostEqual(v["car-7"]["observedSec"], 2.4, places=2, msg="a visit in its exit run counts to the last inside sample")
+        self.assertTrue(v["car-7"]["truncated"])
+        self.assertEqual(v["car-6"]["status"], "completed")
+        self.assertFalse(v["car-6"]["truncated"])
+        self.assertIsNone(v["car-6"]["truncatedAt"])
+        self.assertEqual(v["car-6"]["endSec"], 0.8)
 
 
 if __name__ == "__main__":

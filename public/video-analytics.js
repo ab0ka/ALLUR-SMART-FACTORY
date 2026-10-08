@@ -13,7 +13,10 @@ export const STATUS = {
   lost: 'Потерян из виду: выход не подтверждён',
   open_at_end: 'В зоне на конце записи',
 };
-export const THRESHOLD_SOURCES = { demo_assumption: 'демонстрационный норматив, не норматив Allur' };
+export const THRESHOLD_SOURCES = { demo_assumption: 'демонстрационное допущение, не норматив Allur' };
+export const REPLAY_LABEL = 'Воспроизведение результатов анализа';
+// The only conclusion the screen draws from a visit above the threshold: presence, not a production cause.
+export const OVER_THRESHOLD_CONCLUSION = 'Превышен демонстрационный порог присутствия; производственная причина не определяется';
 const EPS = 1e-6, TIME_EPS = .05, MAX_ERRORS = 40;
 
 const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -47,6 +50,21 @@ export function validateResults(raw) {
     if (a.processingSec != null && (!isNum(a.processingSec) || a.processingSec < 0)) err('analysis.processingSec', 'неотрицательное число или null');
   }
   const duration = isObj(s) && isNum(s.durationSec) ? s.durationSec : Infinity;
+  // Optional validity window: only [fromSec, untilSec] of the recording is a measurement (e.g. the camera moves later).
+  const vi = isObj(a) ? a.validInterval : null;
+  let win = null;
+  if (vi != null) {
+    if (!isObj(vi)) err('analysis.validInterval', 'объект {fromSec, untilSec, reason} или null');
+    else {
+      const okFrom = isNum(vi.fromSec) && vi.fromSec >= 0, okUntil = isNum(vi.untilSec) && vi.untilSec <= duration + TIME_EPS && (!okFrom || vi.untilSec > vi.fromSec);
+      if (!okFrom) err('analysis.validInterval.fromSec', 'неотрицательное число секунд');
+      if (!okUntil) err('analysis.validInterval.untilSec', 'позже начала окна и в пределах записи');
+      if (!isStr(vi.reason) || !vi.reason.trim()) err('analysis.validInterval.reason', 'нужна причина ограничения');
+      if (vi.note != null && !isStr(vi.note)) err('analysis.validInterval.note', 'строка или null');
+      if (okFrom && okUntil) win = { fromSec: vi.fromSec, untilSec: vi.untilSec };
+    }
+  }
+  const outsideWin = t => win != null && (t < win.fromSec - TIME_EPS || t > win.untilSec + TIME_EPS);
 
   const zoneIds = new Set();
   if (!Array.isArray(raw.zones)) err('zones', 'нужен массив зон');
@@ -80,6 +98,7 @@ export function validateResults(raw) {
       const b = o.bbox;
       if (!Array.isArray(b) || b.length !== 4 || !b.every(in01) || b[2] <= 0 || b[3] <= 0 || b[0] + b[2] > 1 + EPS || b[1] + b[3] > 1 + EPS) err(`${q}.bbox`, '[x, y, ширина, высота] в долях кадра 0..1, рамка внутри кадра');
       if (o.zoneId != null && !zoneIds.has(o.zoneId)) err(`${q}.zoneId`, `нет зоны «${o.zoneId}»`);
+      else if (o.zoneId != null && isNum(f.t) && outsideWin(f.t)) err(`${q}.zoneId`, 'вне окна измерения зона не определяется (нужен null)');
     });
   });
 
@@ -97,7 +116,15 @@ export function validateResults(raw) {
     if (!isNum(v.startSec) || v.startSec < 0 || v.startSec > duration + TIME_EPS) err(`${p}.startSec`, 'время в пределах записи');
     if (v.endSec === null) { if (v.status === 'completed') err(`${p}.endSec`, 'у завершённого посещения нужен конец'); }
     else if (!isNum(v.endSec) || v.endSec > duration + TIME_EPS || (isNum(v.startSec) && v.endSec < v.startSec)) err(`${p}.endSec`, 'не раньше начала и в пределах записи, или null');
-    const span = (isNum(v.endSec) ? v.endSec : duration) - v.startSec;
+    if (v.truncated != null && typeof v.truncated !== 'boolean') err(`${p}.truncated`, 'true, false или нет поля');
+    if (v.truncated === true) {
+      if (v.status !== 'open_at_end') err(`${p}.status`, 'обрезанное окном измерения посещение — open_at_end');
+      if (v.endSec !== null) err(`${p}.endSec`, 'у обрезанного посещения конец неизвестен (null)');
+      if (!isNum(v.truncatedAt) || v.truncatedAt > duration + TIME_EPS || (isNum(v.startSec) && v.truncatedAt < v.startSec)) err(`${p}.truncatedAt`, 'момент обрезки: не раньше начала и в пределах записи');
+    } else if (v.truncatedAt != null) err(`${p}.truncatedAt`, 'указывается только при truncated: true');
+    if (isNum(v.startSec) && outsideWin(v.startSec)) err(`${p}.startSec`, 'вне окна измерения');
+    if (isNum(v.endSec) && outsideWin(v.endSec)) err(`${p}.endSec`, 'вне окна измерения');
+    const span = (isNum(v.endSec) ? v.endSec : v.truncated === true && isNum(v.truncatedAt) ? v.truncatedAt : win ? win.untilSec : duration) - v.startSec;
     if (!isNum(v.observedSec) || v.observedSec < 0) err(`${p}.observedSec`, 'неотрицательное число секунд');
     else if (isNum(v.startSec) && Number.isFinite(span) && v.observedSec > span + TIME_EPS) err(`${p}.observedSec`, 'больше промежутка между началом и концом');
   });
@@ -110,10 +137,10 @@ export function validateResults(raw) {
   const data = {
     schemaVersion: raw.schemaVersion,
     source: { ...s, url: s.url ?? null },
-    analysis: { mode: a.mode, model: a.model ?? null, sampleFps: a.sampleFps, processingSec: a.processingSec ?? null },
+    analysis: { mode: a.mode, model: a.model ?? null, sampleFps: a.sampleFps, processingSec: a.processingSec ?? null, validInterval: vi == null ? null : { fromSec: vi.fromSec, untilSec: vi.untilSec, reason: vi.reason, note: vi.note ?? null } },
     zones: raw.zones.map(z => ({ id: z.id, name: z.name, polygon: z.polygon.map(([x, y]) => [x, y]), thresholdSec: z.thresholdSec, thresholdSource: z.thresholdSource })),
     frames: raw.frames.map(f => ({ t: f.t, objects: f.objects.map(o => ({ trackId: String(o.trackId), className: o.className, confidence: o.confidence ?? null, bbox: [...o.bbox], zoneId: o.zoneId ?? null })) })).sort((x, y) => x.t - y.t),
-    visits: raw.visits.map(v => ({ id: v.id, trackId: String(v.trackId), zoneId: v.zoneId, startSec: v.startSec, endSec: v.endSec, observedSec: v.observedSec, status: v.status })),
+    visits: raw.visits.map(v => ({ id: v.id, trackId: String(v.trackId), zoneId: v.zoneId, startSec: v.startSec, endSec: v.endSec, observedSec: v.observedSec, status: v.status, truncated: v.truncated === true, truncatedAt: v.truncated === true ? v.truncatedAt : null })),
   };
   return { data, errors, warnings };
 }
@@ -125,8 +152,19 @@ export function parseResults(text) {
 }
 
 // ---------- Labels ----------
-export const dataLabel = data => data.source.synthetic ? 'Синтетические данные' : 'Не данные Allur';
+export const dataLabel = data => data.source.synthetic ? 'Синтетические данные' : 'Внешняя запись. Не производство Allur';
+// «Внешняя запись. Не производство Allur. Воспроизведение результатов анализа» for a real recording.
+export const sourceLabel = data => `${dataLabel(data)}. ${REPLAY_LABEL}`;
 export const thresholdLabel = zone => THRESHOLD_SOURCES[zone.thresholdSource] ?? `источник порога: ${zone.thresholdSource}`;
+// Validity window of the measurement; null when the whole recording is measured.
+export function validWindow(data) {
+  const w = data.analysis.validInterval;
+  if (!w || (w.fromSec <= EPS && w.untilSec >= data.source.durationSec - TIME_EPS)) return null;
+  const range = w.untilSec < 60 ? `${fmtNum(w.fromSec)}–${fmtNum(w.untilSec)} с` : `${fmtSec(w.fromSec)} – ${fmtSec(w.untilSec)}`;
+  return { ...w, range, label: `Измерение ограничено ${range}${w.note ? `: ${w.note}` : ''}` };
+}
+export const outsideWindow = (data, t) => { const w = data.analysis.validInterval; return Boolean(w) && (t < w.fromSec - EPS || t > w.untilSec + EPS); };
+export const statusLabel = r => r.truncated ? `Измерение остановлено на ${fmtSec(r.truncatedAt)} (конец окна измерения): выход не подтверждён` : STATUS[r.status];
 
 // ---------- Visits ----------
 // Exceedance = max(0, observed − threshold). For lost / open visits the real presence is unknown: the observed time
@@ -147,15 +185,18 @@ export function summarize(rows) {
     maxExceedSec: rows.reduce((m, r) => Math.max(m, r.exceedSec), 0),
   };
 }
-// Possible delays: visits above the threshold, largest first, with a template explanation. Causes are hypotheses.
+// Visits above the threshold, largest first. The screen states presence above a demo threshold and nothing more:
+// no production cause is inferred from boxes in a video.
 export function delays(rows) {
   return rows.filter(r => r.exceeded).sort((a, b) => b.exceedSec - a.exceedSec).map(r => ({
     ...r,
-    text: `Объект ${r.trackId} в зоне «${r.zoneName}»: наблюдаемое время ${fmtSec(r.observedSec)} при пороге ${fmtSec(r.thresholdSec)} — превышение ${r.lowerBound ? 'не меньше ' : ''}${fmtSec(r.exceedSec)}.`,
-    caveat: r.lowerBound
-      ? 'Объект не был виден до выхода из зоны: фактическое время неизвестно, показана нижняя оценка. Завершение не подтверждено.'
-      : 'Это время присутствия в зоне по видео, а не подтверждённое время операции.',
-    hypotheses: ['ожидание освобождения следующего участка', 'нестандартная или дополнительная работа', 'простой без работы'],
+    text: `Объект ${r.trackId} в зоне «${r.zoneName}»: наблюдаемое время ${r.lowerBound ? 'не меньше ' : ''}${fmtSec(r.observedSec)} при демонстрационном пороге ${fmtSec(r.thresholdSec)} — превышение ${r.lowerBound ? 'не меньше ' : ''}${fmtSec(r.exceedSec)}.`,
+    conclusion: OVER_THRESHOLD_CONCLUSION,
+    caveat: r.truncated
+      ? `Измерение остановлено на ${fmtSec(r.truncatedAt)} (конец окна измерения): объект ещё в зоне, фактическое время неизвестно, показана нижняя оценка. Завершение не подтверждено.`
+      : r.lowerBound
+        ? 'Объект не был виден до выхода из зоны: фактическое время неизвестно, показана нижняя оценка. Завершение не подтверждено.'
+        : 'Это время присутствия в зоне по видео, а не подтверждённое время операции.',
   }));
 }
 
@@ -169,13 +210,14 @@ export function frameIndexAt(frames, t) {
 }
 export function stateAt(data, t) {
   const i = frameIndexAt(data.frames, t);
-  if (i < 0) return { t, frame: null, ageSec: null, stale: true, objects: [], counts: Object.fromEntries(data.zones.map(z => [z.id, null])) };
-  const frame = data.frames[i], ageSec = t - frame.t, stale = ageSec > staleAfter(data);
-  const counts = Object.fromEntries(data.zones.map(z => [z.id, stale ? null : frame.objects.filter(o => o.zoneId === z.id).length]));
-  return { t, frame, ageSec, stale, objects: frame.objects, counts };
+  if (i < 0) return { t, frame: null, ageSec: null, stale: true, outsideWindow: outsideWindow(data, t), objects: [], counts: Object.fromEntries(data.zones.map(z => [z.id, null])) };
+  const frame = data.frames[i], ageSec = t - frame.t, stale = ageSec > staleAfter(data), outside = outsideWindow(data, t);
+  // Outside the validity window the zone is not a measured place: no count is shown there.
+  const counts = Object.fromEntries(data.zones.map(z => [z.id, stale || outside ? null : frame.objects.filter(o => o.zoneId === z.id).length]));
+  return { t, frame, ageSec, stale, outsideWindow: outside, objects: frame.objects, counts };
 }
 // Visits that cover time t (for highlighting rows while the video plays).
-export const visitsAt = (rows, t) => rows.filter(r => r.startSec <= t + EPS && t <= (r.endSec ?? r.startSec + r.observedSec) + EPS);
+export const visitsAt = (rows, t) => rows.filter(r => r.startSec <= t + EPS && t <= (r.endSec ?? (r.truncated ? r.truncatedAt : r.startSec + r.observedSec)) + EPS);
 
 // ---------- Zone occupancy over time ----------
 // Number of observed objects in each zone per analysed frame; null where observations are missing (a gap longer
@@ -199,6 +241,7 @@ export function fmtSec(s) {
   const ss = (Number.isInteger(sec) ? String(sec) : sec.toFixed(1)).replace('.', ',');
   return m ? `${m} мин ${ss} с` : `${ss} с`;
 }
+const fmtNum = s => { const r = Math.round(s * 10) / 10; return (Number.isInteger(r) ? String(r) : r.toFixed(1)).replace('.', ','); };
 export const fmtClock = s => { if (s == null || !Number.isFinite(s)) return '—'; const t = Math.max(0, s), m = Math.floor(t / 60), sec = t - m * 60; return `${String(m).padStart(2, '0')}:${sec.toFixed(1).padStart(4, '0')}`; };
 // Text cells are quoted and neutralised against spreadsheet formulas (=, +, -, @, tab, CR at the start).
 export function csvText(v) {
@@ -208,11 +251,12 @@ export function csvText(v) {
 }
 const csvNum = v => v == null || !Number.isFinite(v) ? '' : String(Math.round(v * 100) / 100).replace('.', ',');
 export function visitsCsv(data, rows) {
-  const head = ['Источник', 'Тип данных', 'Режим', 'Посещение', 'Объект', 'Зона', 'Начало, с', 'Конец, с', 'Наблюдаемая длительность, с', 'Порог, с', 'Источник порога', 'Превышение, с', 'Превышение — нижняя оценка', 'Статус'];
+  const head = ['Источник', 'Тип данных', 'Режим', 'Посещение', 'Объект', 'Зона', 'Начало, с', 'Конец, с', 'Наблюдаемая длительность, с', 'Порог, с', 'Источник порога', 'Превышение, с', 'Превышение — нижняя оценка', 'Статус', 'Измерение остановлено на, с', 'Вывод'];
   const lines = [head.map(csvText).join(';')];
   for (const r of rows) lines.push([
     csvText(data.source.title), csvText(dataLabel(data)), csvText(MODES[data.analysis.mode]), csvText(r.id), csvText(r.trackId), csvText(r.zoneName),
-    csvNum(r.startSec), csvNum(r.endSec), csvNum(r.observedSec), csvNum(r.thresholdSec), csvText(thresholdLabel({ thresholdSource: r.thresholdSource })), csvNum(r.exceedSec), csvText(r.lowerBound ? 'да' : 'нет'), csvText(STATUS[r.status]),
+    csvNum(r.startSec), csvNum(r.endSec), csvNum(r.observedSec), csvNum(r.thresholdSec), csvText(thresholdLabel({ thresholdSource: r.thresholdSource })), csvNum(r.exceedSec), csvText(r.lowerBound ? 'да' : 'нет'), csvText(statusLabel(r)),
+    csvNum(r.truncatedAt), csvText(r.exceeded ? OVER_THRESHOLD_CONCLUSION : ''),
   ].join(';'));
   return '\uFEFF' + lines.join('\r\n') + '\r\n';
 }

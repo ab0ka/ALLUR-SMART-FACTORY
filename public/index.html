@@ -200,7 +200,7 @@
       <div class="panel va-load no-print">
         <label class="va-file">Видеозапись <input type="file" id="va-video-file" accept="video/*"></label>
         <label class="va-file">Результаты анализа (JSON) <input type="file" id="va-json-file" accept=".json,application/json"></label>
-        <button type="button" id="va-demo" class="secondary">Синтетическая фикстура</button>
+        <button type="button" id="va-demo" class="secondary">Пример: результаты анализа записи</button>
         <p class="fine-print">Файлы открываются только в этом браузере и не отправляются на сервер. Видео не обязательно: без него показываются только результаты на схеме кадра.</p>
         <div id="va-messages" aria-live="polite"></div>
       </div>
@@ -220,7 +220,7 @@
             <p id="va-frame-note" class="fine-print" aria-live="polite"></p>
           </div>
           <div class="panel va-side">
-            <h2 class="panel-title">Возможные задержки <span class="tag">причины — гипотезы</span></h2>
+            <h2 class="panel-title">Превышения демонстрационного порога <span class="tag">причина не определяется</span></h2>
             <ol id="va-delays" class="va-delays"></ol>
           </div>
         </div>
@@ -235,7 +235,7 @@
           <div class="table-scroll" tabindex="0" role="region" aria-label="Таблица посещений зон"><table id="va-visits" class="va-table"></table></div>
           <h3 class="va-subtitle">Незавершённые посещения</h3>
           <div class="table-scroll" tabindex="0" role="region" aria-label="Незавершённые посещения"><table id="va-open" class="va-table"></table></div>
-          <p class="fine-print">Наблюдаемая длительность — время, когда объект виден в зоне на записи; это не подтверждённое время операции. Превышение = max(0, наблюдаемая длительность − порог). Для потерянных и оставшихся в зоне объектов это нижняя оценка. OEE, брак и вероятность поломки по рамкам видео не рассчитываются.</p>
+          <p class="fine-print">Наблюдаемая длительность — время, когда объект виден в зоне на записи; это не подтверждённое время операции. Превышение = max(0, наблюдаемая длительность − порог). Для потерянных, оставшихся в зоне и обрезанных окном измерения объектов это нижняя оценка. OEE, брак и вероятность поломки по рамкам видео не рассчитываются.</p>
         </div>
       </div>
     </section>

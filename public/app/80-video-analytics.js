@@ -1,6 +1,7 @@
 // ---------- Video analytics: playback of pre-computed analysis results (not a live stream) ----------
 // Local files stay in the browser (object URL for the video, File.text() for the JSON). Every number comes from
-// video-analytics.js; this part only draws it and keeps the picture in step with the video time.
+// video-analytics.js; this part only draws it and keeps the picture in step with the video time. The screen never
+// calls the server API: it does not change the simulation, its output, OEE or equipment.
 import * as VA from './video-analytics.js';
 const va = { data: null, rows: [], series: [], videoUrl: null, videoFile: '', t: 0, playing: false, raf: 0, last: 0, track: null, demoTried: false, msgs: { errors: [], warnings: [] } };
 const vaVideo = $('va-video'), VA_ZONE_CLASSES = 4, VA_MAX_JSON = 50 * 1024 * 1024;
@@ -9,7 +10,7 @@ const vaDuration = () => va.data?.source.durationSec ?? 0;
 const vaNow = () => vaHasVideo() ? vaVideo.currentTime : va.t;
 
 function renderVideo() {
-  // Stable address for demo recordings: #video/demo opens the synthetic fixture.
+  // Stable address for demo recordings: #video/demo opens the bundled example results (video-fixture.json).
   if (location.hash === '#video/demo' && !va.demoTried) { va.demoTried = true; vaLoadDemo(); }
   vaHeaderLabel();
 }
@@ -32,7 +33,12 @@ function vaAccept(result, origin) {
   return true;
 }
 async function vaLoadDemo() {
-  try { const r = await fetch('/video-fixture.json', { signal: AbortSignal.timeout(8000) }); vaAccept(VA.parseResults(await r.text()), 'Загружена синтетическая фикстура: это пример формата, а не результат компьютерного зрения.'); }
+  try {
+    const r = await fetch('/video-fixture.json', { signal: AbortSignal.timeout(8000) }), res = VA.parseResults(await r.text());
+    vaAccept(res, !res.data ? null : res.data.source.synthetic
+      ? 'Загружена синтетическая фикстура: это пример формата, а не результат компьютерного зрения.'
+      : `Загружены сохранённые результаты анализа внешней записи «${res.data.source.fileName}». Само видео в проект не входит: его можно выбрать в поле «Видеозапись», без него рамки показываются на схеме кадра.`);
+  }
   catch (e) { va.msgs = { errors: [`Не удалось открыть фикстуру: ${e.message}`], warnings: [] }; vaMessages(); }
 }
 $('va-demo').addEventListener('click', vaLoadDemo);
@@ -69,17 +75,19 @@ const vaExceed = r => r.exceeded ? `${r.lowerBound ? '≥ ' : '+'}${VA.fmtSec(r.
 function vaRenderAll() {
   const d = va.data, s = d.source, a = d.analysis, sum = VA.summarize(va.rows), url = s.url && VA.safeUrl(s.url);
   $('va-body').hidden = false; $('va-seek').max = String(s.durationSec);
-  $('va-source').innerHTML = `<div class="va-badges"><span class="va-badge replay">Воспроизведение результатов анализа</span><span class="va-badge ${s.synthetic ? 'synthetic' : 'external'}">${esc(VA.dataLabel(d))}</span><span class="va-badge mode">${esc(VA.MODES[a.mode])}</span></div>
+  const win = VA.validWindow(d);
+  $('va-source').innerHTML = `<div class="va-badges"><span class="va-badge ${s.synthetic ? 'synthetic' : 'external'}">${esc(VA.sourceLabel(d))}</span>${win ? `<span class="va-badge replay">${esc(win.label)}</span>` : ''}<span class="va-badge mode">${esc(VA.MODES[a.mode])}</span></div>
     <h2 class="panel-title">${esc(s.title)}</h2>
     <dl class="va-meta"><dt>Файл</dt><dd>${esc(s.fileName)}</dd><dt>Источник</dt><dd>${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(url)}</a>` : 'не указан'}</dd><dt>Лицензия</dt><dd>${esc(s.license)}</dd>
     <dt>Запись</dt><dd>${VA.fmtSec(s.durationSec)} · ${s.width}×${s.height}</dd><dt>Анализ</dt><dd>${a.mode === 'model' ? `модель ${esc(a.model ?? 'не указана')}` : a.mode === 'manual' ? 'ручная разметка' : 'синтетические данные, не компьютерное зрение'} · ${String(a.sampleFps).replace('.', ',')} кадр/с${a.processingSec != null ? ` · обработка ${VA.fmtSec(a.processingSec)}` : ''}</dd>
-    <dt>Зоны</dt><dd>${d.zones.map((z, i) => `<span class="va-zone-key z${i % VA_ZONE_CLASSES}">${esc(z.name)}: порог ${VA.fmtSec(z.thresholdSec)} (${esc(VA.thresholdLabel(z))})</span>`).join(' ')}</dd></dl>
+    ${win ? `<dt>Окно измерения</dt><dd>${esc(win.range)}: ${esc(win.reason)}. Кадры вне окна не анализируются; посещения, не завершённые к ${VA.fmtSec(win.untilSec)}, обрезаны — их время показано как нижняя оценка.</dd>` : ''}
+    <dt>Зоны</dt><dd>${d.zones.map((z, i) => `<span class="va-zone-key z${i % VA_ZONE_CLASSES}">${esc(z.name)}: порог присутствия ${VA.fmtSec(z.thresholdSec)} — ${esc(VA.thresholdLabel(z))}</span>`).join(' ')}</dd></dl>
     <p class="va-sum">Посещений: <b>${sum.visits}</b> · завершено: <b>${sum.finished}</b> · незавершено: <b>${sum.unfinished}</b> · с превышением порога: <b>${sum.exceeded}</b>${sum.exceeded ? ` · наибольшее: <b>${VA.fmtSec(sum.maxExceedSec)}</b>` : ''}</p>`;
   const dl = VA.delays(va.rows);
-  $('va-delays').innerHTML = dl.length ? dl.map(r => `<li class="va-delay${r.lowerBound ? ' open' : ''}" data-visit="${esc(r.id)}"><p>${esc(r.text)}</p><p class="fine-print">${esc(r.caveat)}</p><p class="fine-print">Возможные причины (гипотезы, не подтверждены данными): ${r.hypotheses.map(esc).join('; ')}.</p>
+  $('va-delays').innerHTML = dl.length ? dl.map(r => `<li class="va-delay${r.lowerBound ? ' open' : ''}" data-visit="${esc(r.id)}"><p><b>${esc(r.conclusion)}</b></p><p>${esc(r.text)}</p><p class="fine-print">${esc(r.caveat)}</p>
     <div class="va-delay-actions"><button type="button" class="link" data-va-seek="${r.startSec}" data-va-track="${esc(r.trackId)}">К началу ${VA.fmtClock(r.startSec)}</button><button type="button" class="link" data-va-seek="${r.startSec + r.thresholdSec}" data-va-track="${esc(r.trackId)}">К моменту превышения ${VA.fmtClock(r.startSec + r.thresholdSec)}</button></div></li>`).join('')
     : '<li class="fine-print">Превышений порога в результатах нет.</li>';
-  const row = r => `<tr data-visit="${esc(r.id)}" class="${r.exceeded ? 'exceeded' : ''}"><td><button type="button" class="link" data-va-seek="${r.startSec}" data-va-track="${esc(r.trackId)}" aria-label="Перейти к объекту ${esc(r.trackId)} на ${VA.fmtClock(r.startSec)}">${esc(r.trackId)}</button></td><td>${esc(r.zoneName)}</td><td>${VA.fmtClock(r.startSec)}</td><td>${r.endSec == null ? '—' : VA.fmtClock(r.endSec)}</td><td>${vaObserved(r)}</td><td>${VA.fmtSec(r.thresholdSec)}</td><td>${vaExceed(r)}</td><td>${esc(VA.STATUS[r.status])}</td></tr>`;
+  const row = r => `<tr data-visit="${esc(r.id)}" class="${r.exceeded ? 'exceeded' : ''}"><td><button type="button" class="link" data-va-seek="${r.startSec}" data-va-track="${esc(r.trackId)}" aria-label="Перейти к объекту ${esc(r.trackId)} на ${VA.fmtClock(r.startSec)}">${esc(r.trackId)}</button></td><td>${esc(r.zoneName)}</td><td>${VA.fmtClock(r.startSec)}</td><td>${r.endSec == null ? '—' : VA.fmtClock(r.endSec)}</td><td>${vaObserved(r)}</td><td>${VA.fmtSec(r.thresholdSec)}</td><td>${vaExceed(r)}</td><td>${esc(VA.statusLabel(r))}</td></tr>`;
   const done = va.rows.filter(r => r.finished), open = va.rows.filter(r => !r.finished);
   $('va-visits').innerHTML = vaHead + `<tbody>${done.map(row).join('') || '<tr><td colspan="8">Завершённых посещений нет</td></tr>'}</tbody>`;
   $('va-open').innerHTML = vaHead + `<tbody>${open.map(row).join('') || '<tr><td colspan="8">Незавершённых посещений нет</td></tr>'}</tbody>`;
@@ -93,6 +101,11 @@ function vaRenderChart() {
   for (let n = 0; n <= max; n++) out += `<line x1="${C.x0}" x2="${C.x1}" y1="${Y(n).toFixed(1)}" y2="${Y(n).toFixed(1)}" class="va-gridline"/><text x="${C.x0 - 8}" y="${(Y(n) + 4).toFixed(1)}" class="va-axis end">${n}</text>`;
   const step = dur > 600 ? 120 : dur > 120 ? 30 : 10;
   for (let t = 0; t <= dur + 1e-6; t += step) out += `<text x="${X(t).toFixed(1)}" y="${C.y0 + 18}" class="va-axis mid">${VA.fmtClock(t).replace(/\.\d$/, '')}</text>`;
+  const win = VA.validWindow(d);
+  if (win) for (const [t, label] of [[win.fromSec, 'начало окна измерения'], [win.untilSec, `конец окна измерения ${VA.fmtSec(win.untilSec)}`]]) {
+    if (t <= 1e-6 || t >= dur - 1e-6) continue;
+    out += `<line x1="${X(t).toFixed(1)}" x2="${X(t).toFixed(1)}" y1="${C.y1}" y2="${C.y0}" class="va-gridline"/><text x="${(X(t) - 4).toFixed(1)}" y="${C.y1 + 12}" class="va-axis end">${esc(label)}</text>`;
+  }
   va.series.forEach((s, i) => {
     let path = '', pen = false;
     for (const p of s.points) {
@@ -119,17 +132,20 @@ function vaDraw() {
   const svg = $('va-overlay');
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
   let out = vaHasVideo() ? '' : `<rect width="${W}" height="${H}" class="va-blank"/><text x="${W / 2}" y="${H - fs}" font-size="${fs}" class="va-blank-text">Видео не загружено — показаны только результаты анализа</text>`;
-  d.zones.forEach((z, i) => {
+  // Outside the validity window the zone in frame coordinates is not a place on the road: it is not drawn there.
+  if (!st.outsideWindow) d.zones.forEach((z, i) => {
     const pts = z.polygon.map(([x, y]) => `${(x * W).toFixed(1)},${(y * H).toFixed(1)}`).join(' '), n = st.counts[z.id];
     out += `<polygon points="${pts}" class="va-zone z${i % VA_ZONE_CLASSES}"/><text x="${(z.polygon[0][0] * W + fs * .4).toFixed(1)}" y="${(z.polygon[0][1] * H + fs * 1.2).toFixed(1)}" font-size="${fs}" class="va-zone-label z${i % VA_ZONE_CLASSES}">${esc(z.name)} · ${n == null ? 'нет данных' : `видно: ${n}`}</text>`;
   });
   const limit = VA.staleAfter(d);
-  if (st.frame && (!st.stale || st.ageSec <= limit * 3)) for (const o of st.objects) {
+  if (st.frame && !st.outsideWindow && (!st.stale || st.ageSec <= limit * 3)) for (const o of st.objects) {
     const [x, y, w, h] = o.bbox, sel = va.track === o.trackId;
     out += `<g class="va-box${st.stale ? ' stale' : ''}${sel ? ' selected' : ''}"><rect x="${(x * W).toFixed(1)}" y="${(y * H).toFixed(1)}" width="${(w * W).toFixed(1)}" height="${(h * H).toFixed(1)}"/><text x="${(x * W).toFixed(1)}" y="${Math.max(fs, y * H - fs * .3).toFixed(1)}" font-size="${fs}">${esc(o.trackId)} · ${esc(o.className)}${o.confidence != null ? ` ${Math.round(o.confidence * 100)}%` : ''}</text></g>`;
   }
   svg.innerHTML = out;
-  const note = !st.frame ? 'До первого проанализированного кадра наблюдений нет.' : st.stale
+  const win = VA.validWindow(d);
+  const note = st.outsideWindow && win ? `${win.label}. В этот момент зона не измеряется: посещения, не завершённые к ${VA.fmtSec(win.untilSec)}, обрезаны.`
+    : !st.frame ? 'До первого проанализированного кадра наблюдений нет.' : st.stale
     ? `Нет свежих наблюдений: последний проанализированный кадр ${VA.fmtSec(st.ageSec)} назад${st.ageSec > limit * 3 ? ', рамки скрыты' : ', рамки помечены как устаревшие'}. Отсутствие видимости не означает завершения работы.`
     : `Кадр анализа ${VA.fmtClock(st.frame.t)} · объектов на кадре: ${st.objects.length}`;
   if ($('va-frame-note').textContent !== note) text('va-frame-note', note);
@@ -185,19 +201,21 @@ $('va-csv').addEventListener('click', () => {
 });
 function vaRenderReport() {
   const d = va.data, s = d.source, a = d.analysis, sum = VA.summarize(va.rows), dl = VA.delays(va.rows);
-  const rows = list => list.map(r => `<tr><td>${esc(r.trackId)}</td><td>${esc(r.zoneName)}</td><td>${VA.fmtClock(r.startSec)}</td><td>${r.endSec == null ? '—' : VA.fmtClock(r.endSec)}</td><td>${vaObserved(r)}</td><td>${VA.fmtSec(r.thresholdSec)}</td><td>${vaExceed(r)}</td><td>${esc(VA.STATUS[r.status])}</td></tr>`).join('');
+  const rows = list => list.map(r => `<tr><td>${esc(r.trackId)}</td><td>${esc(r.zoneName)}</td><td>${VA.fmtClock(r.startSec)}</td><td>${r.endSec == null ? '—' : VA.fmtClock(r.endSec)}</td><td>${vaObserved(r)}</td><td>${VA.fmtSec(r.thresholdSec)}</td><td>${vaExceed(r)}</td><td>${esc(VA.statusLabel(r))}</td></tr>`).join('');
+  const win = VA.validWindow(d);
   let rep = $('va-report');
   if (!rep) { rep = document.createElement('section'); rep.id = 'va-report'; rep.className = 'va-report'; $('view-video').append(rep); }
   rep.innerHTML = `<h1>Отчёт видеоанализа</h1>
-    <p><b>${esc(VA.dataLabel(d))}</b> · Воспроизведение результатов анализа, не прямой эфир · ${esc(VA.MODES[a.mode])}</p>
+    <p><b>${esc(VA.sourceLabel(d))}</b> · не прямой эфир · ${esc(VA.MODES[a.mode])}</p>
+    ${win ? `<p><b>${esc(win.label)}.</b> ${esc(win.reason)}. Кадры вне окна не анализируются; посещения, не завершённые к ${VA.fmtSec(win.untilSec)}, обрезаны (нижняя оценка).</p>` : ''}
     <p>Запись: ${esc(s.title)} (${esc(s.fileName)}), ${VA.fmtSec(s.durationSec)}, ${s.width}×${s.height}. Лицензия: ${esc(s.license)}.${s.url ? ` Источник: ${esc(s.url)}.` : ''}</p>
     <p>Анализ: ${a.mode === 'model' ? `модель ${esc(a.model ?? 'не указана')}` : a.mode === 'manual' ? 'ручная разметка' : 'синтетические данные'}, ${String(a.sampleFps).replace('.', ',')} кадр/с. Отчёт сформирован ${esc(new Date().toLocaleString('ru-RU'))}.</p>
-    <p>Зоны и пороги: ${d.zones.map(z => `${esc(z.name)} — ${VA.fmtSec(z.thresholdSec)} (${esc(VA.thresholdLabel(z))})`).join('; ')}.</p>
+    <p>Зоны и пороги присутствия: ${d.zones.map(z => `${esc(z.name)} — ${VA.fmtSec(z.thresholdSec)} (${esc(VA.thresholdLabel(z))})`).join('; ')}.</p>
     <p>Посещений: ${sum.visits}; завершено: ${sum.finished}; незавершено: ${sum.unfinished}; с превышением порога: ${sum.exceeded}.</p>
     <h2>Завершённые посещения</h2><table>${vaHead}<tbody>${rows(va.rows.filter(r => r.finished)) || '<tr><td colspan="8">нет</td></tr>'}</tbody></table>
     <h2>Незавершённые посещения</h2><table>${vaHead}<tbody>${rows(va.rows.filter(r => !r.finished)) || '<tr><td colspan="8">нет</td></tr>'}</tbody></table>
-    <h2>Возможные задержки</h2>${dl.length ? `<ol>${dl.map(r => `<li>${esc(r.text)} ${esc(r.caveat)} Возможные причины — гипотезы, не подтверждены: ${r.hypotheses.map(esc).join('; ')}.</li>`).join('')}</ol>` : '<p>Превышений порога нет.</p>'}
-    <h2>Ограничения</h2><ul><li>Наблюдаемая длительность — время видимости объекта в зоне на записи, а не подтверждённое время операции.</li><li>Если объект потерян из виду или остался в зоне на конце записи, время и превышение — нижняя оценка; завершение не подтверждено.</li><li>Число объектов в зоне не является длиной очереди.</li><li>OEE, брак и вероятность поломки по рамкам видео не рассчитываются.</li><li>Пороги с пометкой «демонстрационный норматив» не являются нормативами Allur.</li></ul>`;
+    <h2>Превышения демонстрационного порога</h2>${dl.length ? `<ol>${dl.map(r => `<li><b>${esc(r.conclusion)}.</b> ${esc(r.text)} ${esc(r.caveat)}</li>`).join('')}</ol>` : '<p>Превышений порога нет.</p>'}
+    <h2>Ограничения</h2><ul><li>Наблюдаемая длительность — время видимости объекта в зоне на записи, а не подтверждённое время операции.</li><li>Если объект потерян из виду, остался в зоне на конце записи или измерение остановлено на конце окна измерения, время и превышение — нижняя оценка; завершение не подтверждено.</li><li>Номера временных треков (car-N) — анонимные идентификаторы этой записи, не VIN и не машины симуляции.</li><li>Производственная причина превышения по видео не определяется.</li><li>Число объектов в зоне не является длиной очереди.</li><li>OEE, брак и вероятность поломки по рамкам видео не рассчитываются.</li><li>Пороги с пометкой «демонстрационное допущение» не являются нормативами Allur.</li></ul>`;
 }
 $('va-print').addEventListener('click', () => {
   if (!va.data) return;
