@@ -168,7 +168,10 @@ export async function main() {
       await cdp.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: width === 390 });
       await cdp.send('Page.navigate', { url: base + '/#handover' });
       await until(() => cdp.evaluate(`${visible} && (${content}).includes(${JSON.stringify(report.resources.stock[0].name)})`), 'handover content');
-      assert.equal(await cdp.evaluate('document.documentElement.scrollWidth <= innerWidth + 1'), true, `overflow at ${width}`);
+      const geometry = await cdp.evaluate(`({ innerWidth, clientWidth: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth, visualWidth: visualViewport.width,
+        overflowing: [...document.querySelectorAll('body *')].filter(e => { const r=e.getBoundingClientRect(); return r.width && r.right > ${width} + 1; }).slice(0,12).map(e=>({tag:e.tagName,id:e.id,class:e.className,right:e.getBoundingClientRect().right})) })`);
+      await writeFile(path.join(output, `geometry-${width}.json`), JSON.stringify(geometry, null, 2));
+      assert.ok(geometry.innerWidth <= width + 1 && geometry.scrollWidth <= width + 1, `overflow at ${width}: ${JSON.stringify(geometry)}`);
       const text = await cdp.evaluate(content);
       for (const item of [...report.problems, ...report.jobs]) assert.ok(text.includes(item.title), `UI includes ${item.id}`);
       for (const item of report.resources.technicians) assert.ok(text.includes(item.name), `UI technician ${item.id}`);
@@ -237,7 +240,7 @@ export async function main() {
     faultMode = false;
     assert.deepEqual(errors, [], 'unexpected console/page errors');
     assert.deepEqual(sim.snapshot(), before, 'UI is read-only');
-    console.log('PASS: keyboard/card/Back, loading/error/retry, no console/page errors; handover E2E complete');
+    console.log('PASS: keyboard/card/Back, loading/error/retry, no console/page errors; cleaning up');
   } catch (error) { failure = error; throw error; }
   finally {
     clearTimeout(deadline);
@@ -246,6 +249,10 @@ export async function main() {
     try {
       try {
         if (cdp) { await cdp.send('Browser.close').catch(() => {}); cdp.close(); }
+        if (child?.pid && child.exitCode === null && child.signalCode === null) {
+          // Give graceful Browser.close time to stop its own subprocesses before fallback kill.
+          await Promise.race([once(child, 'exit'), delay(3000)]);
+        }
         if (child?.pid && child.exitCode === null && child.signalCode === null) {
           let timer;
           const exited = once(child, 'exit');
@@ -273,6 +280,7 @@ export async function main() {
     for (const error of cleanupErrors) console.error(`Cleanup: ${error.message}`);
     if (!failure && cleanupErrors.length) throw new AggregateError(cleanupErrors, 'E2E cleanup failed');
   }
+  console.log('PASS: handover E2E complete, server/browser/profile cleanup confirmed');
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().catch(error => { console.error(`FAIL: ${error.stack}`); process.exitCode = 1; });
