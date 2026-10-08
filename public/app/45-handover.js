@@ -1,7 +1,7 @@
 // A handover is an explicit, read-only snapshot; production polling never reloads it.
-const handover = { active: false, controller: null, generation: 0, report: null, observed: null, status: 'idle' };
+const handover = { active: false, controller: null, generation: 0, report: null, observed: null, status: 'idle', focusOwner: null };
 function handoverStop() {
-  handover.controller?.abort(); handover.controller = null; handover.generation++;
+  handover.controller?.abort(); handover.controller = null; handover.focusOwner = null; handover.generation++;
 }
 function handoverObserve() {
   const previous = handover.observed;
@@ -25,14 +25,17 @@ function handoverTime(report) {
 }
 function renderHandover() {
   if (view !== 'handover') return;
-  if (handoverObserve()) {
-    handoverStop(); handover.report = null; handover.status = 'stale';
-    $('handover-content').innerHTML = '';
-    $('handover-status').textContent = 'Смена изменилась. Обновите срез перед передачей.';
-    $('handover-refresh').disabled = false;
-    $('handover-refresh').textContent = 'Обновить срез';
-    $('handover-content').setAttribute('aria-busy', 'false');
-  }
+  if (handoverObserve()) invalidateHandover();
+}
+function invalidateHandover() {
+  const hadFocus = document.activeElement?.closest('#handover-content') || (handover.focusOwner && (document.activeElement === document.body || document.activeElement === handover.focusOwner));
+  handoverStop(); handover.report = null; handover.status = 'stale';
+  $('handover-content').innerHTML = '';
+  $('handover-status').textContent = 'Смена изменилась. Обновите срез перед передачей.';
+  $('handover-refresh').disabled = false;
+  $('handover-refresh').textContent = 'Обновить срез';
+  $('handover-content').setAttribute('aria-busy', 'false');
+  if (view === 'handover' && hadFocus) $('handover-refresh').focus({ preventScroll: true });
 }
 function handoverPaint(report) {
   const metrics = report.metrics;
@@ -56,7 +59,9 @@ async function loadHandover() {
   if (view !== 'handover') return;
   const focused = document.activeElement?.closest('#view-handover [data-focus-key]');
   const focusKey = focused?.dataset.focusKey;
+  const openDetails = [...$('view-handover').querySelectorAll('details[open] > summary[data-focus-key]')].map(el => el.dataset.focusKey);
   handoverStop(); handoverObserve();
+  handover.focusOwner = focused;
   const generation = handover.generation;
   const controller = new AbortController(); handover.controller = controller;
   handover.status = 'loading'; handover.report = null;
@@ -70,12 +75,11 @@ async function loadHandover() {
     if (!response.ok) throw new Error('handover unavailable');
     const report = await response.json();
     if (generation !== handover.generation || view !== 'handover') return;
-    if (handoverObserve()) { renderHandover(); throw new Error('shift changed'); }
+    if (handoverObserve()) { invalidateHandover(); return; }
     if (report?.schemaVersion !== 1 || report.synthetic !== true || !report.metrics || typeof report.metrics !== 'object') throw new Error('invalid handover');
     handover.report = report; handover.status = 'ready'; handoverPaint(report);
-    if (focusKey && (document.activeElement === document.body || document.activeElement === focused)) {
-      const target = [...$('view-handover').querySelectorAll('[data-focus-key]')].find(el => el.dataset.focusKey === focusKey);
-      target?.focus({ preventScroll: true });
+    for (const summary of $('view-handover').querySelectorAll('details > summary[data-focus-key]')) {
+      if (openDetails.includes(summary.dataset.focusKey)) summary.parentElement.open = true;
     }
     $('handover-status').textContent = 'Срез получен. Для актуальных данных нажмите «Обновить срез».';
   } catch {
@@ -89,6 +93,14 @@ async function loadHandover() {
       $('handover-content').setAttribute('aria-busy', 'false');
       $('handover-refresh').disabled = false;
       $('handover-refresh').textContent = handover.status === 'error' ? 'Повторить запрос' : 'Обновить срез';
+      // Restore only inside this visible view, after enabling controls, without stealing a user's new focus.
+      if (focusKey && (document.activeElement === document.body || document.activeElement === focused)) {
+        const target = [...$('view-handover').querySelectorAll('[data-focus-key]')].find(el => el.dataset.focusKey === focusKey);
+        const details = target?.closest?.('details');
+        if (details) details.open = true;
+        (target ?? $('handover-refresh')).focus({ preventScroll: true });
+      }
+      handover.focusOwner = null;
     }
   }
 }

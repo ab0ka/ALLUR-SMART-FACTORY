@@ -33,7 +33,7 @@ async function api(path, body) {
 async function action(body) {
   if (updating || !state) return false;
   updating = true;
-  try { state = await api('/api/action', body); error(''); if (body.action === 'reset') resetAi(); render(); return true; }
+  try { state = await api('/api/action', body); error(''); if (body.action === 'reset') { resetAi(); if (typeof invalidateHandover === 'function') invalidateHandover(); } render(); return true; }
   catch (e) { error(e.message); return false; }
   finally { updating = false; }
 }
@@ -90,4 +90,3 @@ function renderChrome() {
     ['Ограничивает', f.limiting ? esc(f.limiting.name) : '—'],
   ].map(([k, v]) => `<div><span>${k}</span><strong>${v}</strong></div>`).join('');
 }
-
