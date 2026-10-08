@@ -834,3 +834,5 @@ details.more>summary{cursor:pointer;font-weight:700;color:var(--link);min-height
 .shiftx-view .table-scroll{max-width:100%}.shiftx-view .shift-grid,.shiftx-view .split{min-width:0}
 @media(max-width:1100px){.shiftx-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.shiftx-metrics{grid-template-columns:1fr}.orders-view .order-list{grid-template-columns:minmax(0,1fr)}.shiftx-view .shift-grid,.shiftx-view .split{grid-template-columns:minmax(0,1fr)}}
+/* A referenced record remains distinguishable without relying only on color. */
+.ev.ref-highlight,.decision.ref-highlight{outline:3px solid var(--blue);outline-offset:-3px}

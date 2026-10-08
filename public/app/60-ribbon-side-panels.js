@@ -10,7 +10,9 @@ function eventMatches(e, sel) {
 function renderRibbon() {
   const box = $('ribbon'), sel = ui.selected, only = ui.ribbonOnlySelected && sel;
   const events = state.events.filter(e => !only || eventMatches(e, sel)).slice(-16).reverse();
-  const card = e => { const k = EVENT_KIND[e.type] ?? 'idle'; const where = e.postId ? post(e.postId)?.code ?? '' : e.problemId ?? ''; return `<li><button class="ev ${k}${e.type === 'problem_detected' ? ' strong' : ''}" data-event="${e.seq}"><span class="ev-meta"><span class="mono">${clock(e.minute)}</span>${where ? `<span class="ev-where">${esc(where)}</span>` : ''}${e.actor === 'operator' ? '<span class="ev-op">оператор</span>' : ''}</span><span class="ev-text">${ico(k, '')}<span>${esc(e.text)}</span></span></button></li>`; };
+  const highlighted = ui.routeRef?.type === 'event' ? state.events.find(e => String(e.seq) === ui.routeRef.id) : null;
+  if (highlighted && !events.includes(highlighted)) events.push(highlighted);
+  const card = e => { const k = EVENT_KIND[e.type] ?? 'idle'; const where = e.postId ? post(e.postId)?.code ?? '' : e.problemId ?? ''; return `<li><button id="ribbon-event-${e.seq}" class="ev ${k}${highlighted === e ? ' ref-highlight' : ''}${e.type === 'problem_detected' ? ' strong' : ''}" data-event="${e.seq}"${highlighted === e ? ' aria-current="true"' : ''}><span class="ev-meta">${highlighted === e ? '<span>Выбранное событие</span>' : ''}<span class="mono">${clock(e.minute)}</span>${where ? `<span class="ev-where">${esc(where)}</span>` : ''}${e.actor === 'operator' ? '<span class="ev-op">оператор</span>' : ''}</span><span class="ev-text">${ico(k, '')}<span>${esc(e.text)}</span></span></button></li>`; };
   if (!ui.ribbonOpen) {
     const e = events[0];
     box.className = 'ribbon collapsed';
@@ -147,9 +149,12 @@ function panelCompare(pr) {
 }
 
 // One chat: the visible context can be reset; a change of object is announced, the unsent draft is kept.
-let chatDraft = '', chatPrevContext = null;
+let chatDraft = '', chatPrevContext = null, chatDraftVersion = 0;
 const sameCtx = (a, b) => (a?.type ?? null) === (b?.type ?? null) && (a?.id ?? null) === (b?.id ?? null);
 function setChatContext(ctx) {
+  const resolved = ctx ? validChatContext(ctx.type, ctx.id) : null;
+  ui.chatMissing = Boolean(ctx && !resolved);
+  ctx = resolved;
   if (sameCtx(ctx, chatContext)) return;
   if (chatContext && (chatDraft.trim() || state?.chat.length)) chatPrevContext = chatContext;
   chatContext = ctx;
@@ -162,9 +167,11 @@ function chatPanelShell() {
 }
 function updateSideChat() {
   const ai = state.ai, input = $('side-chat-input');
+  $('side-chat-send').disabled = chatBusy;
+  text('side-chat-send', chatBusy ? 'Думаю…' : 'Спросить');
   if (input && input.value !== chatDraft && document.activeElement !== input) { input.value = chatDraft; text('side-chat-count', `${chatDraft.length}/500`); }
   $('side-chat-mode').textContent = ai.configured ? 'Модель формулирует ответ только из фактов движка; числа проверяет сервер. Чат ничего не меняет сам.' : 'Модель не подключена: работают локальные ответы на типовые вопросы. Чат ничего не меняет сам.';
-  $('side-chat-context').innerHTML = chatContext ? `${tag(`Контекст: ${esc(contextLabel(chatContext))}`, 'blue')}<button class="link small-link" data-chat-clear="1">сбросить</button>` : tag('без контекста — вопросы о смене в целом');
+  $('side-chat-context').innerHTML = chatContext ? `${tag(`Контекст: ${esc(contextLabel(chatContext))}`, 'blue')}<button class="link small-link" data-chat-clear="1">сбросить</button>` : tag(ui.chatMissing ? 'Объект не найден · без контекста' : 'без контекста — вопросы о смене в целом');
   $('side-chat-switch').innerHTML = chatPrevContext && !sameCtx(chatPrevContext, chatContext) ? `<p class="chat-switch">${ico('warn', '')} Контекст сменился: было «${esc(contextLabel(chatPrevContext))}», теперь «${esc(contextLabel(chatContext))}». Новые вопросы — о новом объекте.<button class="link small-link" data-chat-restore="1">Вернуть прежний</button><button class="link small-link" data-chat-ok="1">Понятно</button></p>` : '';
   $('side-chat-suggest').innerHTML = (chatContext?.type === 'vehicle' ? ['Что делать с этой машиной?', 'Почему задерживается этот автомобиль?'] : chatContext?.type === 'problem' ? ['На чём основана гипотеза неисправности?', 'Какую проверку выполнить?', 'Сравни ремонт сейчас и продолжение работы'] : ['Что сейчас угрожает плану?', 'Что делать дальше?', 'Почему результат отличается от прогноза?']).map(q => `<button data-ask="${esc(q)}">${esc(q)}</button>`).join('');
   const log = $('side-chat-log'), host = log.parentElement, atBottom = host.scrollHeight - host.scrollTop - host.clientHeight < 40;

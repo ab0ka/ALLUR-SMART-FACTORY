@@ -63,7 +63,7 @@ function sparkline(eq, channel, nominal, unit, detectedAt) {
 function renderDecisions() {
   $('decision-log').innerHTML = state.decisions.length ? [...state.decisions].reverse().map(d => {
     const r = d.report, o = r.observed;
-    return `<article class="decision"><div class="detail-head"><h3>${esc(d.id)} · ${esc(d.title)}</h3><span class="tag">${clock(d.appliedAt)} · ${problemLink(d.problemId)}</span></div>
+    return `<article id="decision-${esc(d.id)}" tabindex="-1" class="decision${ui.routeRef?.type === 'decision' && ui.routeRef.id === d.id ? ' ref-highlight' : ''}"><div class="detail-head"><h3>${esc(d.id)} · ${esc(d.title)}</h3><span class="tag">${clock(d.appliedAt)} · ${problemLink(d.problemId)}</span></div>
     <div class="table-scroll"><table class="compare-table"><thead><tr><th scope="col">Ветка</th><th scope="col">Тип</th><th scope="col">Выпуск к 16:00</th><th scope="col">Простой, мин</th><th scope="col">Техник, мин</th><th scope="col">Затраты</th></tr></thead><tbody>
       <tr class="observed"><th scope="row">Выбранная</th><td>${esc(o.label)}</td><td><b>${o.accepted}</b>${o.final ? '' : ' (пока)'}</td><td>${o.downtime}</td><td>${o.techMinutes}</td><td>${fmt(o.cost, 0)}</td></tr>
       <tr><th scope="row">Выбранная</th><td>${esc(r.expectedLabel)}</td><td>${fmt(d.expected.accepted)} <small>${d.range.accepted[0]}–${d.range.accepted[1]}</small></td><td>${fmt(d.expected.downtime)}</td><td>${fmt(d.expected.techMinutes)}</td><td>${fmt(d.expected.cost, 0)}</td></tr>
@@ -81,9 +81,17 @@ const SIDE_CHAT = { input: 'side-chat-input', send: 'side-chat-send', count: 'si
 async function ask(message, src = SIDE_CHAT) {
   if (chatBusy || !message?.trim()) return;
   chatBusy = true;
+  const input = $(src.input), draft = input?.value, version = chatDraftVersion, context = chatContext ? { ...chatContext } : null;
   const busy = on => { const b = $(src.send); if (b) { b.disabled = on; b.textContent = on ? 'Думаю…' : 'Спросить'; } };
   busy(true);
-  try { const r = await api('/api/chat', { message: message.trim(), context: chatContext ?? undefined }); state = r.state; chatDraft = ''; chatPrevContext = null; if ($(src.input)) $(src.input).value = ''; if ($(src.count)) $(src.count).textContent = '0/500'; error(''); render(); }
+  try {
+    const r = await api('/api/chat', { message: message.trim(), context: context ?? undefined }); state = r.state;
+    // Only clear the submitted composer; the user may have selected another object or edited a new draft.
+    if (input && $(src.input) === input && input.value === draft && chatDraftVersion === version && sameCtx(context, chatContext)) {
+      chatDraft = ''; chatPrevContext = null; input.value = ''; text(src.count, '0/500');
+    }
+    error(''); render();
+  }
   catch (e) { error(`Чат: ${e.message}`); }
   finally { chatBusy = false; busy(false); }
 }
