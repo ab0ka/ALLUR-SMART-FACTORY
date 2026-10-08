@@ -498,8 +498,9 @@ button.secondary{background:#F4F8FD;border-color:#B9CDE6;color:var(--link);font-
 .opt-grid i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);font-weight:600}.opt-grid b{font-family:var(--mono);font-size:15px}
 .small-link{font-size:13px}
 .chat-body{background:#FAFBFC}
-.chat-foot{flex-direction:column}
+.chat-foot{flex-direction:column;flex-wrap:nowrap;flex-shrink:0}
 .chat-foot .chips{margin:0}
+#side-chat-hint{margin-bottom:8px}
 .side .chat-log{margin:0}
 .side .msg.user{background:var(--blue);color:#fff}.side .msg.user .msg-meta{color:#DCE9FA}
 .side .msg.assistant{background:#fff;border:1px solid var(--line)}
@@ -570,6 +571,8 @@ button.secondary{background:#F4F8FD;border-color:#B9CDE6;color:var(--link);font-
   .spaces{order:5;width:100%;overflow-x:auto}.grow{display:none}
   .space-view{height:calc(100vh - 112px)}
   .side{position:absolute;left:0;right:0;bottom:0;margin:0;max-height:62%;border-radius:20px 20px 0 0;flex:none}
+  .side:has(#side-chat-form){overflow-y:auto}
+  .side:has(#side-chat-form)>*{flex:none}
   .hud{max-width:240px}.hud-card .space-sub{display:none}.hint{display:none}
 }
 @media(max-width:760px){

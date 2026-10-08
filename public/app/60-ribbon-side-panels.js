@@ -150,17 +150,60 @@ function panelCompare(pr) {
   return head + `<div class="side-body">${body}</div><div class="side-foot">${foot}<button class="secondary" data-open-chat="1" data-ctx-type="problem" data-ctx-id="${esc(pr.id)}">Обсудить в чате</button></div>`;
 }
 
+// These patterns only order existing local questions; the server still resolves intent.
+function sideChatQuestions(question = '') {
+  const selected = chatContext;
+  const selectedProblem = selected?.type === 'problem' ? problem(selected.id) : null;
+  const selectedVehicle = selected?.type === 'vehicle' ? vehicle(selected.id) : null;
+  const selectedPost = selected?.type === 'post' ? post(selected.id) : selectedProblem ? post(selectedProblem.postId) : selectedVehicle?.location.type === 'post' ? post(selectedVehicle.location.id) : null;
+  const relatedProblem = selectedProblem ?? (selectedPost ? state.problems.find(p => p.postId === selectedPost.id && p.status === 'open') ?? state.problems.findLast(p => p.postId === selectedPost.id) : !selected ? state.problems.find(p => p.status === 'open') : null);
+  const relatedVehicle = selectedVehicle ?? (selectedPost?.vehicleId ? vehicle(selectedPost.vehicleId) : null);
+  const matches = {
+    delay: /авто|машин|жд|стоит|пауз|задерж|двига|ехать|очеред/i,
+    basis: /причин|слом|неисправ|давлен|температур|насос|масл|оборуд|проблем/i,
+    check: /проверк|провер|диагност|замер|измер/i,
+    compare: /решен|ремонт|выбор|вариант|лучше|сравн/i,
+    transfer: /перев|сосед|параллель|друг.*пост/i,
+    threat: /план|выпуск|смен|срок|риск|произв/i,
+    difference: /прогноз|факт|результат|отлич|разниц/i,
+  };
+  const questions = [], add = (kind, text) => questions.push({ text, rank: matches[kind].test(question) ? 1 : 0 });
+  if (relatedVehicle && selected?.type === 'vehicle') add('delay', `Почему задерживается ${relatedVehicle.id}?`);
+  if (relatedProblem) {
+    add('basis', `На чём основана гипотеза неисправности ${relatedProblem.id}?`);
+    if (relatedProblem.status === 'open') {
+      if (relatedProblem.kind === 'equipment') add('check', `Какую проверку выполнить для ${relatedProblem.id}?`);
+      add('compare', `Сравни ремонт сейчас и продолжение работы для ${relatedProblem.id}`);
+      if (relatedVehicle) add('transfer', `Что даст перевод на другой пост для ${relatedProblem.id}?`);
+    }
+  }
+  if (relatedVehicle && selected?.type !== 'vehicle') add('delay', `Почему задерживается ${relatedVehicle.id}?`);
+  add('threat', SUGGESTED[0]);
+  add('difference', SUGGESTED[6]);
+  return questions.sort((a, b) => b.rank - a.rank).slice(0, 4).map(q => q.text);
+}
+
 function chatPanelShell() {
   return `<div class="side-head"><div class="side-top"><span class="eyebrow">ЧАТ ПО СМЕНЕ</span><span class="side-tools"><button class="icon-btn small" data-close-panel="1" aria-label="Закрыть чат">✕</button></span></div><h2>Чат</h2><div class="chipline" id="side-chat-context"></div><p class="fine-print" id="side-chat-mode"></p></div>
   <div class="side-body chat-body"><ol id="side-chat-log" class="chat-log" aria-live="polite"></ol></div>
   <div class="side-foot chat-foot"><div class="chips small" id="side-chat-suggest" role="group" aria-label="Предложенные вопросы"></div>
-  <form id="side-chat-form" class="chat-form"><label for="side-chat-input" class="sr-only">Вопрос о выбранном объекте</label><textarea id="side-chat-input" rows="2" maxlength="500" placeholder="Вопрос о посте, автомобиле, событии…"></textarea><div class="chat-send"><span id="side-chat-count" class="fine-print">0/500</span><button class="primary" type="submit" id="side-chat-send">Спросить</button></div></form></div>`;
+  <form id="side-chat-form" class="chat-form"><p class="fine-print" id="side-chat-hint"></p><label for="side-chat-input" class="sr-only">Вопрос о выбранном объекте</label><textarea id="side-chat-input" rows="2" maxlength="500" aria-describedby="side-chat-hint side-chat-mode" placeholder="Вопрос о посте, автомобиле, событии…"></textarea><div class="chat-send"><span id="side-chat-count" class="fine-print">0/500</span><button class="primary" type="submit" id="side-chat-send">Спросить</button></div></form></div>`;
 }
 function updateSideChat() {
-  const ai = state.ai;
+  const ai = state.ai, latest = state.chat.at(-1);
+  const unsupported = latest?.role === 'assistant' && latest.source === 'local' && latest.intent === 'unknown';
+  const question = unsupported ? state.chat.findLast(m => m.role === 'user')?.text ?? '' : '';
+  const localQuestions = !ai.configured || unsupported;
   $('side-chat-mode').textContent = ai.configured ? 'Модель формулирует ответ только из фактов движка; числа проверяет сервер. Чат ничего не меняет сам.' : 'Модель не подключена: работают локальные ответы на типовые вопросы. Чат ничего не меняет сам.';
   $('side-chat-context').innerHTML = chatContext ? `${tag(`Контекст: ${esc(contextLabel(chatContext))}`, 'blue')}<button class="link small-link" data-chat-clear="1">убрать</button>` : tag('без контекста');
-  $('side-chat-suggest').innerHTML = SUGGESTED.slice(0, 4).map(q => `<button data-ask="${esc(q)}" data-ask-side="1">${esc(q)}</button>`).join('');
+  const suggestions = $('side-chat-suggest');
+  suggestions.setAttribute('aria-label', unsupported ? 'Ближайшие типовые вопросы' : 'Предложенные вопросы');
+  suggestions.innerHTML = (localQuestions ? sideChatQuestions(question) : SUGGESTED.slice(0, 4)).map(q => `<button data-ask="${esc(q)}" data-ask-side="1">${esc(q)}</button>`).join('');
+  const hint = $('side-chat-hint');
+  hint.hidden = !localQuestions;
+  hint.textContent = unsupported ? 'Свободный вопрос не удалось обработать. Локальные правила отвечают на типовые вопросы — попробуйте ближайшую подсказку выше.' : !ai.configured ? 'Без AI доступны типовые вопросы о смене. Выберите подсказку выше или спросите о задержке автомобиля по его ID.' : '';
+  // Snapshot refreshes update help and messages without replacing the textarea or its draft.
+  $('side-chat-input').placeholder = localQuestions ? 'Типовой вопрос или ID автомобиля…' : 'Вопрос о посте, автомобиле, событии…';
   const log = $('side-chat-log'), host = log.parentElement, atBottom = host.scrollHeight - host.scrollTop - host.clientHeight < 40;
   log.innerHTML = state.chat.map(m => `<li class="msg ${m.role}"><div class="msg-meta">${m.role === 'user' ? 'Вы' : m.source === 'local' ? 'Локальная логика' : m.source === 'openai' ? 'OpenAI' : 'NVIDIA'} · ${clock(m.minute)}${m.context ? ` · ${esc(contextLabel(m.context))}` : ''}</div><div class="msg-text">${esc(m.text)}</div>
     ${m.refs?.length ? `<div class="refs">${m.refs.map(r => `<button class="ref" data-ref-type="${esc(r.type)}" data-ref-id="${esc(r.id)}">${esc(r.label)}</button>`).join('')}</div>` : ''}
