@@ -46,6 +46,8 @@ const chatBtn = (type, id) => `<button class="icon-btn small" data-open-chat="1"
 const lockNote = '<p class="lock">Проверки, ремонт, перевод и снятие поста с загрузки меняют производство — каждое такое действие запросит подтверждение.</p>';
 
 function panelVehicle(v) {
+  const events = state.events.filter(e => e.vehicleId === v.id).slice(-10).reverse();
+  const history = `<h3>Последние события</h3><p class="fine-print">До 10 событий из журнала смены, новые сверху. Выберите событие, чтобы открыть связанный объект в его цехе.</p><ol class="vehicle-history">${events.map(e => `<li><button data-vehicle-event="${e.seq}"><time class="mono">${clock(e.minute)}</time><span>${esc(e.text)}${e.actor === 'operator' ? '<small>Действие оператора</small>' : ''}</span></button></li>`).join('') || '<li class="muted">Событий автомобиля в текущем журнале нет.</li>'}</ol>`;
   const op = v.currentOperation && v.currentOperation.completedAt === null ? v.currentOperation : null;
   const p = v.location.type === 'post' ? post(v.location.id) : null, order = state.orders.find(o => o.id === v.orderId);
   let kind = VEHICLE_KIND(v); if (p?.state === 'slow') kind = 'warn';
@@ -71,7 +73,7 @@ function panelVehicle(v) {
   }
   actions += `<button class="link" data-legacy="vehicles" data-legacy-id="${esc(v.id)}">Полный паспорт и история событий →</button>`;
   return sideHead('АВТОМОБИЛЬ · ПАСПОРТ', `<span class="mono">${esc(v.id)}</span>`, tag(esc(v.modelName), 'blue') + tag(`Задание ${esc(v.orderId)}${order ? ` · срок ${order.dueMinute > state.shift ? 'после смены' : clock(order.dueMinute)}` : ''}`) + tag(`Приоритет ${PRIORITY[v.priority].toLowerCase()}`), chatBtn('vehicle', v.id))
-    + `<div class="side-body">${now}<h3>Пройденный маршрут</h3>${route}<h3>Проверки и ремонт</h3>${checks}<h3>Доступные действия</h3><div class="actions-col">${actions}</div>${lockNote}</div>`;
+    + `<div class="side-body">${now}<h3>Пройденный маршрут</h3>${route}<h3>Проверки и ремонт</h3>${checks}${history}<h3>Доступные действия</h3><div class="actions-col">${actions}</div>${lockNote}</div>`;
 }
 
 function panelPost(p) {

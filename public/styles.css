@@ -152,6 +152,12 @@ h3{font-size:14px;margin:16px 0 8px;color:#14222E}
 .history,.event-log{list-style:none;margin:0;padding:0;font-size:13px;max-height:420px;overflow:auto}
 .history li,.event-log li{display:grid;grid-template-columns:48px 1fr auto;gap:8px;padding:5px 0;border-bottom:1px solid #FFFFFF}
 .history time,.event-log time{color:var(--muted);font-variant-numeric:tabular-nums}
+.vehicle-history{list-style:none;margin:0;padding:0}
+.vehicle-history li+li{border-top:1px solid var(--line)}
+.vehicle-history button{display:grid;grid-template-columns:44px minmax(0,1fr);gap:8px;width:100%;text-align:left;border:0;border-radius:6px;background:transparent;padding:9px 4px;font-weight:400;line-height:1.45}
+.vehicle-history button:hover{background:var(--panel-2)}
+.vehicle-history small{display:block;color:var(--muted);margin-top:3px}
+.stage-inner tr.selected{background:#E8F2FF;outline:2px solid var(--blue);outline-offset:-2px}
 .history em,.event-log em{font-style:normal;font-size:11px;color:var(--amber-ink)}
 .event-log li.incident_started span{color:var(--red)}.event-log li.vehicle_accepted span{color:var(--link)}
 
