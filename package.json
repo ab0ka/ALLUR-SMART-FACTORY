@@ -1,0 +1,14 @@
+{
+  "name": "allur-smart-factory-mvp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Local synthetic manufacturing simulation, no real Allur data",
+  "engines": { "node": ">=22.13.0" },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server/index.mjs",
+    "dev": "node --env-file-if-exists=.env --watch server/index.mjs",
+    "build": "node scripts/build.mjs",
+    "test": "node --test tests/*.test.mjs"
+  }
+}
