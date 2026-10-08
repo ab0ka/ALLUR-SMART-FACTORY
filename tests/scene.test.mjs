@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { route, placeOf, pointOf, carFootprint, overlaps, OBSTACLES, SLOTS, BAY_Y, techRoute, techPoint, depthOrder } from '../public/scene.js';
+import { readFileSync } from 'node:fs';
+import { route, placeOf, pointOf, carFootprint, overlaps, OBSTACLES, SLOTS, BAY_Y, techRoute, techPoint, depthOrder, enterpriseCards, enterpriseSvg, SHOPS } from '../public/scene.js';
 import { Workshop } from '../server/simulation.mjs';
 
 const places = [...Object.keys(BAY_Y).map(id => ({ kind: 'bay', id })), ...SLOTS.B2.map((_, index) => ({ kind: 'B2', index })), ...SLOTS.B3.map((_, index) => ({ kind: 'B3', index }))];
@@ -59,4 +60,37 @@ test('depth order draws a car on a lift between the rear and the front lift post
   const car = { name: 'car', fp: carFootprint(pointOf({ kind: 'bay', id: 'A2' })), h: 60 };
   const order = depthOrder([front, car, back]).map(o => o.name);
   assert.ok(order.indexOf('back') < order.indexOf('car') && order.indexOf('car') < order.indexOf('front'), order.join(','));
+});
+
+for (const equipmentProblem of [false, true]) test(`enterprise cards stay clear with all posts faulted${equipmentProblem ? ' and an equipment problem on the same assembly post' : ''}`, () => {
+  const w = new Workshop({ warmup: 195, episode: equipmentProblem ? 'default' : false });
+  for (const id of Object.keys(w.posts)) w.injectIncident(id, 'breakdown');
+  const state = w.snapshot(), cards = enterpriseCards(state);
+  assert.equal(cards.reduce((n, c) => n + c.problems.length, 0), state.posts.length + Number(equipmentProblem), 'all open problems remain on their shop cards');
+  if (equipmentProblem) assert.equal(cards.find(c => c.space === 'assembly').problems.length, 4, 'equipment and manual problems on A2 both remain visible');
+  const [vx, vy, vw, vh] = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8')
+    .match(/id="enterprise"[^>]*viewBox="([^"]+)"/)[1].split(' ').map(Number);
+  const box = points => ({ x0: Math.min(...points.map(p => p.x)), x1: Math.max(...points.map(p => p.x)), y0: Math.min(...points.map(p => p.y)), y1: Math.max(...points.map(p => p.y)) });
+  const project = (x, y, z = 0) => ({ x: 380 + .866 * (x - y), y: 100 + .5 * (x + y) - z });
+  // Conservative envelopes include the 44-unit back walls, not just the floor.
+  const shops = [...SHOPS.map(s => ({ name: s.space, x: s.x0, y: 0, w: s.w, h: 140 })), { name: 'rework', x: 670, y: 210, w: 140, h: 110 }]
+    .map(s => ({ name: s.name, ...box([project(s.x, s.y, 44), project(s.x + s.w, s.y), project(s.x, s.y + s.h), project(s.x + s.w, s.y + s.h)]) }));
+  // Read the actual route path so extending the drawn route is checked too.
+  const tokens = enterpriseSvg(state).match(/<path d="([^"]+)" class="em-route"/)[1].match(/[MHV]|-?\d+(?:\.\d+)?/g);
+  const routes = []; let x = 0, y = 0;
+  for (let i = 0; i < tokens.length;) {
+    const command = tokens[i++], before = project(x, y);
+    if (command === 'M') { x = Number(tokens[i++]); y = Number(tokens[i++]); continue; }
+    if (command === 'H') x = Number(tokens[i++]);
+    else if (command === 'V') y = Number(tokens[i++]);
+    else assert.fail(`unsupported route command ${command}`);
+    const b = box([before, project(x, y)]);
+    routes.push({ name: `route ${routes.length + 1}`, x0: b.x0 - 4, x1: b.x1 + 4, y0: b.y0 - 4, y1: b.y1 + 4 });
+  }
+  const bounds = cards.map(c => ({ name: c.space, x0: c.left, x1: c.left + c.width, y0: c.top, y1: c.top + c.height }));
+  for (const [i, card] of bounds.entries()) {
+    assert.ok(card.x0 >= vx && card.y0 >= vy && card.x1 <= vx + vw && card.y1 <= vy + vh, `${card.name} leaves the viewBox`);
+    for (const other of [...bounds.slice(i + 1), ...shops, ...routes]) assert.ok(!overlaps(card, other), `${card.name} covers ${other.name}`);
+  }
+  assert.ok(bounds.filter(c => ['weld', 'paint', 'assembly'].includes(c.name)).every(c => c.y0 >= 410 && c.y1 <= vy + vh - 10), 'left cards retain the HUD clearance and bottom margin');
 });
