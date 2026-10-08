@@ -90,22 +90,30 @@ async function ask(message, src = SIDE_CHAT) {
 async function applyProposal(msgId) {
   const m = state.chat.find(x => x.id === msgId); if (!m?.proposal) return;
   const p = m.proposal;
+  // Decisions from chat use the same resource/stop consequences as the comparison panel.
+  if (p.kind === 'decision') return applyDecision(p.experimentId, p.optionId);
   if (!await confirmAction(p.title, `<p>${esc(p.consequences)}</p>`)) return;
-  if (p.kind === 'decision') await applyDecision(p.experimentId, p.optionId, true);
-  else await action({ ...p.command, requestId: requestId() });
+  await action({ ...p.command, requestId: requestId() });
 }
 async function applyDecision(experimentId, optionId, confirmed = false) {
   const exp = state.experiments.find(e => e.id === experimentId), o = exp?.options.find(x => x.id === optionId);
   if (!o) return;
+  if (rejectedComparisons.has(experimentId)) { ui.panel = { type: 'compare', id: exp.problemId }; syncHash(); render(); error('Снимок устарел. Пересчитайте варианты.'); return; }
   const jobs = o.commands.filter(c => c.action === 'job').map(c => state.jobKinds.find(k => k.id === c.kind)).filter(Boolean);
   const stops = jobs.filter(k => k.stopsPost), parts = Object.entries(o.expected.parts ?? {}).filter(([, n]) => n > 0);
   const pc = post(problem(exp.problemId)?.postId)?.code ?? '';
   if (!confirmed && !await confirmAction(`Применить: ${o.title}`, `<p>${esc(o.description)}</p>${jobs.length ? `<p>Работы ТЕХ-1: ${jobs.map(k => `${esc(k.title.toLowerCase())} — ${k.duration} мин`).join('; ')}${jobs.some(k => k.type === 'repair' && k.id.startsWith('repair_') && k.id !== 'repair_generic') ? ', затем автоматическая проверка после ремонта' : ''}.</p>` : ''}${stops.length ? `<p><b>Пост ${esc(pc)} будет остановлен</b> на время работ; автомобиль на посту встанет на паузу.</p>` : ''}${parts.length ? `<p>Запчасти: ${parts.map(([id, n]) => `${esc(state.stock.find(s => s.id === id)?.name ?? id)} × ${fmt(n, 2)}`).join(', ')} (на складе: ${parts.map(([id]) => state.stock.find(s => s.id === id)?.available ?? '—').join(', ')}).</p>` : ''}<p>Ожидаемый годный выпуск к 16:00: <b>${fmt(o.expected.accepted)}</b> (диапазон ${o.range.accepted[0]}–${o.range.accepted[1]}); без вмешательства — ${fmt(exp.options[0].expected.accepted)}. Это расчёт на копиях снимка ${clock(exp.minute)}, не гарантия.</p><p>Ресурсы: техник ${fmt(o.expected.techMinutes)} мин, затраты ${fmt(o.expected.cost, 0)} ${esc(state.tariffs.currency)}</p><p class="fine-print">Если смена изменилась после расчёта, сервер отклонит применение. Повторное нажатие не создаст второе решение.</p>`)) return;
   if (updating) return;
-  updating = true;
+  updating = true; setProductionPending(true);
   try { const r = await api('/api/decision', { experimentId, optionId, requestId: requestId() }); state = r.state; error(''); ui.panel = { type: 'problem', id: exp.problemId }; syncHash(); render(); }
-  catch (e) { error(e.code === 'stale' ? `${e.message}` : `Не удалось применить: ${e.message}`); }
-  finally { updating = false; }
+  catch (e) {
+    if (e.code === 'stale') {
+      rejectedComparisons.add(experimentId);
+      ui.panel = { type: 'compare', id: exp.problemId }; syncHash(); render();
+      error('Снимок устарел. Пересчитайте варианты.');
+    } else error(`Не удалось применить: ${e.message}`);
+  }
+  finally { updating = false; setProductionPending(false); }
 }
 async function compare(problemId) {
   if (updating) return;

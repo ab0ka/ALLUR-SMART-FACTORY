@@ -33,21 +33,61 @@ async function api(path, body) {
 async function action(body) {
   if (updating || !state) return false;
   updating = true;
+  const production = !['play', 'pause', 'step', 'speed'].includes(body.action);
+  if (production) setProductionPending(true);
   try { state = await api('/api/action', body); error(''); if (body.action === 'reset') resetAi(); render(); return true; }
   catch (e) { error(e.message); return false; }
-  finally { updating = false; }
+  finally { updating = false; if (production) setProductionPending(false); }
 }
-function resetAi() { aiRevision = null; text('ai-text', 'Смена сброшена. Запросите объяснение нового снимка.'); text('ai-source', 'Локальный режим доступен без ключа'); }
+
+// Keep existing availability flags when locking rendered production controls.
+const PRODUCTION_CONTROLS = '#release-form button[type=submit], #plan-form button[type=submit], [data-check], [data-job], [data-fault], [data-transfer], [data-hold], [data-priority], [data-apply], [data-apply-choice], [data-proposal]';
+let productionPending = false;
+const productionButtonState = new Map();
+function renderProductionBusy() {
+  if (!productionPending) return;
+  for (const b of document.querySelectorAll(PRODUCTION_CONTROLS)) {
+    if (!productionButtonState.has(b)) productionButtonState.set(b, { disabled: b.disabled, text: b.textContent });
+    b.disabled = true; if (b.textContent !== 'Выполняется…') b.textContent = 'Выполняется…';
+  }
+}
+const productionObserver = new MutationObserver(renderProductionBusy);
+function setProductionPending(on) {
+  productionPending = on;
+  if (on) { renderProductionBusy(); productionObserver.observe(document.body, { childList: true, subtree: true }); }
+  else {
+    productionObserver.disconnect();
+    for (const [b, before] of productionButtonState) { b.disabled = before.disabled; b.textContent = before.text; }
+    productionButtonState.clear();
+  }
+}
+const rejectedComparisons = new Set();
+
+function resetAi() { rejectedComparisons.clear(); aiRevision = null; text('ai-text', 'Смена сброшена. Запросите объяснение нового снимка.'); text('ai-source', 'Локальный режим доступен без ключа'); }
 // Every shift-changing action from the dispatcher, chat or proposals goes through this confirmation.
 function confirmAction(title, bodyHtml) {
+  const d = $('confirm');
+  // Reject competing intents before changing the visible consequences or adding listeners.
+  if (d.open || updating) return Promise.resolve(false);
   return new Promise(resolve => {
-    const d = $('confirm'); text('confirm-title', title); $('confirm-body').innerHTML = bodyHtml;
+    text('confirm-title', title); $('confirm-body').innerHTML = bodyHtml;
     let done = false;
-    const finish = ok => { if (done) return; done = true; d.removeEventListener('click', onClick); resolve(ok); };
+    const finish = ok => {
+      if (done) return;
+      done = true;
+      d.removeEventListener('click', onClick);
+      d.removeEventListener('close', onClose);
+      d.removeEventListener('cancel', onCancel);
+      resolve(ok);
+    };
     // The button click decides synchronously; the close event (Esc, backdrop) is the fallback.
     const onClick = e => { const b = e.target.closest('button'); if (b) finish(b.value === 'ok'); };
+    // A delayed close from the previous dialog must not cancel a newly opened one.
+    const onClose = () => { if (!d.open) finish(false); };
+    const onCancel = () => finish(false);
     d.addEventListener('click', onClick);
-    d.addEventListener('close', () => finish(d.returnValue === 'ok'), { once: true });
+    d.addEventListener('close', onClose);
+    d.addEventListener('cancel', onCancel);
     d.returnValue = 'cancel'; d.showModal(); $('confirm-ok').focus();
   });
 }
