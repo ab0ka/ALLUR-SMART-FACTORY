@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Видеодоказательство задержек — защита MVP</title>
+<style>
+  :root { --ink:#14222E; --muted:#4F6072; --line:#DCE3EA; --accent:#1F6FD1; --warn:#B45309; --bad:#C0362C; --bg:#FFFFFF; --soft:#F1F4F8; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; background:#E9EDF2; color:var(--ink); font-family:"Segoe UI", system-ui, Arial, sans-serif; }
+  .slide { width:1280px; height:720px; margin:24px auto; background:var(--bg); padding:56px 72px; position:relative; overflow:hidden; box-shadow:0 8px 28px rgba(20,34,46,.12); display:flex; flex-direction:column; }
+  .num { position:absolute; right:40px; bottom:28px; font-size:18px; color:var(--muted); }
+  .kicker { font-size:20px; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); font-weight:700; margin:0 0 10px; }
+  h1 { font-size:46px; line-height:1.12; margin:0 0 22px; }
+  p, li { font-size:28px; line-height:1.38; }
+  ul { margin:0; padding-left:30px; } li { margin:0 0 12px; }
+  .flow { display:flex; gap:14px; align-items:stretch; margin:20px 0 28px; }
+  .step { flex:1; border:2px solid var(--line); border-radius:16px; padding:18px 16px; font-size:26px; font-weight:700; text-align:center; display:flex; align-items:center; justify-content:center; }
+  .arrow { align-self:center; font-size:34px; color:var(--muted); }
+  .ph { border:3px dashed #9AAABA; border-radius:16px; background:var(--soft); color:var(--muted); display:flex; align-items:center; justify-content:center; text-align:center; font-size:24px; padding:16px; }
+  .todo { color:var(--warn); font-weight:700; }
+  .nm { color:var(--bad); font-weight:700; }
+  .row { display:flex; gap:28px; flex:1; min-height:0; }
+  .col { flex:1; display:flex; flex-direction:column; gap:14px; min-height:0; }
+  table { border-collapse:collapse; width:100%; font-size:21px; }
+  th, td { border-bottom:2px solid var(--line); padding:6px 8px; text-align:left; vertical-align:top; }
+  td.nm, td.todo { white-space:nowrap; }
+  th { color:var(--muted); font-weight:700; }
+  .caption { font-size:18px; color:var(--muted); margin:6px 0 0; }
+  .thesis { margin-top:auto; font-size:30px; font-weight:800; border-left:8px solid var(--accent); padding:8px 0 8px 18px; }
+  .small { font-size:20px; color:var(--muted); }
+  .check { position:absolute; right:40px; top:28px; font-size:16px; font-weight:700; color:var(--warn); border:2px solid var(--warn); border-radius:999px; padding:4px 12px; }
+  @media print {
+    @page { size:1280px 720px; margin:0; }
+    html, body { background:#fff; }
+    .slide { margin:0; box-shadow:none; page-break-after:always; break-after:page; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 1. Проблема -->
+<section class="slide">
+  <p class="kicker">1 · Проблема</p>
+  <h1>Задержки на участке трудно вовремя заметить и проверить по записи</h1>
+  <div class="row">
+    <div class="col">
+      <ul>
+        <li>Камеры пишут часы видео, а время в зоне никто не измеряет.</li>
+        <li>Чтобы проверить задержку, нужно вручную искать момент в записи.</li>
+        <li>Без видеодоказательства спор о причине простоя превращается в мнение.</li>
+      </ul>
+    </div>
+    <div class="col">
+      <div class="ph" style="flex:1">Вступительный ролик 8 с: «Automated Car Factory», Pexels (автор Engin Altundağ)<br><span class="todo">[файл не скачан — ждёт разрешения]</span></div>
+      <p class="caption">Иллюстративное видео производства. Не предприятие Allur. Не входные данные анализа.</p>
+    </div>
+  </div>
+  <span class="num">1 / 5</span>
+</section>
+
+<!-- 2. Решение -->
+<section class="slide">
+  <span class="check">черновик: проверить на сборке №2 (FACT_CHECK 3–6)</span>
+  <p class="kicker">2 · Решение</p>
+  <h1>Из записи — в проверяемый отчёт о задержке</h1>
+  <div class="flow">
+    <div class="step">Видео</div><div class="arrow">→</div>
+    <div class="step">Объекты</div><div class="arrow">→</div>
+    <div class="step">Посещения зон</div><div class="arrow">→</div>
+    <div class="step">Превышение норматива</div><div class="arrow">→</div>
+    <div class="step">Отчёт</div>
+  </div>
+  <ul>
+    <li>Система находит объекты в кадре и отмечает, когда объект вошёл в зону и вышел из неё.</li>
+    <li>Время в зоне сравнивается с нормативом, заданным пользователем.</li>
+    <li>Превышение — это <b>возможная задержка</b>: событие со ссылкой на момент видео.</li>
+  </ul>
+  <p class="thesis">Мы измеряем наблюдаемое время в зоне и показываем видеодоказательство отклонения.</p>
+  <span class="num">2 / 5</span>
+</section>
+
+<!-- 3. Рабочий сценарий -->
+<section class="slide">
+  <span class="check">черновик: данные после проверки сборки</span>
+  <p class="kicker">3 · Рабочий сценарий</p>
+  <h1>Один объект, одна зона, одно проверяемое событие</h1>
+  <div class="row">
+    <div class="col" style="flex:1.3">
+      <div class="ph" style="flex:1">Скриншот работающего интерфейса: видео, зона, найденный объект<br><span class="todo">[снять со сборки участника №2]</span></div>
+    </div>
+    <div class="col">
+      <table>
+        <tr><th>Запись</th><td class="todo">[источник от №1]</td></tr>
+        <tr><th>Объект</th><td class="todo">[ID]</td></tr>
+        <tr><th>Зона</th><td class="todo">[название]</td></tr>
+        <tr><th>Вход / выход</th><td class="todo">[мм:сс — мм:сс]</td></tr>
+        <tr><th>Время в зоне</th><td class="todo">[с]</td></tr>
+        <tr><th>Норматив</th><td class="todo">[с]</td></tr>
+        <tr><th>Итог</th><td class="todo">[превышение / нет]</td></tr>
+      </table>
+      <p class="small">Причина задержки системой не устанавливается.</p>
+    </div>
+  </div>
+  <span class="num">3 / 5</span>
+</section>
+
+<!-- 4. Проверка -->
+<section class="slide">
+  <p class="kicker">4 · Проверка</p>
+  <h1>Ручная разметка против результата системы</h1>
+  <div class="row">
+    <div class="col">
+      <table>
+        <tr><th>Показатель</th><th>Значение</th></tr>
+        <tr><td>Размечено посещений вручную</td><td class="nm">не измерено</td></tr>
+        <tr><td>Найдено системой</td><td class="nm">не измерено</td></tr>
+        <tr><td>Пропущено</td><td class="nm">не измерено</td></tr>
+        <tr><td>Лишние посещения</td><td class="nm">не измерено</td></tr>
+        <tr><td>Ошибка длительности, с</td><td class="nm">не измерено</td></tr>
+        <tr><td>Отложенный фрагмент</td><td class="nm">не измерено</td></tr>
+      </table>
+      <p class="small">Выборка — несколько посещений в одной записи. Это не общая точность системы.</p>
+    </div>
+    <div class="col">
+      <p style="font-size:26px;margin:0"><b>Ограничения и ошибки</b></p>
+      <ul>
+        <li>Выборка: <span class="todo">[N посещений, одна запись]</span>.</li>
+        <li>Не проверялись: перекрытие объектов, смена ракурса, другие камеры.</li>
+        <li>Система показывает превышение времени, причину подтверждает человек.</li>
+        <li class="todo">[дополнить по фактическим ошибкам]</li>
+      </ul>
+    </div>
+  </div>
+  <span class="num">4 / 5</span>
+</section>
+
+<!-- 5. Применение в Allur -->
+<section class="slide">
+  <p class="kicker">5 · Следующий этап</p>
+  <h1>Пилот в Allur: одна камера, одна зона, сверка с журналом оборудования</h1>
+  <ul>
+    <li><b>Доступ к камерам:</b> записи выбранного участка и согласие на обработку.</li>
+    <li><b>Настройка:</b> границы зон и нормативы времени задают специалисты завода.</li>
+    <li><b>Проверка причин:</b> событие задержки сверяется с журналом оборудования — система показывает момент, причину подтверждает человек.</li>
+    <li class="todo">[сюда — функции, которые не реализованы в версии для показа]</li>
+    <li><b>Критерий пилота:</b> доля задержек, подтверждённых по журналу, и ошибка длительности на размеченной выборке.</li>
+  </ul>
+  <p class="small" style="margin-top:18px">Интеграция с системами Allur, экономический эффект и точность на данных завода — <span class="nm">не измерено</span>.</p>
+  <p class="thesis">Мы измеряем наблюдаемое время в зоне и показываем видеодоказательство отклонения.</p>
+  <span class="num">5 / 5</span>
+</section>
+
+</body>
+</html>
