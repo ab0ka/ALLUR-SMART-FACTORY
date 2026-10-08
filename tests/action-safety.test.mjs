@@ -20,7 +20,7 @@ function harness() {
     close(value = 'cancel') { this.returnValue = value; this.open = false; this.dispatchEvent(new Event('close')); }
   }
   const element = id => { if (!nodes.has(id)) nodes.set(id, new Element()); return nodes.get(id); };
-  const context = vm.createContext({ MutationObserver: class { observe() {} disconnect() {} }, document: { querySelectorAll: () => [], getElementById: element }, AbortSignal });
+  const context = vm.createContext({ MutationObserver: class { observe() {} disconnect() {} }, document: { addEventListener() {}, querySelectorAll: () => [], getElementById: element }, AbortSignal });
   vm.runInContext(`${source}\nfunction render() {}\nstate = { csrf: 'synthetic-test-token' };`, context);
   return { element, run: code => vm.runInContext(code, context), context };
 }
