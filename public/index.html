@@ -39,7 +39,7 @@
     <span id="diag-count" class="sr-only" aria-hidden="true" hidden></span>
   </div>
   <nav id="manage-navigation" class="context-tabs" aria-label="Управление" hidden><a href="#dispatcher" data-nav="dispatcher">Задачи и решения <span id="nav-problems" class="nav-count"></span></a><a href="#orders" data-nav="orders">Задания <span id="nav-orders" class="nav-count"></span></a></nav>
-  <nav id="analytics-navigation" class="context-tabs" aria-label="Аналитика" hidden><a href="#shift" data-nav="shift">Результаты смены</a><a href="#lab" data-nav="lab">Модели и эксперименты</a></nav>
+  <nav id="analytics-navigation" class="context-tabs" aria-label="Аналитика" hidden><a href="#shift" data-nav="shift">Результаты смены</a><a href="#handover" data-nav="handover">Передача смены</a><a href="#lab" data-nav="lab">Модели и эксперименты</a></nav>
 </div>
 <div id="error" role="alert" hidden></div>
 <main>
@@ -154,6 +154,14 @@
         <div class="panel"><h2 class="panel-title">Журнал событий <span id="event-count" class="tag"></span></h2><ol id="event-log" class="event-log" reversed></ol></div>
       </div>
       </details>
+    </section>
+
+    <section id="view-handover" class="view handover-view" aria-labelledby="h-handover" hidden>
+      <header class="handover-header"><div><p class="handover-eyebrow">АНАЛИТИКА · ПЕРЕДАЧА СМЕНЫ</p><h1 id="h-handover">Что передаём следующей смене</h1><p class="handover-description">Показатели и незавершённые дела из одного снимка производства.</p></div><span class="handover-badge">Синтетические данные</span></header>
+      <div class="handover-toolbar" aria-label="Срез и выгрузка"><button type="button" id="handover-refresh" class="handover-refresh" data-handover-refresh="1" data-focus-key="handover-refresh">Обновить срез</button><a class="handover-download" data-focus-key="handover-json" href="/api/handover?format=json" download>Скачать JSON</a><a class="handover-download" data-focus-key="handover-csv" href="/api/handover?format=csv" download>Скачать CSV</a></div>
+      <p class="handover-note">Выгрузка создаёт новый срез на момент скачивания. Время указано в модельных часах смены; «—» означает отсутствие данных.</p>
+      <p id="handover-status" class="handover-status" role="status" aria-live="polite" aria-atomic="true">Ожидаем загрузку среза.</p>
+      <div id="handover-content" aria-busy="false"></div>
     </section>
 
     <section id="view-lab" class="view" aria-labelledby="h-lab" hidden>

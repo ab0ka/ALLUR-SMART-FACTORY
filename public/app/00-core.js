@@ -18,7 +18,7 @@ const JOB_STATUS = { queued: 'в очереди техника', running: 'вы�
 const FILTERS = [['all', 'Все'], ['active', 'В работе'], ['queued', 'В очередях'], ['problem', 'Пауза, блокировки, доработка'], ['done', 'Приняты и отгружены']];
 const filterOf = { all: () => true, active: v => ['processing', 'rework'].includes(v.state), queued: v => ['not_started', 'waiting'].includes(v.state), problem: v => ['paused', 'blocked', 'stopped', 'rework_wait', 'rework'].includes(v.state), done: v => v.accepted };
 const SUGGESTED = ['Что сейчас угрожает плану?', 'Что делать с этой машиной?', 'Почему задерживается этот автомобиль?', 'На чём основана гипотеза неисправности?', 'Какую проверку выполнить?', 'Сравни ремонт сейчас и продолжение работы', 'Что даст перевод на другой пост?', 'Почему результат отличается от прогноза?'];
-const VIEWS = ['dispatcher', 'workshop', 'vehicles', 'orders', 'shift', 'lab'];
+const VIEWS = ['dispatcher', 'workshop', 'vehicles', 'orders', 'shift', 'handover', 'lab'];
 let state = null, view = 'space', selectedPost = 'A2', selectedVehicle = null, vehicleFilter = 'all', chatContext = null;
 let updating = false, fetching = false, aiRevision = null, aiBusy = false, chatBusy = false, lab = null;
 const text = (id, value) => { $(id).textContent = value; };
@@ -36,7 +36,7 @@ async function action(body) {
   const production = !['play', 'pause', 'step', 'speed'].includes(body.action);
   if (production) setProductionPending(true);
   try {
-    state = await api('/api/action', body); error(''); if (body.action === 'reset') resetAi();
+    state = await api('/api/action', body); error(''); if (body.action === 'reset') { resetAi(); if (typeof invalidateHandover === 'function') invalidateHandover(); }
     // Restore the temporary lock before the new snapshot calculates availability.
     if (production) setProductionPending(false);
     render(); return true;
@@ -135,4 +135,3 @@ function renderChrome() {
     ['Ограничивает', f.limiting ? esc(f.limiting.name) : '—'],
   ].map(([k, v]) => `<div><span>${k}</span><strong>${v}</strong></div>`).join('');
 }
-

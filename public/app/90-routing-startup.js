@@ -41,6 +41,8 @@ function setView(hash) {
   renderNavigation();
   if (view !== 'space') destroyScene();
   if (view === 'lab' && !lab) loadLab();
+  $('summary').hidden = view === 'handover';
+  if (typeof handoverRoute === 'function') handoverRoute();
   render(); revealRouteReference();
 }
 function revealRouteReference() {
@@ -65,7 +67,7 @@ function renderNavigation() {
   $('manage-navigation').hidden = section !== 'manage';
   $('analytics-navigation').hidden = section !== 'analytics';
   $('shop-select').value = space;
-  document.title = `${view === 'space' ? SPACES[space].short : { workshop: '2D-схема', vehicles: 'Автомобили', dispatcher: 'Задачи и решения', orders: 'Задания', shift: 'Результаты смены', lab: 'Модели и эксперименты' }[view]} · Allur`;
+  document.title = `${view === 'space' ? SPACES[space].short : { workshop: '2D-схема', vehicles: 'Автомобили', dispatcher: 'Задачи и решения', orders: 'Задания', shift: 'Результаты смены', handover: 'Передача смены', lab: 'Модели и эксперименты' }[view]} · Allur`;
 }
 function focusKey(el) {
   if (!el || el === document.body || !el.closest('main')) return null;
@@ -82,6 +84,7 @@ function render() {
   else if (view === 'vehicles') renderVehicles();
   else if (view === 'orders') renderOrders();
   else if (view === 'shift') renderShift();
+  else if (view === 'handover') renderHandover();
   else renderLab();
   renderSide(); renderCar3d();
   if (key && !document.activeElement?.closest('main')) visibleNavigationTarget(key)?.focus({ preventScroll: true });
