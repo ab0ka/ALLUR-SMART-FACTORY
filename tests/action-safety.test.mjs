@@ -65,13 +65,41 @@ test('an unsuccessful action releases the lock and reports its error', async () 
   assert.equal(await h.run("action({ action: 'job' })"), true);
 });
 
-// Deliberate TODO regression: execute the assertion so the baseline gap remains visible.
-// Remove TODO when wave 3 implements the guard; do not treat this as acceptance.
-test('one confirmation must not approve two competing intents', { todo: 'T5 wave 3: guard dialog reentry before registering listeners' }, async () => {
+test('one confirmation must not approve two competing intents', async () => {
   const h = harness();
   const first = h.run("confirmAction('Ремонт', '<p>Ремонт</p>')");
   const second = h.run("confirmAction('Сброс', '<p>Сброс смены</p>')");
   h.element('confirm').clickValue('ok');
   const approvals = await Promise.all([first, second]);
   assert.equal(approvals.filter(Boolean).length, 1);
+});
+
+
+test('competing confirmation preserves the original consequences', async () => {
+  const h = harness();
+  const first = h.run("confirmAction('Original', '<p>Original effect</p>')");
+  assert.equal(await h.run("confirmAction('Other', '<p>Other effect</p>')"), false);
+  assert.equal(h.element('confirm-title').textContent, 'Original');
+  assert.equal(h.element('confirm-body').innerHTML, '<p>Original effect</p>');
+  h.element('confirm').clickValue('cancel');
+  assert.equal(await first, false);
+});
+
+test('pending request does not open another confirmation', async () => {
+  const h = harness();
+  h.run('updating = true');
+  assert.equal(await h.run("confirmAction('Other', '')"), false);
+  assert.equal(h.element('confirm').open, false);
+});
+
+test('late close does not dismiss the next dialog; Escape cancels it', async () => {
+  const h = harness(), d = h.element('confirm');
+  const first = h.run("confirmAction('First', '')");
+  d.clickValue('ok');
+  assert.equal(await first, true);
+  d.open = false; // Native default closes the dialog; close event is queued.
+  const second = h.run("confirmAction('Second', '')");
+  d.dispatchEvent(new Event('close'));
+  d.dispatchEvent(new Event('cancel'));
+  assert.equal(await second, false);
 });
