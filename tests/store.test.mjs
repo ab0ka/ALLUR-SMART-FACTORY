@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
-import { mkdtemp, readFile, writeFile, readdir, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, rmdir, readFile, writeFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Workshop } from '../server/simulation.mjs';
 import { compareOptions, applyOption } from '../server/decisions.mjs';
-import { saveState, loadState, STATE_VERSION } from '../server/store.mjs';
+import { saveState, loadState, STATE_FORMAT, STATE_VERSION } from '../server/store.mjs';
 import { createApp } from '../server/index.mjs';
 
 async function withDir(fn) { const dir = await mkdtemp(path.join(tmpdir(), 'allur-store-')); try { await fn(dir); } finally { await rm(dir, { recursive: true, force: true }); } }
@@ -47,4 +47,26 @@ test('the saved file never contains API keys; saving refuses credential-like val
   } finally { await new Promise(res => { app.close(res); app.closeAllConnections(); }); }
   const w = new Workshop(); w.chat.push({ role: 'user', text: `мой ключ ${key}` });
   assert.throws(() => saveState(path.join(dir, 'other.json'), w), /credential/);
+}));
+
+test('failed quarantine stops recovery and preserves the only rejected state file', t => withDir(async dir => {
+  const file = path.join(dir, 'state.json');
+  const original = JSON.stringify({ format: STATE_FORMAT, version: STATE_VERSION + 1, data: { synthetic: true } });
+  await writeFile(file, original);
+  const timestamp = '2026-10-08T12:34:56.789Z';
+  const aside = `${file}.rejected-${timestamp.replace(/[:.]/g, '-')}`;
+  await mkdir(aside); // Renaming a file onto an existing directory must fail on Windows and POSIX.
+  const date = t.mock.method(Date.prototype, 'toISOString', () => timestamp);
+  try {
+    assert.throws(() => loadState(file), error => /Cannot quarantine rejected shift state/.test(error.message) && Boolean(error.cause?.code));
+    assert.equal(await readFile(file, 'utf8'), original);
+    assert.deepEqual(await readdir(aside), []);
+    assert.deepEqual((await readdir(dir)).sort(), [path.basename(file), path.basename(aside)].sort());
+    await rmdir(aside);
+    const recovered = loadState(file);
+    assert.match(recovered.error, /unsupported version/);
+    assert.equal(recovered.movedTo, aside);
+    assert.equal(await readFile(aside, 'utf8'), original);
+    await assert.rejects(readFile(file), { code: 'ENOENT' });
+  } finally { date.mock.restore(); }
 }));
