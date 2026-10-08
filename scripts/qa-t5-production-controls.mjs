@@ -5,6 +5,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { Workshop } from '../server/simulation.mjs';
 import { createApp } from '../server/index.mjs';
 import { compareOptions } from '../server/decisions.mjs';
+import { delayedQaRoute, closeQaFixture } from './lib/qa-lifecycle.mjs';
 import { answerChat } from '../server/chat.mjs';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE);
 const port = Number(process.env.T5_PORT || 3032);
@@ -51,10 +52,11 @@ try {
   for (const width of [1440, 390]) for (const name of ['check', 'job', 'transfer', 'hold', 'decision', 'proposal-command', 'proposal-decision']) {
     const { w, selector, view, selectPost, endpoint } = await fixture(name);
     const server = createApp({ simulation: w, aiOptions: { provider: 'local' } });
-    const page = await browser.newPage({ viewport: { width, height: 1000 } });
-    const errors = []; page.on('pageerror', e => errors.push(e.message));
-    let unblock;
+    let page, delayed;
+    const errors = [];
     try {
+      page = await browser.newPage({ viewport: { width, height: 1000 } });
+      page.on('pageerror', e => errors.push(e.message));
       await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); });
       await page.goto(`http://127.0.0.1:${port}/#${view}`);
       if (view === 'workshop') await page.locator(`#workshop-map [data-post="${selectPost}"]`).click();
@@ -83,23 +85,17 @@ try {
       }
       const attempts = requests.length, jobs = w.jobs.length, decisions = w.decisions.length;
       const eventSeq = w.eventSeq;
-      let committed;
-      const hasCommitted = new Promise(resolve => { committed = resolve; });
-      const gate = new Promise(resolve => { unblock = resolve; });
-      await page.route(`**${endpoint}`, async route => {
-        const response = await route.fetch(); // Real command commits; only its response is delayed.
-        assert.equal(response.status(), 200, name);
-        committed(); await gate; await route.fulfill({ response });
-      }, { times: 1 });
+      delayed = delayedQaRoute(name);
+      await page.route(`**${endpoint}`, route => delayed.handle(route), { times: 1 });
       await button.evaluate(b => { b.click(); b.click(); });
       await page.locator('#confirm[open]').waitFor();
       await page.locator('#confirm-ok').evaluate(b => { b.click(); b.click(); });
-      await hasCommitted;
+      await delayed.committed;
       await button.evaluate(b => { b.click(); b.click(); });
       assert.equal(await page.locator('#confirm').evaluate(d => d.open), false);
       assert.equal(requests.length, attempts + 1, `${name}: duplicate POST`);
       const response = page.waitForResponse(r => r.url().endsWith(endpoint));
-      unblock(); unblock = null; await response;
+      delayed.release(); await Promise.all([response, delayed.finished]);
       const newEvents = w.events.filter(e => e.seq > eventSeq);
       if (name === 'transfer') assert.equal(newEvents.filter(e => e.type === 'vehicle_transferred').length, 1);
       else if (name === 'hold') assert.equal(newEvents.filter(e => e.type === 'hold_changed').length, 1);
@@ -113,7 +109,10 @@ try {
       assert.deepEqual(errors, []);
       results.push({ name, width, cancel: true, escape: true, injected409Recovery: true, networkRecovery: true, delayedRealResponse: true, successfulPosts: 1, singleProductionEffect: true, newIntentAfterCompletion: true });
       console.log(`${name} ${width}: PASS`);
-    } finally { unblock?.(); await page.close(); await new Promise(resolve => server.close(resolve)); }
+    } finally {
+      try { delayed?.dispose(); }
+      finally { await closeQaFixture(page, server); }
+    }
   }
   await writeFile(new URL('report.json', output), JSON.stringify(results, null, 2));
   console.log(`PASS: ${output.pathname}`);
