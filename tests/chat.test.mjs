@@ -75,3 +75,14 @@ test('chat HTTP route requires CSRF, validates input, is rate limited and works 
     assert.equal((await ask({ message: 'Почему?', context: { type: 'post', id: '__proto__' } })).status, 404);
   } finally { await new Promise(res => { app.close(res); app.closeAllConnections(); }); }
 });
+
+
+test('a delay question resolves the current vehicle from either its problem or its post', async () => {
+  const w = detected(), p = w.problems[0], id = w.posts[p.postId].vehicleId;
+  assert.ok(id);
+  for (const context of [{ type: 'problem', id: p.id }, { type: 'post', id: p.postId }]) {
+    const reply = await answerChat(w, { message: 'Почему задерживается этот автомобиль?', context });
+    assert.ok(reply.text.startsWith(id), reply.text);
+    assert.ok(reply.refs.some(r => r.type === 'vehicle' && r.id === id));
+  }
+});
