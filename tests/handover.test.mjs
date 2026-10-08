@@ -86,7 +86,21 @@ test('explicit allowlists exclude hidden fields at every level and reject object
   assert.equal(report.revision, null); assert.equal(report.problems[0].title, null);
   assert.deepEqual(report.problems[0].vehicleIds, [null, 'DEMO-001']);
   assert.deepEqual(report.tasks[0].object, { type: 'vehicle', id: 'DEMO-001' });
-  assert.deepEqual(Object.keys(report).sort(), ['schemaVersion', 'synthetic', 'revision', 'elapsed', 'shift', 'shiftStart', 'finished', 'metrics', 'counts', 'problems', 'jobs', 'tasks', 'orders', 'resources', 'events'].sort());
+  assert.deepEqual(Object.keys(report).sort(), ['schemaVersion', 'synthetic', 'shiftEpoch', 'revision', 'elapsed', 'shift', 'shiftStart', 'finished', 'metrics', 'counts', 'problems', 'jobs', 'tasks', 'orders', 'resources', 'events'].sort());
+});
+
+test('shiftEpoch copies only a public scalar and stays null when absent or object-valued', () => {
+  for (const shiftEpoch of ['synthetic-run-1', 0, false]) {
+    const snapshot = freeze({ shiftEpoch });
+    assert.equal(createHandover(snapshot).shiftEpoch, shiftEpoch);
+    assert.deepEqual(snapshot, { shiftEpoch });
+  }
+  assert.equal(createHandover().shiftEpoch, null);
+  for (const shiftEpoch of [null, undefined, { csrf: 'private-marker' }, ['private-marker']]) {
+    const report = createHandover(freeze({ shiftEpoch }));
+    assert.equal(report.shiftEpoch, null);
+    assert.doesNotMatch(JSON.stringify(report), /private-marker|csrf/);
+  }
 });
 
 test('missing values stay null, empty collections stay empty, no forecast or resource data invented', () => {
