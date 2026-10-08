@@ -14,7 +14,7 @@ function handoverRoute() {
   if (view !== 'handover') { handoverStop(); handover.active = false; return; }
   if (handover.active) return;
   handover.active = true; handover.observed = null; handoverObserve();
-  loadHandover();
+  loadHandover({ returnFocus: captureNavigationReturnFocus($('view-handover')) });
 }
 function handoverNumber(value, percent = false) {
   return typeof value === 'number' && Number.isFinite(value) ? esc(percent ? pct(value) : fmt(value)) : '—';
@@ -56,7 +56,7 @@ function handoverPaint(report) {
     ${empty ? '<p class="handover-empty">Открытых проблем, работ, задач и незавершённых заданий в этом срезе нет.</p>' : ''}
     <div id="handover-items">${typeof renderHandoverItems === 'function' ? renderHandoverItems(report) : '<p class="handover-empty">Подробные списки станут доступны после подключения модуля передачи смены.</p>'}</div>`;
 }
-async function loadHandover() {
+async function loadHandover({ returnFocus = null } = {}) {
   if (view !== 'handover') return;
   const focused = document.activeElement?.closest('#view-handover [data-focus-key]');
   const focusKey = focused?.dataset.focusKey;
@@ -98,7 +98,9 @@ async function loadHandover() {
       $('handover-refresh').disabled = false;
       $('handover-refresh').textContent = handover.status === 'error' ? 'Повторить запрос' : 'Обновить срез';
       // Restore only inside this visible view, after enabling controls, without stealing a user's new focus.
-      if (focusKey && (document.activeElement === document.body || document.activeElement === focused)) {
+      if (returnFocus) {
+        restoreNavigationReturnFocus(returnFocus, $('handover-refresh'));
+      } else if (focusKey && (document.activeElement === document.body || document.activeElement === focused)) {
         const target = [...$('view-handover').querySelectorAll('[data-focus-key]')].find(el => el.dataset.focusKey === focusKey);
         const details = target?.closest?.('details');
         if (details) details.open = true;
