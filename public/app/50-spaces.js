@@ -66,12 +66,15 @@ function renderSpace() {
 
 function enterpriseCardsSvg() {
   return enterpriseCards(state).map(c => {
-    const lines = [...c.lines, ...c.problems.map(p => `${p.id}: ${p.title}`)];
-    const h = 34 + lines.length * 18;
-    return `<g class="em-card${c.live ? ' live' : ''}" role="button" tabindex="0" data-space="${c.space}" aria-label="${esc(`${c.title}. ${lines.join('. ')}${c.later ? '. Подробная сцена в разработке' : '. Открыть сцену'}`)}" transform="translate(${c.left} ${c.top})">
-      <rect width="280" height="${h}" rx="12" class="em-cardbox"/><text x="12" y="22" class="em-card-title">${esc(c.title)}</text>
-      <text x="268" y="22" text-anchor="end" class="em-card-tag${c.live ? ' live' : ''}">${c.live ? 'Открыть сцену →' : 'сцена позже'}</text>
-      ${lines.map((l, i) => `<text x="12" y="${42 + i * 18}" class="em-card-line${i >= c.lines.length ? ' warn' : ''}">${esc(l.length > 44 ? l.slice(0, 43) + '…' : l)}</text>`).join('')}</g>`;
+    const lines = [...c.lines.map(text => ({ text, full: text })), ...c.problems.map(p => ({
+      text: `${p.id} · ${post(p.postId).code} · ${p.kind === 'equipment' ? 'отклонение' : p.title.startsWith('Снижение') ? 'снижение темпа' : 'неисправность'}`,
+      full: `${p.id}: ${p.title}`,
+    }))];
+    return `<g class="em-card${c.live ? ' live' : ''}" role="button" tabindex="0" data-space="${c.space}" aria-label="${esc(`${c.title}. ${lines.map(l => l.full).join('. ')}${c.later ? '. Подробная сцена в разработке' : '. Открыть сцену'}`)}" transform="translate(${c.left} ${c.top})">
+      <rect width="${c.width}" height="${c.height}" rx="12" class="em-cardbox"/><text x="12" y="22" class="em-card-title">${esc(c.title)}</text>
+      <text x="12" y="40" class="em-card-tag${c.live ? ' live' : ''}">${c.live ? 'Открыть сцену →' : 'сцена позже'}</text>
+      <defs><clipPath id="em-card-clip-${c.space}"><rect x="12" y="46" width="${c.width - 24}" height="${c.height - 52}"/></clipPath></defs>
+      <g clip-path="url(#em-card-clip-${c.space})">${lines.map((l, i) => `<text x="12" y="${60 + i * 18}" class="em-card-line${i >= c.lines.length ? ' warn' : ''}"><title>${esc(l.full)}</title>${esc(l.text.length > 44 ? l.text.slice(0, 43) + '…' : l.text)}</text>`).join('')}</g></g>`;
   }).join('');
 }
 
@@ -117,4 +120,3 @@ function objectsTable() {
     <div class="table-scroll"><table class="obj-table"><caption class="sr-only">Объекты пространства «${esc(SPACES[space].short)}» на ${clock(state.elapsed)}</caption><thead><tr><th scope="col">Объект</th><th scope="col">Тип</th><th scope="col">Состояние</th><th scope="col">Автомобиль</th><th scope="col">Операция</th><th scope="col">Ход / заполнение</th><th scope="col">Причина</th><th scope="col"><span class="sr-only">Действие</span></th></tr></thead><tbody>${rows}</tbody></table></div>
     <p class="keys"><b>Клавиатура:</b> <kbd>Tab</kbd> объекты · <kbd>Enter</kbd> карточка · <kbd>Esc</kbd> закрыть · <kbd>1</kbd>–<kbd>6</kbd> пространства · <kbd>0</kbd> общий вид · <kbd>T</kbd> сцена ↔ таблица</p></div>`;
 }
-

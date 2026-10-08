@@ -491,19 +491,28 @@ export function enterpriseSvg(state) {
   }
   return out;
 }
-// Shop cards for the enterprise map: positions next to each block and live numbers.
+// Keep cards in the clear margins of the map. Reserve room for an open problem
+// on every post; the left column also stays below the fixed HTML HUD.
 export function enterpriseCards(state) {
   const post = id => state.posts.find(p => p.id === id), stage = id => state.stages.find(s => s.id === id);
   const busy = ids => ids.filter(id => post(id).vehicleId && !['fault', 'idle'].includes(post(id).state)).length;
   const q = state.quality, b = id => stage(id).buffer;
   const open = state.problems.filter(p => p.status === 'open');
   const probFor = st => open.filter(p => post(p.postId)?.stage === st);
-  return [
-    { space: 'weld', left: 360, top: 4, title: 'Сварка', later: true, lines: [`СВ-1, СВ-2 · заняты ${busy(['W1', 'W2'])} из 2`, `Входной буфер: ${b('weld').vehicleIds.length} кузовов`], problems: probFor('weld') },
-    { space: 'paint', left: 542, top: 109, title: 'Окраска', later: true, lines: [`ОК-1, ОК-2 · заняты ${busy(['P1', 'P2'])} из 2`, `B1: ${b('paint').vehicleIds.length} из ${b('paint').capacity}`], problems: probFor('paint') },
-    { space: 'assembly', left: 724, top: 206, title: 'Сборка', live: true, lines: [`СБ-1…СБ-3 · заняты ${busy(['A1', 'A2', 'A3'])} из 3 · B2: ${b('assembly').vehicleIds.length} из ${b('assembly').capacity}`], problems: probFor('assembly') },
-    { space: 'tests', left: 940, top: 331, title: 'Испытания · контроль', later: true, lines: [`КК-1, КК-2 · заняты ${busy(['Q1', 'Q2'])} из 2 · B3: ${b('quality').vehicleIds.length} из ${b('quality').capacity}`, `С первого предъявления: ${q.firstInspections ? `${q.firstPass} из ${q.firstInspections}` : '—'}`, 'Испытательных стендов в модели нет'], problems: probFor('quality') },
-    { space: 'ship', left: 1122, top: 444, title: 'Отгрузка', later: true, lines: [`ОТ-1 · ${post('S1').vehicleId ? `занят ${post('S1').vehicleId}` : 'свободен'} · FG: ${b('shipping').vehicleIds.length} из ${b('shipping').capacity}`, `Отгружено за смену: ${state.totals.shipped}`], problems: probFor('shipping') },
-    { space: 'rework', left: 470, top: 556, title: 'Доработка', later: true, lines: [`ДР-1 · ${post('R1').vehicleId ? `занят ${post('R1').vehicleId}` : 'свободен'} · очередь ${state.rework.buffer.vehicleIds.length}`, `Приняты после доработки: ${q.reworkedAccepted}`], problems: probFor('rework') },
-  ];
+  const cards = [
+    { space: 'weld', left: 30, top: 430, title: 'Сварка', later: true, lines: [`СВ-1, СВ-2 · заняты ${busy(['W1', 'W2'])} из 2`, `Входной буфер: ${b('weld').vehicleIds.length} кузовов`], problems: probFor('weld') },
+    { space: 'paint', left: 30, top: 566, title: 'Окраска', later: true, lines: [`ОК-1, ОК-2 · заняты ${busy(['P1', 'P2'])} из 2`, `B1: ${b('paint').vehicleIds.length} из ${b('paint').capacity}`], problems: probFor('paint') },
+    { space: 'assembly', left: 30, top: 702, title: 'Сборка', live: true, lines: [`СБ-1…СБ-3 · заняты ${busy(['A1', 'A2', 'A3'])} из 3 · B2: ${b('assembly').vehicleIds.length} из ${b('assembly').capacity}`], problems: probFor('assembly') },
+    { space: 'tests', left: 1110, top: 40, title: 'Испытания · контроль', later: true, lines: [`КК-1, КК-2 · заняты ${busy(['Q1', 'Q2'])} из 2 · B3: ${b('quality').vehicleIds.length} из ${b('quality').capacity}`, `С первого предъявления: ${q.firstInspections ? `${q.firstPass} из ${q.firstInspections}` : '—'}`, 'Испытательных стендов в модели нет'], problems: probFor('quality') },
+    { space: 'ship', left: 1110, top: 206, title: 'Отгрузка', later: true, lines: [`ОТ-1 · ${post('S1').vehicleId ? `занят ${post('S1').vehicleId}` : 'свободен'} · FG: ${b('shipping').vehicleIds.length} из ${b('shipping').capacity}`, `Отгружено за смену: ${state.totals.shipped}`], problems: probFor('shipping') },
+    { space: 'rework', left: 1110, top: 338, title: 'Доработка', later: true, lines: [`ДР-1 · ${post('R1').vehicleId ? `занят ${post('R1').vehicleId}` : 'свободен'} · очередь ${state.rework.buffer.vehicleIds.length}`, `Приняты после доработки: ${q.reworkedAccepted}`], problems: probFor('rework') },
+  ].map(c => ({ ...c, width: 280, height: 52 + (c.lines.length + c.problems.length) * 18 }));
+  // Equipment and a manual incident may both be open on one assembly post.
+  // Pack upwards only when needed, retaining a gap and the bottom margin.
+  let bottom = 826;
+  for (const c of cards.filter(c => c.left === 30).reverse()) {
+    c.top = Math.min(c.top, bottom - c.height);
+    bottom = c.top - 12;
+  }
+  return cards;
 }
