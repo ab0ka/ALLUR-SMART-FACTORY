@@ -80,6 +80,8 @@ test('successful reset at unchanged minute invalidates report and cancels pendin
   const core = await readFile(new URL('../public/app/00-core.js', import.meta.url), 'utf8');
   const action = core.slice(core.indexOf('async function action('), core.indexOf('function resetAi('));
   h.run('updating = false; api = async () => state; error = () => {}; resetAi = () => {}; render = () => renderHandover();');
+  h.context.MutationObserver = class { observe() {} disconnect() {} };
+  h.context.document.querySelectorAll = () => [];
   h.run(action);
   const pending = h.run('loadHandover()');
   assert.equal(await h.run("action({ action: 'reset' })"), true);
