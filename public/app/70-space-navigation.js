@@ -1,8 +1,9 @@
 // ---------- Selection and navigation inside spaces ----------
-function openPanel(panel, selected, ctx) {
+function openPanel(panel, selected, ctx, routeChanged = false) {
   ui.panel = panel; if (selected !== undefined) ui.selected = selected; if (ctx) chatContext = ctx;
   if (view !== 'space') { location.hash = spaceHash({ space: ['assembly', 'diag'].includes(space) ? space : 'assembly', panel, table: ui.table }); return; }
-  syncHash(); render();
+  syncHash();
+  if (routeChanged) setView(location.hash.slice(1)); else render();
   if (narrow() && scene && ui.selected) { if (ui.selected.type === 'vehicle') scene.focusVehicle(ui.selected.id, 1.6); else if (ui.selected.type === 'post') scene.focusPost(ui.selected.id, 1.6); }
   requestAnimationFrame(() => $('side').querySelector('h2')?.focus?.());
 }
