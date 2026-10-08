@@ -195,8 +195,8 @@ export class AssemblyScene {
   constructor(svg, { onSelect } = {}) {
     this.svg = svg; this.onSelect = onSelect; this.cars = new Map(); this.raf = 0; this.cam = { s: 1, cx: 500, cy: 330 };
     svg.setAttribute('viewBox', `0 0 ${VIEW.w} ${VIEW.h}`);
-    svg.innerHTML = `${DEFS}<g class="sc-cam">${floorLayer()}<g class="sc-rings"></g><g class="sc-objects"></g><g class="sc-overlay"></g></g>`;
-    this.camEl = svg.querySelector('.sc-cam'); this.rings = svg.querySelector('.sc-rings'); this.objectsEl = svg.querySelector('.sc-objects'); this.overlay = svg.querySelector('.sc-overlay');
+    svg.innerHTML = `${DEFS}<g class="sc-cam">${floorLayer()}<g class="sc-rings"></g><g class="sc-leaders"></g><g class="sc-objects"></g><g class="sc-overlay"></g></g>`;
+    this.camEl = svg.querySelector('.sc-cam'); this.rings = svg.querySelector('.sc-rings'); this.leaders = svg.querySelector('.sc-leaders'); this.objectsEl = svg.querySelector('.sc-objects'); this.overlay = svg.querySelector('.sc-overlay');
     this.statics = [];
     const addStatic = (markup, fp, h) => { const g = document.createElementNS(NS, 'g'); g.innerHTML = markup; this.objectsEl.append(g); this.statics.push({ el: g, fp, h }); };
     for (const [post, y] of Object.entries(BAY_Y)) {
@@ -215,8 +215,12 @@ export class AssemblyScene {
     this.applyTech(); this.sortObjects(true); this.applyCamera();
     this.onVisible = () => { if (!document.hidden) this.snapAll(); };
     document.addEventListener('visibilitychange', this.onVisible);
+    // The card beside the scene and the window size change the scene's size on screen, and with it the label scale.
+    this.resize = typeof ResizeObserver === 'function' ? new ResizeObserver(() => { if (this.last && this.labelScale() !== this.k) this.renderOverlay(...this.last); }) : null;
+    this.resize?.observe(svg);
   }
   destroy() {
+    this.resize?.disconnect();
     cancelAnimationFrame(this.raf); this.raf = 0;
     document.removeEventListener('visibilitychange', this.onVisible);
     this.cars.clear(); this.svg.innerHTML = '';
@@ -225,6 +229,14 @@ export class AssemblyScene {
   applyCamera() {
     const { s, cx, cy } = this.cam;
     this.camEl.setAttribute('transform', `translate(${r1(VIEW.w / 2 - s * cx)} ${r1(VIEW.h / 2 - s * cy)}) scale(${s})`);
+    if (this.last && this.labelScale() !== this.k) this.renderOverlay(...this.last);
+  }
+  // Plates and chips are scaled so that their smallest text (12 units) is at least 12 px on screen.
+  labelScale() {
+    const w = this.svg.clientWidth, h = this.svg.clientHeight;
+    if (!w || !h) return 1;
+    const px = Math.min(w / VIEW.w, h / VIEW.h) * this.cam.s;
+    return Math.min(1.4, Math.max(1, Math.ceil(20 / px - .02) / 20)); // steps of 0.05
   }
   zoom(f, cx, cy) {
     this.cam.s = Math.min(2.6, Math.max(.7, this.cam.s * f));
@@ -357,7 +369,7 @@ export class AssemblyScene {
     const car = this.cars.get(tag.dataset.for);
     if (!car?.pos) { tag.setAttribute('visibility', 'hidden'); return; }
     const [x, y] = iso(car.pos.x, car.pos.y, 58 + (car.pos.z ?? 0));
-    tag.setAttribute('visibility', 'visible'); tag.setAttribute('transform', `translate(${r1(x)} ${r1(y)})`);
+    tag.setAttribute('visibility', 'visible'); tag.setAttribute('transform', `translate(${r1(x)} ${r1(y)}) scale(${this.k ?? 1})`);
   }
 
   // ----- rings, plates, chips -----
@@ -386,27 +398,33 @@ export class AssemblyScene {
     return { working: ['ok', 'Работает'], idle: ['idle', 'Свободен'], slow: ['warn', p.problemId ? 'Отклонение' : 'Темп снижен'], blocked: ['warn', 'Ждёт место'], fault: ['stop', 'Неисправность'], maintenance: ['stop', 'Работы'], shift_over: ['idle', 'Смена окончена'] }[p.state] ?? ['idle', p.state];
   }
   renderOverlay(state, ui) {
-    const anchors = { A1: [716, 196], A2: [620, 300], A3: [452, 412] };
-    let out = GATE_BEAM;
-    for (const [postId, y] of Object.entries(BAY_Y)) {
-      const p = state.posts.find(q => q.id === postId), [sx, sy] = iso(BAY_X, y), [ax, ay] = anchors[postId];
-      const [kind, label] = this.plateState(state, p), job = this.jobOn(state, postId);
-      const eq = state.equipment.find(e => e.postId === postId);
+    this.last = [state, ui]; const k = this.k = this.labelScale();
+    const plates = Object.entries(BAY_Y).map(([postId, y]) => {
+      const p = state.posts.find(q => q.id === postId), job = this.jobOn(state, postId);
       let sub = '';
       if (job) sub = `${job.id} · ${job.short} · ${Math.max(0, job.duration - job.remaining)}/${job.duration} мин`;
       else if (p.problemId) sub = `${p.problemId} · ${p.state === 'slow' ? 'темп снижен' : 'открыта'}`;
       else if (p.state === 'blocked') sub = 'B3 заполнен';
       else if (p.hold) sub = 'снят с загрузки';
+      const eq = state.equipment.find(e => e.postId === postId), diag = ui.diag && eq;
+      return { postId, y, p, job, sub, eq, diag, h: plateHeight(Boolean(sub), Boolean(diag)) };
+    });
+    const L = labelLayout(k, Object.fromEntries(plates.map(q => [q.postId, q.h])));
+    let out = GATE_BEAM, leaders = '';
+    for (const { postId, y, p, job, sub, eq, h } of plates) {
+      const [sx, sy] = iso(BAY_X, y), { x: ax, y: ay } = L.plates[postId];
+      const [kind, label] = this.plateState(state, p);
       const diag = ui.diag && eq ? `Отклонение подъёмника ${(Math.round(eq.anomalyScore * 10) / 10).toString().replace('.', ',')} / 4,5` : '';
-      const barY = sub ? 64 : 48, h = barY + 12 + (diag ? 18 : 0);
+      const barY = sub ? 64 : 48;
       const lampCls = { ok: 'sc-lamp-ok', idle: 'sc-lamp-idle', warn: 'sc-lamp-warn', check: 'sc-lamp-check', stop: 'sc-lamp-stop' }[kind];
       const [lx, ly] = [sx - 6, sy - 23.5];
       out += `<circle cx="${r1(lx)}" cy="${r1(ly)}" r="6" class="sc-postlamp ${lampCls}"/>`;
       if (p.problemId || kind === 'stop') out += `<ellipse cx="${r1(sx + 7.4)}" cy="${r1(sy + 56)}" rx="22" ry="24" class="sc-unitmark ${kind === 'stop' ? 'stop' : ''}"/>`;
-      const [x0, y0] = [sx + 95.3, sy + 13];
-      out += `<circle cx="${r1(x0)}" cy="${r1(y0)}" r="3" class="sc-leaderdot"/><path d="M${r1(x0)} ${r1(y0)}L${ax} ${ay + 26}" class="sc-leader"/>`;
+      // Leader from the bay edge to the plate, drawn beneath cars and equipment.
+      const [[x0, y0], [x1, y1]] = leaderOf(postId, y, L.plates[postId], h, k);
+      leaders += `<path d="M${r1(x0)} ${r1(y0)}L${r1(x1)} ${r1(y1)}" class="sc-leader"/><circle cx="${r1(x0)}" cy="${r1(y0)}" r="3" class="sc-leaderdot"/>`;
       const sel = ui.selected?.type === 'post' && ui.selected.id === postId;
-      out += `<g class="sc-plate ${kind}${sel ? ' selected' : ''}" role="button" tabindex="0" data-post="${postId}" aria-label="${esc(`${p.code}: ${label}${p.vehicleId ? `, ${p.vehicleId}, ${Math.round((p.progress ?? 0) * 100)}%` : ''}${sub ? `, ${sub}` : ''}`)}" transform="translate(${ax} ${ay})">
+      out += `<g class="sc-plate ${kind}${sel ? ' selected' : ''}" role="button" tabindex="0" data-post="${postId}" aria-label="${esc(`${p.code}: ${label}${p.vehicleId ? `, ${p.vehicleId}, ${Math.round((p.progress ?? 0) * 100)}%` : ''}${sub ? `, ${sub}` : ''}`)}" transform="translate(${r1(ax)} ${r1(ay)}) scale(${k})">
         <rect width="216" height="${h}" rx="10" class="sc-platebox"/>
         <text x="10" y="20" class="sc-plate-code">${esc(p.code)}</text>${icon(kind, 54, 9)}<text x="72" y="20" class="sc-plate-status ${kind}">${esc(label)}</text>
         <text x="10" y="38" class="sc-plate-line">${p.vehicleId ? `${esc(p.vehicleId)} · сборка ${Math.round((p.progress ?? 0) * 100)}%` : 'нет автомобиля'}</text>
@@ -422,20 +440,52 @@ export class AssemblyScene {
     const stock = Object.fromEntries(state.stock.map(s => [s.id, s]));
     const tech = state.technicians[0], tjob = tech?.jobId ? state.jobs.find(j => j.id === tech.jobId) : null;
     const b2 = state.stages.find(s => s.id === 'assembly').buffer, b3 = state.stages.find(s => s.id === 'quality').buffer;
-    out += chip(30, 280, 230, `B2 · Буфер перед сборкой ${b2.vehicleIds.length}/${b2.capacity}`, b2.vehicleIds.length ? `${b2.vehicleIds[0]} ждёт свободный пост` : 'Очередь пуста', b2.vehicleIds.length ? 'wait' : 'muted', b2.vehicleIds[0] ? `data-vehicle="${esc(b2.vehicleIds[0])}"` : 'data-table="1"');
-    out += chip(760, 524, 230, `B3 · Буфер перед контролем ${b3.vehicleIds.length}/${b3.capacity}`, b3.vehicleIds.length ? `${b3.vehicleIds[0]} ждёт свободный КК` : 'Очередь пуста', b3.vehicleIds.length ? 'wait' : 'muted', b3.vehicleIds[0] ? `data-vehicle="${esc(b3.vehicleIds[0])}"` : 'data-space="tests"');
-    out += chip(20, 420, 250, tjob ? `ТЕХ-1 · ${tjob.id} на ${tjob.postCode ?? state.posts.find(p => p.id === tjob.postId)?.code}` : 'ТЕХ-1 · свободен', `Склад: уплотнения ${stock.seal_kit?.available ?? '—'} · насос ${stock.pump?.available ?? '—'}`, 'tech', tjob?.problemId ? `data-problem="${esc(tjob.problemId)}"` : 'data-table="1"');
-    out += chip(818, 386, 176, 'Испытания: КК-1, КК-2 →', '', 'nav', 'data-space="tests"');
-    out += chip(64, 172, 196, '← Вход из окраски', '', 'muted', 'data-space="paint"');
+    const C = L.chips, techPost = tjob ? tjob.postCode ?? state.posts.find(p => p.id === tjob.postId)?.code : '';
+    // Secondary chips are compact; the full wording stays in their accessible names.
+    out += chip(C.b2, k, `B2 · на сборку ${b2.vehicleIds.length}/${b2.capacity}`, b2.vehicleIds.length ? `${b2.vehicleIds[0]} ждёт пост` : 'очередь пуста', b2.vehicleIds.length ? 'wait' : 'muted', b2.vehicleIds[0] ? `data-vehicle="${esc(b2.vehicleIds[0])}"` : 'data-table="1"',
+      `B2 · Буфер перед сборкой ${b2.vehicleIds.length}/${b2.capacity}. ${b2.vehicleIds.length ? `${b2.vehicleIds[0]} ждёт свободный пост` : 'Очередь пуста'}`);
+    out += chip(C.b3, k, `B3 · на контроль ${b3.vehicleIds.length}/${b3.capacity}`, b3.vehicleIds.length ? `${b3.vehicleIds[0]} ждёт КК` : 'очередь пуста', b3.vehicleIds.length ? 'wait' : 'muted', b3.vehicleIds[0] ? `data-vehicle="${esc(b3.vehicleIds[0])}"` : 'data-space="tests"',
+      `B3 · Буфер перед контролем ${b3.vehicleIds.length}/${b3.capacity}. ${b3.vehicleIds.length ? `${b3.vehicleIds[0]} ждёт свободный КК` : 'Очередь пуста'}`);
+    out += chip(C.tech, k, tjob ? `ТЕХ-1 · ${tjob.id} на ${techPost}` : 'ТЕХ-1 · свободен', `Склад: уплотнения ${stock.seal_kit?.available ?? '—'} · насос ${stock.pump?.available ?? '—'}`, 'tech', tjob?.problemId ? `data-problem="${esc(tjob.problemId)}"` : 'data-table="1"');
+    out += chip(C.nav, k, 'Испытания: КК-1, КК-2 →', '', 'nav', 'data-space="tests"');
+    out += chip(C.entry, k, '← Вход из окраски', '', 'muted', 'data-space="paint"');
     const sel = ui.selected?.type === 'vehicle' ? ui.selected.id : null;
     if (sel && this.cars.has(sel)) out += `<g class="sc-seltag" data-for="${esc(sel)}" visibility="hidden"><path d="M0 0L-18 -40" class="sc-tagstem"/><rect x="-104" y="-70" width="150" height="28" rx="14" class="sc-tagbox"/><text x="-29" y="-51" class="sc-tagtext">${esc(sel)} · выбран</text></g>`;
+    this.leaders.innerHTML = leaders;
     this.overlay.innerHTML = out;
     this.positionTag();
   }
 }
-function chip(x, y, w, title, sub, kind, data) {
+function chip({ x, y, w }, k, title, sub, kind, data, label) {
   const h = sub ? 46 : 30;
-  return `<g class="sc-chip ${kind}" role="button" tabindex="0" ${data} aria-label="${esc(`${title}${sub ? `. ${sub}` : ''}`)}" transform="translate(${x} ${y})"><rect width="${w}" height="${h}" rx="10" class="sc-chipbox"/><text x="11" y="19" class="sc-chip-title">${esc(title)}</text>${sub ? `<text x="11" y="36" class="sc-chip-sub">${esc(sub)}</text>` : ''}</g>`;
+  return `<g class="sc-chip ${kind}" role="button" tabindex="0" ${data} aria-label="${esc(label ?? `${title}${sub ? `. ${sub}` : ''}`)}" transform="translate(${r1(x)} ${r1(y)}) scale(${k})"><rect width="${w}" height="${h}" rx="10" class="sc-chipbox"/><text x="11" y="19" class="sc-chip-title">${esc(title)}</text>${sub ? `<text x="11" y="36" class="sc-chip-sub">${esc(sub)}</text>` : ''}</g>`;
+}
+// ---------- Label layout ----------
+// Plates and chips sit where no car ever drives and where the page's own controls do not cover them
+// (top-left: shop card and view switches, top-right: camera buttons, top centre: the hint).
+// k is the label scale (see labelScale); sizes below are in label units, positions in scene units.
+export const PLATE_W = 216;
+export const plateHeight = (sub, diag) => (sub ? 64 : 48) + 12 + (diag ? 18 : 0);
+export const CHIP_SIZE = { b2: [172, 46], b3: [172, 46], tech: [220, 46], nav: [176, 30], entry: [150, 30] };
+export function labelLayout(k, plateH) {
+  const gap = 8, bottom = VIEW.h - 4, right = VIEW.w - 4, size = id => ({ w: CHIP_SIZE[id][0], h: CHIP_SIZE[id][1] });
+  // СБ-1 above the back wall; СБ-3 and СБ-2 side by side along the bottom edge
+  const A1 = { x: 925 - PLATE_W * k, y: 62 };
+  const A3 = { x: 20, y: bottom - plateH.A3 * k }, A2 = { x: A3.x + PLATE_W * k + gap, y: bottom - plateH.A2 * k };
+  // ТЕХ-1 and B2 stacked above СБ-3 (left of the technician's zone and the aisle), the entry next to СБ-2
+  const tech = size('tech'); Object.assign(tech, { x: 20, y: A3.y - gap - tech.h * k });
+  const b2 = size('b2'); Object.assign(b2, { x: 20, y: tech.y - gap - b2.h * k });
+  const entry = size('entry'); Object.assign(entry, { x: A2.x + PLATE_W * k + gap, y: bottom - entry.h * k });
+  // B3 in the bottom-right corner, the way to the tests next to the gate
+  const b3 = size('b3'); Object.assign(b3, { x: right - b3.w * k, y: bottom - b3.h * k });
+  const nav = size('nav'); Object.assign(nav, { x: right - nav.w * k, y: 384 });
+  return { plates: { A1, A2, A3 }, chips: { tech, entry, b2, b3, nav } };
+}
+// Leader endpoints: from a corner of the bay floor to the nearest edge of its plate.
+export function leaderOf(postId, y, plate, h, k) {
+  const a = postId === 'A1' ? iso(400, y - 30) : postId === 'A2' ? iso(400, y + 80) : iso(220, y + 80);
+  const x = Math.min(Math.max(a[0], plate.x + 24 * k), plate.x + (PLATE_W - 24) * k);
+  return [a, [x, postId === 'A1' ? plate.y + h * k : plate.y]];
 }
 export function icon(kind, x, y) {
   const t = `transform="translate(${x} ${y}) scale(.8125)"`;
