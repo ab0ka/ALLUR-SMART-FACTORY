@@ -749,3 +749,31 @@ details.more>summary{cursor:pointer;font-weight:700;color:var(--link);min-height
 .c3-badge a{color:inherit}
 .c3-badge .short{display:none}
 @media(max-width:760px){.c3-badge .long{display:none}.c3-badge .short{display:inline}.c3-badge{left:6px;bottom:6px;padding:3px 7px;font-size:10.5px}}
+
+/* T4: additions scoped to orders-/shiftx-, preserving the PR45 shell. */
+.orders-filters{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 8px}
+.orders-filters button[aria-pressed=true]{background:#E3EEFB;border-color:#1A5FB4;color:#14222E}
+.orders-result,.orders-empty,.shiftx-note{color:#4F6072;font-size:13px;line-height:1.5}
+.orders-counts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}
+.orders-counts div{background:#F1F4F8;border-radius:8px;padding:8px 10px}
+.orders-counts dt{font-size:13px;color:#4F6072}.orders-counts dd{margin:2px 0 0;font-size:20px;font-weight:700}
+.orders-view .order,.shiftx-view .panel{min-width:0}
+.orders-view .mini,.orders-view .segmented-buttons button,.shiftx-view button.link{min-height:40px;min-width:40px}
+.orders-view .eyebrow{font-size:12px;letter-spacing:.8px}
+.orders-view .order-head{flex-wrap:wrap}.orders-view .order-due{text-align:left}
+.shiftx-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0}
+.shiftx-metric{padding:12px;background:#F1F4F8;border-radius:10px;border-top:4px solid #526474;min-width:0}
+.shiftx-metric dt{font-size:14px;font-weight:700}.shiftx-metric dd{font-size:28px;font-weight:700;margin:6px 0 0}
+.shiftx-metric dd span{font-size:13px;font-weight:400;color:#4F6072}
+.shiftx-metric small{display:block;font-size:13px;line-height:1.5;font-weight:400;color:#4F6072;margin-top:6px}
+.shiftx-target{border-top-color:#8A5A00}.shiftx-reference{border-top-style:dashed}.shiftx-forecast{border-top-color:#0B7A73;border-top-style:dotted}.shiftx-fact{border-top-color:#1A5FB4}
+.shiftx-gap{font-size:14px}
+.shiftx-oee caption{text-align:left;font-size:13px;color:#4F6072;padding:8px 0}
+.shiftx-oee thead{background:#EEF2F6}.shiftx-oee thead button{border:0;background:transparent;padding:6px;color:#14222E;min-width:40px;min-height:40px}
+.shiftx-oee tbody tr:nth-child(even){background:#F7F9FB}
+.shiftx-oee th[scope=row]{position:sticky;left:0;background:#fff;border-right:1px solid #DCE3EA}
+.shiftx-view .chart-axis,.shiftx-view .chart-label{font-size:13px;fill:#4F6072}
+.shiftx-view .k-target{color:#8A5A00}.shiftx-view .k-plan{color:#4F6072}
+.shiftx-view .table-scroll{max-width:100%}.shiftx-view .shift-grid,.shiftx-view .split{min-width:0}
+@media(max-width:1100px){.shiftx-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.shiftx-metrics{grid-template-columns:1fr}.orders-view .order-list{grid-template-columns:minmax(0,1fr)}.shiftx-view .shift-grid,.shiftx-view .split{grid-template-columns:minmax(0,1fr)}}
