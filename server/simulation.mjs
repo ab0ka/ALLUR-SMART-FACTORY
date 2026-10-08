@@ -326,6 +326,13 @@ export class Workshop {
     if (this.holds[postId]) return { ok: false, status: 409, reason: `${target.code} снят с загрузки` };
     return { ok: true };
   }
+  postTransferOptions(postId) {
+    const def = POST[postId], post = this.posts[postId];
+    const targets = POSTS.filter(p => p.stage === def.stage && p.id !== postId);
+    const reason = this.finished ? 'Смена завершена' : !post.vehicleId ? `${def.code}: на посту нет автомобиля` : !targets.length ? `${def.code}: на участке нет параллельных постов` : null;
+    return { reason, targets: targets.map(target => ({ postId: target.id, postCode: target.code,
+      ...(reason ? { ok: false, status: 409, reason } : this.transferAvailability(post.vehicleId, target.id)) })) };
+  }
   transfer(vehicleId, postId, actor = 'operator') {
     const a = this.transferAvailability(vehicleId, postId);
     if (!a.ok) throw new SimulationError(a.reason, a.status);
@@ -650,6 +657,7 @@ export class Workshop {
     return {
       id: def.id, code: def.code, stage: def.stage, stageName: stage.name, capacity: def.capacity, state, reason, incidentId: incident?.id ?? null, problemId: problem?.id ?? null, hold: Boolean(this.holds[def.id]), equipmentId: LIFT_BY_POST[def.id]?.id ?? null,
       vehicleId: post.vehicleId, operation: exec ? exec.operation : null, progress: exec ? round(1 - exec.remaining / exec.work) : null, remaining: exec ? round(exec.remaining, 1) : null,
+      transfer: this.postTransferOptions(def.id),
       stats: { ...post.stats, nominal: round(post.stats.nominal, 2) }, metrics: postOee(post.stats, this.minute, quality),
     };
   }

@@ -90,6 +90,16 @@ function panelPost(p) {
     if (state.posts.some(x => x.stage === p.stage && x.id !== p.id)) actions.push(`<button class="wide" data-hold="${esc(p.id)}" data-on="${p.hold ? '0' : '1'}">${p.hold ? 'Вернуть пост в загрузку…' : 'Не загружать пост новыми автомобилями…'}</button>`);
     if (!incident && !p.problemId) actions.push(`<details class="demo"><summary>Учебный сценарий неисправности</summary><button class="wide" data-fault="${esc(p.id)}" data-kind="breakdown">Создать неисправность…</button><button class="wide" data-fault="${esc(p.id)}" data-kind="slowdown">Создать снижение темпа…</button></details>`);
   }
+  const transfer = p.transfer;
+  if (transfer) {
+    if (transfer.reason) actions.push(`<button class="wide" disabled aria-describedby="post-transfer-reason">Перевести на соседний пост</button><p id="post-transfer-reason" class="why">Недоступно: ${esc(transfer.reason)}.</p>`);
+    else for (const target of transfer.targets) {
+      const reasonId = `post-transfer-${p.id}-${target.postId}`;
+      actions.push(target.ok
+        ? `<button class="wide" data-transfer="${esc(p.vehicleId)}" data-to="${esc(target.postId)}">Перевести ${esc(p.vehicleId)} на ${esc(target.postCode)}…</button>`
+        : `<button class="wide" disabled aria-describedby="${esc(reasonId)}">Перевести на ${esc(target.postCode)}</button><p id="${esc(reasonId)}" class="why">Недоступно: ${esc(target.reason)}.</p>`);
+    }
+  }
   const m = p.metrics;
   body += `<h3>Действия</h3><div class="actions-col">${actions.join('') || '<p class="muted">Действий нет.</p>'}</div>${lockNote}<p class="fine-print">A ${pct(m.availability)} · P ${pct(m.performance)} · Q ${pct(m.quality)} · OEE ${pct(m.oee)} · работа ${p.stats.run} мин · простой без входа ${p.stats.starved} мин</p>`;
   return sideHead(`ПОСТ · ${esc(p.stageName.toUpperCase())}`, esc(p.code), p.equipmentId ? tag(esc(state.equipment.find(e => e.id === p.equipmentId)?.name ?? '')) : '', chatBtn('post', p.id)) + `<div class="side-body">${body}</div>`;
