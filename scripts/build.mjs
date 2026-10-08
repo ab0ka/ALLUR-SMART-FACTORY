@@ -18,10 +18,11 @@ export async function assembleApp(publicDir) {
 export async function buildDist({ publicDir = path.join(root, 'public'), distDir = path.join(root, 'dist'), quarantineRoot = path.join(root, 'build-quarantine'), now = new Date() } = {}) {
   // Validate the complete source snapshot before touching the previous build or its quarantine.
   const assets = await Promise.all(PUBLIC_ASSETS.map(async file => ({
-    file, data: file === 'app.js' ? (await assembleApp(publicDir)).code : await readFile(path.join(publicDir, file), 'utf8'),
+    file, data: file === 'app.js' ? (await assembleApp(publicDir)).code : await readFile(path.join(publicDir, file), file.endsWith('.webp') ? undefined : 'utf8'),
   })));
   const secrets = [process.env.NVIDIA_API_KEY, process.env.OPENAI_API_KEY].map(s => s?.trim()).filter(Boolean);
   for (const { file, data } of assets) {
+    if (file.endsWith('.webp')) continue; // Preserve opaque binary assets; inspect text assets for credentials.
     if (/(?:nvapi-|sk-)[A-Za-z0-9_-]{16,}/.test(data) || secrets.some(secret => data.includes(secret))) throw new Error(`Possible secret in client asset ${file}`);
   }
   for (const { file, data } of assets.filter(asset => asset.file.endsWith('.js'))) {

@@ -23,6 +23,9 @@ test('build keeps only allowlisted public assets and moves unexpected dist entri
     await writeFile(path.join(distDir, 'old', 'server.mjs'), 'stale');
     const result = await buildDist({ publicDir, distDir, quarantineRoot, now: new Date('2026-10-08T12:00:00Z') });
     assert.deepEqual((await readdir(distDir)).sort(), [...PUBLIC_ASSETS].sort());
+    for (const file of PUBLIC_ASSETS.filter(f => f !== 'app.js')) {
+      assert.deepEqual(await readFile(path.join(distDir, file)), await readFile(path.join(publicDir, file)), `${file} must be copied byte-for-byte`);
+    }
     assert.deepEqual(result.strays.sort(), ['.env', 'old']);
     assert.equal(await readFile(path.join(result.quarantineDir, '.env'), 'utf8'), 'NVIDIA_API_KEY=placeholder-not-a-secret');
     assert.equal(await readFile(path.join(result.quarantineDir, 'old', 'server.mjs'), 'utf8'), 'stale');
