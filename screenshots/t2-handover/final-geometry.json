@@ -1,0 +1,129 @@
+{
+  "baseIntegration": "eae50107d0ff6bbced9040e65d3f43e936d13a95",
+  "checkout": "4d3da5abab484210ddfcc75bf645ef667f0ea5a1",
+  "cssCommit": "348935f43a48d583d7ac49966ca47137efa736d6",
+  "cssOverlayOnly": true,
+  "addedRules": "@media(max-width:760px){#analytics-navigation>a{min-width:0;white-space:normal;min-height:40px}}",
+  "sizes": [
+    {
+      "width": 414,
+      "height": 896,
+      "innerWidth": 414,
+      "clientWidth": 414,
+      "scrollWidth": 414,
+      "nav": [
+        {
+          "text": "Результаты смены",
+          "x": 8,
+          "width": 127.328125,
+          "height": 40,
+          "right": 135.328125,
+          "clientWidth": 127,
+          "scrollWidth": 127,
+          "whiteSpace": "normal"
+        },
+        {
+          "text": "Передача смены",
+          "x": 143.328125,
+          "width": 127.34375,
+          "height": 40,
+          "right": 270.671875,
+          "clientWidth": 127,
+          "scrollWidth": 127,
+          "whiteSpace": "normal"
+        },
+        {
+          "text": "Модели и эксперименты",
+          "x": 278.671875,
+          "width": 127.328125,
+          "height": 50,
+          "right": 406,
+          "clientWidth": 127,
+          "scrollWidth": 127,
+          "whiteSpace": "normal"
+        }
+      ]
+    },
+    {
+      "width": 896,
+      "height": 414,
+      "innerWidth": 896,
+      "clientWidth": 896,
+      "scrollWidth": 896,
+      "nav": [
+        {
+          "text": "Результаты смены",
+          "x": 412.75,
+          "width": 140.90625,
+          "height": 35.5,
+          "right": 553.65625,
+          "clientWidth": 141,
+          "scrollWidth": 141,
+          "whiteSpace": "nowrap"
+        },
+        {
+          "text": "Передача смены",
+          "x": 561.65625,
+          "width": 131.328125,
+          "height": 35.5,
+          "right": 692.984375,
+          "clientWidth": 131,
+          "scrollWidth": 131,
+          "whiteSpace": "nowrap"
+        },
+        {
+          "text": "Модели и эксперименты",
+          "x": 700.984375,
+          "width": 183.015625,
+          "height": 35.5,
+          "right": 884,
+          "clientWidth": 183,
+          "scrollWidth": 183,
+          "whiteSpace": "nowrap"
+        }
+      ]
+    },
+    {
+      "width": 640,
+      "height": 320,
+      "innerWidth": 640,
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "nav": [
+        {
+          "text": "Результаты смены",
+          "x": 8,
+          "width": 202.65625,
+          "height": 40,
+          "right": 210.65625,
+          "clientWidth": 203,
+          "scrollWidth": 203,
+          "whiteSpace": "normal"
+        },
+        {
+          "text": "Передача смены",
+          "x": 218.65625,
+          "width": 202.671875,
+          "height": 40,
+          "right": 421.328125,
+          "clientWidth": 203,
+          "scrollWidth": 203,
+          "whiteSpace": "normal"
+        },
+        {
+          "text": "Модели и эксперименты",
+          "x": 429.328125,
+          "width": 202.671875,
+          "height": 40,
+          "right": 632,
+          "clientWidth": 203,
+          "scrollWidth": 203,
+          "whiteSpace": "normal"
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "readOnly": true,
+  "pass": true
+}
