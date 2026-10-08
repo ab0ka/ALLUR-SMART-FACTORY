@@ -92,7 +92,7 @@ test('pending request does not open another confirmation', async () => {
   assert.equal(h.element('confirm').open, false);
 });
 
-test('late close does not dismiss the next dialog; Escape cancels it', async () => {
+test('late close does not dismiss the next dialog before confirmation', async () => {
   const h = harness(), d = h.element('confirm');
   const first = h.run("confirmAction('First', '')");
   d.clickValue('ok');
@@ -100,6 +100,13 @@ test('late close does not dismiss the next dialog; Escape cancels it', async () 
   d.open = false; // Native default closes the dialog; close event is queued.
   const second = h.run("confirmAction('Second', '')");
   d.dispatchEvent(new Event('close'));
-  d.dispatchEvent(new Event('cancel'));
-  assert.equal(await second, false);
+  d.clickValue('ok');
+  assert.equal(await second, true);
+});
+
+test('Escape cancels a newly opened confirmation', async () => {
+  const h = harness();
+  const result = h.run("confirmAction('Escape', '')");
+  h.element('confirm').dispatchEvent(new Event('cancel'));
+  assert.equal(await result, false);
 });
