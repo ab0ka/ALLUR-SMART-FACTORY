@@ -18,15 +18,15 @@ function renderThreat() {
     ${!open.length && f.gap < 0 ? '<p class="fine-print">Дефицит к плану без открытых проблем вызван мощностью и браком — сравните с эталонной мощностью.</p>' : ''}`;
 }
 function sparkline(eq, channel, nominal, unit, detectedAt) {
-  const from = Math.max(0, state.elapsed - 150), window = eq.readings.filter(r => Number.isFinite(r.minute) && r.minute >= from && r.minute <= state.elapsed);
-  const rs = window.filter(r => Number.isFinite(r[channel]));
+  const from = Math.max(0, state.elapsed - 150), shown = eq.readings.filter(r => Number.isFinite(r.minute) && r.minute >= from && r.minute <= state.elapsed);
+  const rs = shown.filter(r => Number.isFinite(r[channel]));
   const W = 300, H = 92, pad = 26;
   const names = { pressure: 'Давление', temperature: 'Температура масла', cycle: 'Время цикла' };
   if (!rs.length) return `<figure class="spark"><figcaption>${names[channel]}, ${esc(unit)} <span>норма ${nominal}</span></figcaption><p class="muted">Нет измерений в показанном окне.</p></figure>`;
   const vals = rs.map(r => r[channel]), lo = Math.min(...vals, nominal) - 2, hi = Math.max(...vals, nominal) + 2;
   const x = m => pad + (m - from) / Math.max(1, state.elapsed - from) * (W - pad - 6), y = v => 8 + (hi - v) / (hi - lo) * (H - 26);
   const segments = []; let segment = [];
-  for (const r of window) {
+  for (const r of shown) {
     if (Number.isFinite(r[channel])) segment.push(r);
     else if (segment.length) { segments.push(segment); segment = []; }
   }
