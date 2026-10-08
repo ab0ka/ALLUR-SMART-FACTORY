@@ -193,6 +193,7 @@ export async function main() {
     const ref = '#view-handover a.handover-items-link[href*="/problem/"]';
     assert.equal(await cdp.evaluate(`Boolean(document.querySelector(${JSON.stringify(ref)}))`), true, 'real entity reference');
     await cdp.evaluate(`document.querySelector(${JSON.stringify(ref)}).focus()`);
+    const problemFocusKey = await cdp.evaluate(`document.activeElement.dataset.focusKey`);
     const selectedProblem = await cdp.evaluate(`decodeURIComponent(document.querySelector(${JSON.stringify(ref)}).hash.split('/').at(-1))`);
     await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', text: '\r', windowsVirtualKeyCode: 13 });
     await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
@@ -200,12 +201,16 @@ export async function main() {
     assert.equal(await cdp.evaluate(`!document.querySelector('#side').hidden && document.querySelector('#side h2').textContent.includes(${JSON.stringify(selectedProblem)})`), true, 'selected real problem card');
     await cdp.evaluate('history.back()'); await until(() => cdp.evaluate(`location.hash === '#handover' && ${visible}`), 'browser Back');
     await until(() => cdp.evaluate(`(${content}).includes(${JSON.stringify(report.resources.stock[0].name)})`), 'report after Back');
+    await until(() => cdp.evaluate(`document.activeElement.dataset.focusKey === ${JSON.stringify(problemFocusKey)}`), 'Back restores original problem link focus');
     const orderLink = '#view-handover a.handover-items-link[href*="/order/"]';
     const selectedOrder = await cdp.evaluate(`decodeURIComponent(document.querySelector(${JSON.stringify(orderLink)}).hash.split('/').at(-1))`);
+    const orderFocusKey = await cdp.evaluate(`document.querySelector(${JSON.stringify(orderLink)}).dataset.focusKey`);
     await cdp.evaluate(`document.querySelector(${JSON.stringify(orderLink)}).click()`);
     await until(() => cdp.evaluate(`location.hash.includes('/order/') && document.activeElement.closest('#order-' + ${JSON.stringify(selectedOrder)}) !== null`), 'real focused order card');
-    await cdp.evaluate('history.back()');
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
     await until(() => cdp.evaluate(`location.hash === '#handover' && (${content}).includes(${JSON.stringify(report.resources.stock[0].name)})`), 'report after order Back');
+    await until(() => cdp.evaluate(`document.activeElement.dataset.focusKey === ${JSON.stringify(orderFocusKey)}`), 'Escape restores original order link focus');
     await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
     await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
     assert.equal(await cdp.evaluate(`document.activeElement !== document.body && document.activeElement.getBoundingClientRect().width > 0`), true, 'visible keyboard focus');
