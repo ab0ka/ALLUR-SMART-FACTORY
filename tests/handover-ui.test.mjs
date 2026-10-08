@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFile } from 'node:fs/promises';
+import { Workshop } from '../server/simulation.mjs';
 const code = await readFile(new URL('../public/app/45-handover.js', import.meta.url), 'utf8');
 function setup() {
   const elements = new Map();
@@ -114,4 +115,22 @@ test('focused record moved into collapsed overflow is revealed before focus', as
   h.context.document.activeElement = h.context.document.body;
   h.calls[0].resolve({ ok: true, json: async () => report }); await pending;
   assert.equal(h.context.document.activeElement, next);
+});
+test('public event sequence regression detects another tab reset on the same minute', async () => {
+  const h = setup(), sim = new Workshop();
+  const initial = sim.snapshot();
+  sim.setPlanTarget(initial.plan.target + 1);
+  h.context.state = { ...sim.snapshot(), csrf: 'test' };
+  const before = h.context.state;
+  const pending = h.run('loadHandover()');
+  sim.reset(42);
+  h.context.state = { ...sim.snapshot(), csrf: 'test' };
+  assert.equal(h.context.state.elapsed, before.elapsed);
+  assert.equal(h.context.state.seed, before.seed);
+  assert.ok(h.context.state.revision > before.revision);
+  assert.ok(h.context.state.events.at(-1).seq < before.events.at(-1).seq);
+  h.run('renderHandover()');
+  assert.match(h.$('handover-status').textContent, /Смена изменилась/);
+  h.calls[0].resolve({ ok: true, json: async () => report }); await pending;
+  assert.equal(h.$('handover-content').innerHTML, '');
 });

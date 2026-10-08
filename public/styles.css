@@ -797,3 +797,4 @@ details.more>summary{cursor:pointer;font-weight:700;color:var(--link);min-height
 @media(max-width:360px){.handover-metrics{grid-template-columns:1fr}}
 /* A referenced record remains distinguishable without relying only on color. */
 .ev.ref-highlight,.decision.ref-highlight{outline:3px solid var(--blue);outline-offset:-3px}
+@media(max-width:760px){#analytics-navigation>a{min-width:0;white-space:normal;min-height:40px}}

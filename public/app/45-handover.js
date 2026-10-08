@@ -5,9 +5,9 @@ function handoverStop() {
 }
 function handoverObserve() {
   const previous = handover.observed;
-  const next = state && { csrf: state.csrf, seed: state.seed, elapsed: state.elapsed, revision: state.revision };
+  const next = state && { csrf: state.csrf, seed: state.seed, elapsed: state.elapsed, revision: state.revision, eventSeq: state.events?.at(-1)?.seq };
   handover.observed = next;
-  return previous && next && (previous.csrf !== next.csrf || previous.seed !== next.seed || next.elapsed < previous.elapsed || next.revision < previous.revision);
+  return previous && next && (previous.csrf !== next.csrf || previous.seed !== next.seed || next.elapsed < previous.elapsed || next.revision < previous.revision || (Number.isFinite(previous.eventSeq) && Number.isFinite(next.eventSeq) && next.eventSeq < previous.eventSeq));
 }
 function handoverRoute() {
   if (view !== 'handover') { handoverStop(); handover.active = false; return; }
