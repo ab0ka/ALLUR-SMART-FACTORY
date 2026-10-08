@@ -116,6 +116,7 @@ function panelProblem(pr) {
     body += `<h3>Симптом</h3><p>Отклонение ${fmt(pr.anomalyScore)} при пороге 4,5${pr.status === 'open' ? '' : ' (на момент закрытия)'}. Средние за 30 мин против нормы:</p>
       <table class="mini-table"><thead><tr><th scope="col">Параметр</th><th scope="col">30 мин</th><th scope="col">Норма</th><th scope="col">${last ? clock(last.minute) : 'последнее'}</th></tr></thead><tbody>${Object.entries(pr.latest).map(([c, x]) => { const dev = Math.abs(x.mean - x.nominal) >= (c === 'pressure' ? 2 : 1.5); return `<tr><th scope="row">${esc(x.name)}, ${esc(x.unit)}</th><td class="${dev ? 'warn-text' : ''}">${dev ? (x.mean > x.nominal ? '↑ ' : '↓ ') : ''}${fmt(x.mean)}</td><td>${x.nominal}</td><td>${last?.[c] !== undefined && last?.[c] !== null ? fmt(last[c]) : '—'}</td></tr>`; }).join('')}</tbody></table>`;
   } else if (pr.observations.length) body += `<h3>Наблюдения</h3><p>${esc(pr.observations[0].text)}</p>`;
+  if (eq) body += `<h3>Измерения</h3><p class="fine-print">Синтетические замеры каждые 5 мин. Последние 150 мин.</p><div class="problem-charts">${['pressure', 'temperature', 'cycle'].map(c => sparkline(eq, c, pr.latest?.[c]?.nominal ?? { pressure: 180, temperature: 45, cycle: 42 }[c], { pressure: 'бар', temperature: '°C', cycle: 'с' }[c], pr.detectedAt)).join('')}</div><p class="chart-key"><span class="key-reading">Измерение</span><span class="key-nominal">Норма</span><span class="key-detected">Обнаружено ${clock(pr.detectedAt)}</span></p>${pr.detectedAt < Math.max(0, state.elapsed - 150) ? '<p class="fine-print">Момент обнаружения раньше показанного окна.</p>' : ''}`;
   body += `<h3>Гипотезы</h3><p class="fine-print">Оценка по измерениям, а не установленная причина</p><ul class="hyp">${pr.hypotheses.map(h => `<li><span class="hyp-row"><b>${esc(h.title)}</b><span class="mono">${h.probability !== null ? pct(h.probability) : '—'}</span></span>${h.probability !== null ? bar(h.probability, 'wide blue') : ''}<span class="fine-print">${esc(HYP_STATUS[h.status])}</span></li>`).join('')}</ul>`;
   if (pr.status === 'open' && pr.availableChecks?.length) {
     const t = state.technicians[0];
@@ -124,7 +125,7 @@ function panelProblem(pr) {
   }
   const foot = pr.status === 'open' && !state.finished ? `<button class="primary" data-compare="${esc(pr.id)}">Сравнить решения</button>` : '';
   return sideHead(`ПРОБЛЕМА · ${pr.kind === 'equipment' ? 'ОБОРУДОВАНИЕ' : 'РУЧНОЙ СЦЕНАРИЙ'}`, `<span class="mono">${esc(pr.id)}</span> · ${esc(pr.title)}`, statusTag + tag(`Затронуты: ${pr.vehicleIds.map(id => `<button class="link mono" data-vehicle="${esc(id)}">${esc(id)}</button>`).join(', ') || '—'}`), chatBtn('problem', pr.id))
-    + `<div class="side-body">${body}${lockNote}<p><button class="link" data-legacy="dispatcher" data-legacy-id="${esc(pr.id)}">Графики измерений и журнал решений в диспетчере →</button></p></div>${foot ? `<div class="side-foot">${foot}<button class="secondary" data-open-chat="1" data-ctx-type="problem" data-ctx-id="${esc(pr.id)}">Обсудить в чате</button></div>` : ''}`;
+    + `<div class="side-body">${body}${lockNote}<p><button class="link" data-legacy="dispatcher" data-legacy-id="${esc(pr.id)}">Журнал решений в диспетчере →</button></p></div>${foot ? `<div class="side-foot">${foot}<button class="secondary" data-open-chat="1" data-ctx-type="problem" data-ctx-id="${esc(pr.id)}">Обсудить в чате</button></div>` : ''}`;
 }
 
 function panelCompare(pr) {
@@ -166,4 +167,3 @@ function updateSideChat() {
     ${m.proposal ? `<div class="proposal"><span>Предложение: ${esc(m.proposal.title)}</span><button class="primary" data-proposal="${esc(m.id)}" ${state.finished ? 'disabled' : ''}>Подтвердить…</button></div>` : ''}</li>`).join('') || '<li class="muted">Спросите о выбранном объекте. Ссылки в ответах ведут к автомобилю, посту, событию или сравнению.</li>';
   if (atBottom) host.scrollTop = host.scrollHeight;
 }
-
