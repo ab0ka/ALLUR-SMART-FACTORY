@@ -36,8 +36,11 @@ function openVehicleEvent(e) {
   const nextSpace = { weld: 'weld', paint: 'paint', assembly: 'assembly', quality: 'tests', rework: 'rework', shipping: 'ship' }[stage] ?? 'enterprise';
   const target = p ? { type: 'post', id: p.id } : v ? { type: 'vehicle', id: v.id } : null;
   if (!target) return;
-  const hash = `#space/${nextSpace}/${target.type}/${encodeURIComponent(target.id)}`;
-  if (location.hash === hash) setView(hash.slice(1)); else location.hash = hash;
+  if (space !== nextSpace || ui.panel?.type !== target.type || ui.panel?.id !== target.id) history.pushState(null, '', location.hash);
+  space = nextSpace;
+  // Use the same URL, context and focus handling as every other card.
+  openPanel(target, target, target);
+  setView(location.hash.slice(1));
 }
 // Returns true when the click was handled by the space UI.
 async function spaceClick(t, d) {
