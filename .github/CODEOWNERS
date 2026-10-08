@@ -1,5 +1,5 @@
 # Ответственные за зоны проекта: GitHub автоматически зовёт их на проверку pull request.
-# Замените @ab0ka на логины участников, когда распределите зоны. Последнее совпадение в файле важнее.
+# Абзал — @ab0ka, Диас — @dias8507306, Тони — @bltangenss. Последнее совпадение в файле важнее.
 
 *                                   @ab0ka
 
@@ -14,12 +14,14 @@
 /server/chat.mjs                    @ab0ka
 
 # Изометрическая сцена
-/public/scene.js                    @ab0ka
+/public/scene.js                    @dias8507306
 
 # Интерфейс: части клиента и стили
-/public/app/                        @ab0ka
-/public/styles.css                  @ab0ka
-/public/index.html                  @ab0ka
+/public/app/                        @bltangenss
+/public/styles.css                  @bltangenss
+/public/index.html                  @bltangenss
+# Карта предприятия и пространства — общая зона сцены и интерфейса
+/public/app/50-spaces.js            @dias8507306 @bltangenss
 
 # ML и сравнение политик (этапы D и E)
 /scripts/                           @ab0ka
