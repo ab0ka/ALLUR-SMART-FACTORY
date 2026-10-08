@@ -62,10 +62,11 @@ $('menu').addEventListener('click', e => { if (e.target.closest('a, button')) $(
 $('reset').addEventListener('click', async () => { if (await confirmAction('Сбросить смену?', '<p>Смена начнётся заново в 11:00 с тем же seed. Решения, проверки, сравнения и история чата текущей смены будут удалены из сохранённого состояния.</p>')) action({ action: 'reset' }); });
 $('release-form').addEventListener('submit', async e => {
   e.preventDefault();
-  const quantity = Number($('release-quantity').value), priority = new FormData(e.target).get('release-priority');
-  if (await action({ action: 'release', model: $('release-model').value, quantity, priority, requestId: requestId() })) text('release-note', `Задание ${state.orders.at(-1).id} выпущено: ${quantity} авт. во входном буфере. ${$('release-note').textContent}`);
+  const quantity = Number($('release-quantity').value), priority = new FormData(e.target).get('release-priority'), model = $('release-model').value;
+  if (!await confirmAction(`Выпустить задание: модель ${model} × ${quantity}`, `<p>Во входном буфере появятся ${quantity} синтетических автомобилей. Приоритет: ${esc(PRIORITY[priority])}. Они займут место в очереди; начатые операции не прерываются.</p>`)) return;
+  if (await action({ action: 'release', model, quantity, priority, requestId: requestId() })) text('release-note', `Задание ${state.orders.at(-1).id} выпущено: ${quantity} авт. во входном буфере. ${$('release-note').textContent}`);
 });
-$('plan-form').addEventListener('submit', async e => { e.preventDefault(); const target = Number($('plan-target').value); if (await confirmAction(`Задать план смены: ${target}`, `<p>План — обязательство смены, его задаёт оператор. Сейчас: ${state.plan.target}. Прогноз и факт от этого не меняются.</p>`)) action({ action: 'plan', target }); });
+$('plan-form').addEventListener('submit', async e => { e.preventDefault(); const target = Number($('plan-target').value); if (await confirmAction(`Задать план смены: ${target}`, `<p>План — обязательство смены, его задаёт оператор. Сейчас: ${state.plan.target}. Прогноз и факт от этого не меняются.</p>`)) action({ action: 'plan', target, requestId: requestId() }); });
 $('chat-form').addEventListener('submit', e => { e.preventDefault(); ask($('chat-input').value); });
 $('chat-input').addEventListener('input', e => text('chat-count', `${e.target.value.length}/500`));
 $('chat-input').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(e.target.value); } });
@@ -94,8 +95,11 @@ document.addEventListener('click', async e => {
   if (d.job) { const p = post(d.postId), job = state.jobKinds.find(j => j.id === d.job); if (await confirmAction(`${job.title} на ${p.code}`, `<p>Техник ТЕХ-1 будет занят ${job.duration} мин${job.stopsPost ? `, пост остановлен на время работ` : ''}. Если техник занят, работа встанет в очередь.</p>`)) action({ action: 'job', postId: d.postId, kind: d.job, requestId: requestId() }); return; }
   if (d.fault) { if (await confirmAction(`Ручной сценарий на ${post(d.fault).code}`, `<p>Будет создан демонстрационный инцидент «${d.kind === 'breakdown' ? 'неисправность' : 'снижение темпа'}». Неисправность не исчезнет сама: потребуется ремонт.</p>`)) action({ action: 'fault', postId: d.fault, kind: d.kind, requestId: requestId() }); return; }
   if (d.transfer) { if (await confirmAction(`Перевести ${d.transfer} на ${post(d.to).code}`, '<p>Автомобиль переедет на параллельный пост; остаток операции сохранится. Сервер проверит, что пост свободен и исправен.</p>')) action({ action: 'transfer', vehicleId: d.transfer, postId: d.to, requestId: requestId() }); return; }
-  if (d.hold) { const on = d.on === '1'; if (await confirmAction(on ? `Не загружать ${post(d.hold).code} новыми автомобилями` : `Вернуть ${post(d.hold).code} в загрузку`, `<p>${on ? 'Следующие автомобили из очереди пойдут на параллельные посты. Текущая операция на посту продолжится.' : 'Пост снова будет получать автомобили из очереди.'}</p>`)) action({ action: 'hold', postId: d.hold, on }); return; }
-  if (d.priority) action({ action: 'priority', orderId: d.order, priority: d.priority });
+  if (d.hold) { const on = d.on === '1'; if (await confirmAction(on ? `Не загружать ${post(d.hold).code} новыми автомобилями` : `Вернуть ${post(d.hold).code} в загрузку`, `<p>${on ? 'Следующие автомобили из очереди пойдут на параллельные посты. Текущая операция на посту продолжится.' : 'Пост снова будет получать автомобили из очереди.'}</p>`)) action({ action: 'hold', postId: d.hold, on, requestId: requestId() }); return; }
+  if (d.priority) {
+    const orderId = d.order, priority = d.priority;
+    if (await confirmAction(`Изменить приоритет ${orderId}: ${PRIORITY[priority]}`, '<p>Изменится порядок ещё не начатых операций этого задания в очередях. Уже начатые операции не прерываются.</p>')) action({ action: 'priority', orderId, priority, requestId: requestId() });
+  }
 });
 $('workshop-map').addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('[role=button]')) { e.preventDefault(); e.target.closest('[role=button]').dispatchEvent(new MouseEvent('click', { bubbles: true })); } });
 $('explain').addEventListener('click', async () => {
@@ -108,10 +112,14 @@ $('explain').addEventListener('click', async () => {
 async function refresh() {
   if (updating || fetching || chatBusy) return;
   fetching = true;
+  // A completed POST can replace state while this GET is still in flight.
+  // Identity also works across reset/restart, where revisions can decrease.
+  const requestedState = state;
+  const stillCurrent = () => !updating && !chatBusy && state === requestedState;
   try {
     const next = await api('/api/state');
-    if (!updating) { const changed = !state || state.revision !== next.revision || state.recordVersion !== next.recordVersion || state.running !== next.running || state.speed !== next.speed || state.csrf !== next.csrf; state = next; if (changed && !$('confirm').open) render(); error(''); }
-  } catch { error('Нет связи с локальным сервером. Проверьте, что npm start продолжает работать. Повторяем подключение…'); }
+    if (stillCurrent()) { const changed = !state || state.revision !== next.revision || state.recordVersion !== next.recordVersion || state.running !== next.running || state.speed !== next.speed || state.csrf !== next.csrf; state = next; if (changed && !$('confirm').open) render(); error(''); }
+  } catch { if (stillCurrent()) error('Нет связи с локальным сервером. Проверьте, что npm start продолжает работать. Повторяем подключение…'); }
   finally { fetching = false; }
 }
 await refresh(); setView(location.hash.slice(1)); setInterval(refresh, 1200);

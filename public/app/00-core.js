@@ -40,14 +40,28 @@ async function action(body) {
 function resetAi() { aiRevision = null; selectedProblem = null; text('ai-text', 'Смена сброшена. Запросите объяснение нового снимка.'); text('ai-source', 'Локальный режим доступен без ключа'); }
 // Every shift-changing action from the dispatcher, chat or proposals goes through this confirmation.
 function confirmAction(title, bodyHtml) {
+  const d = $('confirm');
+  // Reject competing intents before changing the visible consequences or adding listeners.
+  if (d.open || updating) return Promise.resolve(false);
   return new Promise(resolve => {
-    const d = $('confirm'); text('confirm-title', title); $('confirm-body').innerHTML = bodyHtml;
+    text('confirm-title', title); $('confirm-body').innerHTML = bodyHtml;
     let done = false;
-    const finish = ok => { if (done) return; done = true; d.removeEventListener('click', onClick); resolve(ok); };
+    const finish = ok => {
+      if (done) return;
+      done = true;
+      d.removeEventListener('click', onClick);
+      d.removeEventListener('close', onClose);
+      d.removeEventListener('cancel', onCancel);
+      resolve(ok);
+    };
     // The button click decides synchronously; the close event (Esc, backdrop) is the fallback.
     const onClick = e => { const b = e.target.closest('button'); if (b) finish(b.value === 'ok'); };
+    // A delayed close from the previous dialog must not cancel a newly opened one.
+    const onClose = () => { if (!d.open) finish(false); };
+    const onCancel = () => finish(false);
     d.addEventListener('click', onClick);
-    d.addEventListener('close', () => finish(d.returnValue === 'ok'), { once: true });
+    d.addEventListener('close', onClose);
+    d.addEventListener('cancel', onCancel);
     d.returnValue = 'cancel'; d.showModal(); $('confirm-ok').focus();
   });
 }
