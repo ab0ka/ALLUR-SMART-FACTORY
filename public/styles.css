@@ -587,3 +587,27 @@ button.secondary{background:#F4F8FD;border-color:#B9CDE6;color:var(--link);font-
   .kv div{grid-template-columns:1fr;gap:0}
 }
 @media(prefers-reduced-motion:reduce){.sc-pulse{animation:none;opacity:0}.space-stage.enter{animation:none}}
+
+/* T4: orders and shift figures share the light workspace surfaces. */
+.shift-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 16px}
+.shift-metric{background:var(--panel);border:1px solid var(--line);border-top:4px solid #5A6B7A;border-radius:12px;padding:14px 16px;min-width:0}
+.shift-metric dt{font-size:14px;font-weight:700}
+.shift-metric dd{font-size:30px;font-weight:700;margin:6px 0;font-variant-numeric:tabular-nums}
+.shift-metric dd span{font-size:13px;font-weight:400;color:var(--muted)}
+.shift-metric small{display:block;margin-top:6px;font-weight:400;color:var(--muted);font-size:13px;line-height:1.5}
+.metric-target{border-top-color:var(--amber-ink)}
+.metric-reference{border-top-style:dashed}
+.metric-forecast{border-top-color:var(--teal);border-top-style:dotted}
+.metric-fact{border-top-color:var(--blue)}
+#view-orders .order-counts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}
+.order-counts div{background:#F7F9FB;border-radius:8px;padding:8px 10px}
+.order-counts dt{font-size:12px;color:var(--muted)}
+.order-counts dd{margin:2px 0 0;font-size:18px;font-weight:700;color:var(--text)}
+#oee-table caption{text-align:left;padding:8px 0;color:var(--muted);font-size:13px}
+#oee-table thead{background:#EEF2F6}
+#oee-table tbody tr:nth-child(even){background:#F7F9FB}
+#oee-table th[scope=row]{position:sticky;left:0;background:var(--panel);border-right:1px solid var(--line)}
+#view-shift .panel{min-width:0}
+#view-shift .table-scroll:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
+@media(max-width:1099px){.shift-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:480px){.shift-summary{grid-template-columns:1fr}#view-orders .order-head{flex-wrap:wrap}#view-orders .order-due{text-align:left}}

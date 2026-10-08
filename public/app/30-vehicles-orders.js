@@ -30,7 +30,7 @@ function renderOrders() {
     const late = state.forecast.lateOrders.includes(o.id);
     return `<article class="panel order ${esc(o.state)}" id="order-${esc(o.id)}"><div class="order-head"><div><span class="eyebrow">${esc(ORDER_STATES[o.state].toUpperCase())}${o.overdue ? ' · <b class="negative">СРОК ПРОШЁЛ</b>' : late ? ' · <b class="negative">ПО ПРОГНОЗУ ОПОЗДАЕТ</b>' : ''}</span><h2>${esc(o.id)} · ${esc(state.models.find(m => m.id === o.modelId).name)} × ${o.quantity}</h2></div><span class="order-due">срок ${o.dueMinute > 480 ? 'следующая смена' : clock(o.dueMinute)}<br>выпущено ${clock(o.releasedAt)}</span></div>
     <div class="order-progress">${bar(o.accepted / o.quantity, 'wide')}<strong>${o.accepted}/${o.quantity}</strong> принято</div>
-    <p class="order-counts">${counts.map(([k, n]) => `${k}: <b>${n}</b>`).join(' · ')}</p>
+    <dl class="order-counts">${counts.map(([k, n]) => `<div><dt>${k}</dt><dd>${n}</dd></div>`).join('')}</dl>
     <div class="segmented-buttons" role="group" aria-label="Приоритет ${esc(o.id)}"><span>Приоритет</span>${Object.entries(PRIORITY).map(([id, name]) => `<button data-priority="${id}" data-order="${esc(o.id)}" aria-pressed="${o.priority === id}" ${o.state === 'completed' || state.finished ? 'disabled' : ''}>${name}</button>`).join('')}</div>
     <div class="order-vehicles">${o.vehicleIds.map(id => { const v = vehicle(id); return `<button class="mini ${esc(v.state)}" data-vehicle="${esc(id)}" title="${esc(v.status)}">${esc(id.replace('DEMO-', '#'))} <span>${esc(VEHICLE_STATES[v.state])}</span></button>`; }).join('')}</div></article>`;
   }).join('');

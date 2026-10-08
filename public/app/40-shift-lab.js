@@ -1,6 +1,13 @@
 // ---------- Shift and analytics ----------
 function renderShift() {
   const t = state.totals, f = state.forecast, ref = state.plan.reference, max = Math.max(state.plan.target, ref?.total ?? 0, t.created, 4);
+  const summary = [
+    ['target', 'План смены', state.plan.target, 'Задан оператором · к 16:00'],
+    ['reference', 'Эталонная мощность', ref?.total ?? '—', ref ? `Без отклонений оборудования · к сейчас ${ref.now}` : 'Эталон недоступен'],
+    ['forecast', 'Прогноз', f.projected, `К 16:00 без новых вмешательств${f.low < f.high ? ` · диапазон ${f.low}–${f.high}` : ''}`],
+    ['fact', 'Факт', t.accepted, `Принято к ${clock(state.elapsed)} · каждый автомобиль один раз`],
+  ];
+  $('shift-summary').innerHTML = summary.map(([kind, label, value, note]) => `<div class="shift-metric metric-${kind}"><dt>${esc(label)}</dt><dd>${esc(value)} <span>авт.</span><small>${esc(note)}</small></dd></div>`).join('');
   const x = m => 50 + m / 480 * 690, y = v => 230 - v / max * 205;
   const line = pts => pts.map(p => `${x(p.minute).toFixed(1)},${y(p.accepted).toFixed(1)}`).join(' ');
   const ticks = [0, Math.round(max / 2), max];
@@ -13,7 +20,6 @@ function renderShift() {
   if (document.activeElement !== $('plan-target')) $('plan-target').value = String(state.plan.target);
   $('plan-form').querySelector('button').disabled = false;
   $('shift-numbers').innerHTML = [
-    ['Факт: принято', t.accepted], ['План смены (задан)', state.plan.target], ['Эталонная мощность', ref ? `${ref.total} (к сейчас ${ref.now})` : '—'], ['Прогноз к 16:00', `${f.projected}${f.low < f.high ? ` (${f.low}–${f.high})` : ''}`],
     ['В работе (WIP)', t.inProcess], ['Из них на доработке', t.rework], ['Не начаты', t.notStarted], ['Готовы к отгрузке', t.ready], ['Отгружено', t.shipped],
     ['Создано всего', `${t.created} ${t.balanced ? '✓ баланс сходится' : '✗ баланс нарушен'}`], ['Среднее время прохождения', state.leadTime ? `${fmt(state.leadTime.average)} мин (${state.leadTime.count} авт.)` : '—'],
   ].map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('');
@@ -23,8 +29,8 @@ function renderShift() {
     <p class="fine-print">${esc(f.method)} ${esc(f.assumption)}</p>`;
   const q = state.quality;
   $('quality-box').innerHTML = `<h3>Качество (из проверок контроля)</h3><dl class="numbers"><div><dt>С первого предъявления</dt><dd>${q.firstPassYield === null ? '—' : `${pct(q.firstPassYield)} (${q.firstPass}/${q.firstInspections})`}</dd></div><div><dt>Не прошли контроль</dt><dd>${q.failed}</dd></div><div><dt>Приняты после доработки</dt><dd>${q.reworkedAccepted}</dd></div><div><dt>Сейчас в доработке</dt><dd>${q.inRework}</dd></div></dl><p class="fine-print">Каждый автомобиль засчитывается в годный выпуск один раз — после успешного контроля. Дефекты синтетические (~15%).</p>`;
-  const cols = ['Пост', 'Участок', 'Состояние', 'A', 'P', 'Q', 'OEE', 'Работа', 'Неиспр.', 'Техник', 'Нет входа', 'Блок.', 'Операций'];
-  $('oee-table').innerHTML = `<thead><tr>${cols.map(c => `<th scope="col">${c}</th>`).join('')}</tr></thead><tbody>${state.posts.map(p => `<tr><th scope="row"><button class="link" data-post-link="${esc(p.id)}">${esc(p.code)}</button></th><td>${esc(p.stageName)}</td><td>${esc(POST_SHORT[p.state])}</td><td>${pct(p.metrics.availability)}</td><td>${pct(p.metrics.performance)}</td><td>${pct(p.metrics.quality)}</td><td><b>${pct(p.metrics.oee)}</b></td><td>${p.stats.run}</td><td>${p.stats.fault}</td><td>${p.stats.maintenance}</td><td>${p.stats.starved}</td><td>${p.stats.blocked}</td><td>${p.stats.completed}</td></tr>`).join('')}</tbody>`;
+  const cols = ['Пост', 'Участок', 'Состояние', 'A', 'P', 'Q', 'OEE', 'Работа, мин', 'Неисправность, мин', 'Техник, мин', 'Нет входа, мин', 'Блокировка, мин', 'Операций'];
+  $('oee-table').innerHTML = `<caption>Показатели каждого поста к ${clock(state.elapsed)} · синтетические данные</caption><thead><tr>${cols.map(c => `<th scope="col">${c}</th>`).join('')}</tr></thead><tbody>${state.posts.map(p => `<tr><th scope="row"><button class="link" data-post-link="${esc(p.id)}">${esc(p.code)}</button></th><td>${esc(p.stageName)}</td><td>${esc(POST_SHORT[p.state])}</td><td>${pct(p.metrics.availability)}</td><td>${pct(p.metrics.performance)}</td><td>${pct(p.metrics.quality)}</td><td><b>${pct(p.metrics.oee)}</b></td><td>${p.stats.run}</td><td>${p.stats.fault}</td><td>${p.stats.maintenance}</td><td>${p.stats.starved}</td><td>${p.stats.blocked}</td><td>${p.stats.completed}</td></tr>`).join('')}</tbody>`;
   const jobs = state.jobs.map(j => `<article class="incident ${j.status === 'done' ? 'resolved' : 'active'}"><div class="incident-head"><strong>${esc(j.id)} · ${esc(j.title)}</strong><span>${postLink(j.postId)} · ${clock(j.createdAt)}${j.completedAt !== null ? ` → ${clock(j.completedAt)}` : ''}</span></div><p class="fine-print">${esc(JOB_STATUS[j.status])}${j.status === 'running' ? `, осталось ${j.remaining} мин` : ''}${j.part ? ` · запчасть: ${esc(state.stock.find(s => s.id === j.part)?.name)}` : ''}${j.decisionId ? ` · по решению ${esc(j.decisionId)}` : ''}${j.result ? ` · ${esc(j.result.text)}` : ''}</p></article>`).join('');
   const incidents = state.incidents.map(i => `<article class="incident ${esc(i.status)}"><div class="incident-head"><strong>${i.severity === 'critical' ? '●' : '◇'} ${esc(i.title)}</strong><span>${clock(i.start)} → ${i.end !== null ? clock(i.end) : i.status === 'unresolved' ? 'не устранён' : '…'}</span></div><p class="fine-print">${postLink(i.postId)} · ${esc(i.cause)} · ${esc(i.status === 'active' ? 'активен — нужен ремонт' : i.resolution)}</p></article>`).join('');
   $('incident-log').innerHTML = (incidents + jobs) || '<p class="muted">Инцидентов и работ нет.</p>';
