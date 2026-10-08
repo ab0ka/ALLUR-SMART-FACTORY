@@ -1,0 +1,31 @@
+{
+  "schemaValidation": "passed",
+  "timestampAlignment": "all JSON timestamps match decoded source PTS",
+  "sourceDecodedFrames": 1050,
+  "sourceFirstPts": 0.0,
+  "sourceLastPts": 34.967,
+  "annotatedDecodedFrames": 175,
+  "annotatedFps": 5.0,
+  "annotatedDurationSec": 35.0,
+  "summary": {
+    "frames": 175,
+    "tracks": 38,
+    "visits": 32
+  },
+  "statuses": {
+    "lost": 22,
+    "completed": 2,
+    "open_at_end": 8
+  },
+  "visitsOverDemoThreshold": 4,
+  "maxObservedSec": 10.6,
+  "processingSec": 646.266,
+  "sourceSha256": "e5facb24baf755f0c1193999d823e99f6032661ad2bdef5cc28cc1cbbfde03e2",
+  "analysisSha256": "1efa0858c125bd0d892844f73c09ce4acdee793cd2a94c1bb8bc48a753141737",
+  "limitations": [
+    "No ground truth accuracy measurement",
+    "Temporary IDs may split after occlusion",
+    "Road demonstration, not Allur",
+    "No real-time claim"
+  ]
+}

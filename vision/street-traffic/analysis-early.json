@@ -1,0 +1,732 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "id": "street-traffic-01",
+    "title": "Street traffic, San Francisco — сторонняя дорожная демонстрация, не Allur",
+    "url": "https://commons.wikimedia.org/wiki/File:Street_traffic.webm",
+    "license": "CC BY 3.0; author: Editor (YouTube); https://creativecommons.org/licenses/by/3.0/",
+    "synthetic": false,
+    "fileName": "street-traffic.webm",
+    "durationSec": 35.004,
+    "width": 1920,
+    "height": 1080
+  },
+  "analysis": {
+    "mode": "model",
+    "model": "YOLOX-S OpenCV Zoo 2022nov ONNX + ByteTrack supervision 0.25.1",
+    "sampleFps": 5,
+    "processingSec": 163.139,
+    "analyzedUntilSec": 10.0,
+    "timestampSource": "decoder CAP_PROP_POS_MSEC",
+    "modelSha256": "c5c2d13e59ae883e6af3b45daea64af4833a4951c92d116ec270d9ddbe998063"
+  },
+  "zones": [
+    {
+      "id": "zone-1",
+      "name": "Демонстрационная зона дорожного движения",
+      "polygon": [
+        [
+          0.1,
+          0.4
+        ],
+        [
+          0.9,
+          0.4
+        ],
+        [
+          0.9,
+          0.95
+        ],
+        [
+          0.1,
+          0.95
+        ]
+      ],
+      "thresholdSec": 5,
+      "thresholdSource": "demo_assumption"
+    }
+  ],
+  "frames": [
+    {
+      "t": 0.0,
+      "objects": [
+        {
+          "trackId": "car-1",
+          "className": "car",
+          "confidence": 0.72988,
+          "bbox": [
+            0.342197,
+            0.495925,
+            0.048514,
+            0.182741
+          ],
+          "zoneId": null
+        },
+        {
+          "trackId": "car-2",
+          "className": "car",
+          "confidence": 0.56597,
+          "bbox": [
+            0.311039,
+            0.517842,
+            0.025519,
+            0.084061
+          ],
+          "zoneId": null
+        }
+      ]
+    },
+    {
+      "t": 0.2,
+      "objects": [
+        {
+          "trackId": "car-1",
+          "className": "car",
+          "confidence": 0.75843,
+          "bbox": [
+            0.349747,
+            0.491785,
+            0.041577,
+            0.18607
+          ],
+          "zoneId": null
+        },
+        {
+          "trackId": "car-2",
+          "className": "car",
+          "confidence": 0.53501,
+          "bbox": [
+            0.311614,
+            0.528733,
+            0.022926,
+            0.079191
+          ],
+          "zoneId": null
+        }
+      ]
+    },
+    {
+      "t": 0.4,
+      "objects": [
+        {
+          "trackId": "car-1",
+          "className": "car",
+          "confidence": 0.78383,
+          "bbox": [
+            0.349729,
+            0.499282,
+            0.041672,
+            0.184693
+          ],
+          "zoneId": "zone-1"
+        },
+        {
+          "trackId": "car-2",
+          "className": "car",
+          "confidence": 0.15972,
+          "bbox": [
+            0.310633,
+            0.526358,
+            0.014942,
+            0.086441
+          ],
+          "zoneId": "zone-1"
+        }
+      ]
+    },
+    {
+      "t": 0.6,
+      "objects": [
+        {
+          "trackId": "car-1",
+          "className": "car",
+          "confidence": 0.63336,
+          "bbox": [
+            0.354779,
+            0.48433,
+            0.038159,
+            0.20329
+          ],
+          "zoneId": "zone-1"
+        }
+      ]
+    },
+    {
+      "t": 0.8,
+      "objects": [
+        {
+          "trackId": "car-1",
+          "className": "car",
+          "confidence": 0.79358,
+          "bbox": [
+            0.35485,
+            0.496411,
+            0.037993,
+            0.192874
+          ],
+          "zoneId": "zone-1"
+        }
+      ]
+    },
+    {
+      "t": 1.0,
+      "objects": [
+        {
+          "trackId": "car-1",
+          "className": "car",
+          "confidence": 0.82116,
+          "bbox": [
+            0.356438,
+            0.497873,
+            0.035632,
+            0.192401
+          ],
+          "zoneId": "zone-1"
+        }
+      ]
+    },
+    {
+      "t": 1.2,
+      "objects": [
+        {
+          "trackId": "car-1",
+          "className": "car",
+          "confidence": 0.83312,
+          "bbox": [
+            0.359964,
+            0.499703,
+            0.034219,
+            0.191677
+          ],
+          "zoneId": "zone-1"
+        }
+      ]
+    },
+    {
+      "t": 1.4,
+      "objects": [
+        {
+          "trackId": "car-1",
+          "className": "car",
+          "confidence": 0.82683,
+          "bbox": [
+            0.361525,
+            0.49374,
+            0.035585,
+            0.200163
+          ],
+          "zoneId": "zone-1"
+        }
+      ]
+    },
+    {
+      "t": 1.6,
+      "objects": [
+        {
+          "trackId": "car-1",
+          "className": "car",
+          "confidence": 0.8327,
+          "bbox": [
+            0.362285,
+            0.49601,
+            0.038151,
+            0.202863
+          ],
+          "zoneId": "zone-1"
+        }
+      ]
+    },
+    {
+      "t": 1.8,
+      "objects": [
+        {
+          "trackId": "car-1",
+          "className": "car",
+          "confidence": 0.8771,
+          "bbox": [
+            0.363872,
+            0.501185,
+            0.036565,
+            0.200812
+          ],
+          "zoneId": "zone-1"
+        }
+      ]
+    },
+    {
+      "t": 2.0,
+      "objects": [
+        {
+          "trackId": "car-1",
+          "className": "car",
+          "confidence": 0.8603,
+          "bbox": [
+            0.365633,
+            0.49762,
+            0.035817,
+            0.2057
+          ],
+          "zoneId": "zone-1"
+        }
+      ]
+    },
+    {
+      "t": 2.2,
+      "objects": [
+        {
+          "trackId": "car-1",
+          "className": "car",
+          "confidence": 0.83875,
+          "bbox": [
+            0.367908,
+            0.497372,
+            0.037555,
+            0.205188
+          ],
+          "zoneId": "zone-1"
+        }
+      ]
+    },
+    {
+      "t": 2.4,
+      "objects": [
+        {
+          "trackId": "car-1",
+          "className": "car",
+          "confidence": 0.82354,
+          "bbox": [
+            0.368527,
+            0.500969,
+            0.038368,
+            0.197435
+          ],
+          "zoneId": "zone-1"
+        }
+      ]
+    },
+    {
+      "t": 2.6,
+      "objects": [
+        {
+          "trackId": "car-1",
+          "className": "car",
+          "confidence": 0.8232,
+          "bbox": [
+            0.368737,
+            0.494446,
+            0.043253,
+            0.206785
+          ],
+          "zoneId": "zone-1"
+        }
+      ]
+    },
+    {
+      "t": 2.8,
+      "objects": [
+        {
+          "trackId": "car-1",
+          "className": "car",
+          "confidence": 0.813,
+          "bbox": [
+            0.368865,
+            0.494647,
+            0.044751,
+            0.207839
+          ],
+          "zoneId": "zone-1"
+        }
+      ]
+    },
+    {
+      "t": 3.0,
+      "objects": [
+        {
+          "trackId": "car-1",
+          "className": "car",
+          "confidence": 0.81821,
+          "bbox": [
+            0.370162,
+            0.495019,
+            0.045818,
+            0.208695
+          ],
+          "zoneId": "zone-1"
+        }
+      ]
+    },
+    {
+      "t": 3.2,
+      "objects": [
+        {
+          "trackId": "car-1",
+          "className": "car",
+          "confidence": 0.79457,
+          "bbox": [
+            0.370426,
+            0.498958,
+            0.046294,
+            0.209567
+          ],
+          "zoneId": "zone-1"
+        }
+      ]
+    },
+    {
+      "t": 3.4,
+      "objects": [
+        {
+          "trackId": "car-1",
+          "className": "car",
+          "confidence": 0.79877,
+          "bbox": [
+            0.370905,
+            0.499131,
+            0.047854,
+            0.210602
+          ],
+          "zoneId": "zone-1"
+        }
+      ]
+    },
+    {
+      "t": 3.6,
+      "objects": [
+        {
+          "trackId": "car-1",
+          "className": "car",
+          "confidence": 0.80759,
+          "bbox": [
+            0.372419,
+            0.500526,
+            0.049929,
+            0.214391
+          ],
+          "zoneId": "zone-1"
+        }
+      ]
+    },
+    {
+      "t": 3.8,
+      "objects": [
+        {
+          "trackId": "car-1",
+          "className": "car",
+          "confidence": 0.76946,
+          "bbox": [
+            0.373944,
+            0.49785,
+            0.05042,
+            0.218051
+          ],
+          "zoneId": "zone-1"
+        }
+      ]
+    },
+    {
+      "t": 4.0,
+      "objects": [
+        {
+          "trackId": "car-1",
+          "className": "car",
+          "confidence": 0.65414,
+          "bbox": [
+            0.376216,
+            0.495248,
+            0.052992,
+            0.229094
+          ],
+          "zoneId": "zone-1"
+        }
+      ]
+    },
+    {
+      "t": 4.2,
+      "objects": []
+    },
+    {
+      "t": 4.4,
+      "objects": []
+    },
+    {
+      "t": 4.6,
+      "objects": []
+    },
+    {
+      "t": 4.8,
+      "objects": []
+    },
+    {
+      "t": 5.0,
+      "objects": []
+    },
+    {
+      "t": 5.2,
+      "objects": []
+    },
+    {
+      "t": 5.4,
+      "objects": []
+    },
+    {
+      "t": 5.6,
+      "objects": []
+    },
+    {
+      "t": 5.8,
+      "objects": []
+    },
+    {
+      "t": 6.0,
+      "objects": [
+        {
+          "trackId": "car-6",
+          "className": "car",
+          "confidence": 0.81697,
+          "bbox": [
+            0.762181,
+            0.547278,
+            0.073206,
+            0.181877
+          ],
+          "zoneId": null
+        }
+      ]
+    },
+    {
+      "t": 6.2,
+      "objects": [
+        {
+          "trackId": "car-6",
+          "className": "car",
+          "confidence": 0.8472,
+          "bbox": [
+            0.746287,
+            0.534343,
+            0.076594,
+            0.181935
+          ],
+          "zoneId": null
+        }
+      ]
+    },
+    {
+      "t": 6.4,
+      "objects": [
+        {
+          "trackId": "car-6",
+          "className": "car",
+          "confidence": 0.89505,
+          "bbox": [
+            0.738521,
+            0.532687,
+            0.076342,
+            0.179185
+          ],
+          "zoneId": "zone-1"
+        }
+      ]
+    },
+    {
+      "t": 6.6,
+      "objects": [
+        {
+          "trackId": "car-6",
+          "className": "car",
+          "confidence": 0.87177,
+          "bbox": [
+            0.731183,
+            0.530469,
+            0.068284,
+            0.169362
+          ],
+          "zoneId": "zone-1"
+        }
+      ]
+    },
+    {
+      "t": 6.8,
+      "objects": [
+        {
+          "trackId": "car-6",
+          "className": "car",
+          "confidence": 0.87677,
+          "bbox": [
+            0.724104,
+            0.529851,
+            0.066765,
+            0.159516
+          ],
+          "zoneId": "zone-1"
+        }
+      ]
+    },
+    {
+      "t": 7.0,
+      "objects": [
+        {
+          "trackId": "car-6",
+          "className": "car",
+          "confidence": 0.75798,
+          "bbox": [
+            0.721714,
+            0.525258,
+            0.055975,
+            0.153476
+          ],
+          "zoneId": "zone-1"
+        }
+      ]
+    },
+    {
+      "t": 7.2,
+      "objects": [
+        {
+          "trackId": "car-6",
+          "className": "car",
+          "confidence": 0.56823,
+          "bbox": [
+            0.724151,
+            0.55667,
+            0.045525,
+            0.116986
+          ],
+          "zoneId": "zone-1"
+        }
+      ]
+    },
+    {
+      "t": 7.4,
+      "objects": [
+        {
+          "trackId": "car-6",
+          "className": "car",
+          "confidence": 0.53669,
+          "bbox": [
+            0.724038,
+            0.553342,
+            0.033254,
+            0.121299
+          ],
+          "zoneId": "zone-1"
+        }
+      ]
+    },
+    {
+      "t": 7.6,
+      "objects": [
+        {
+          "trackId": "car-6",
+          "className": "car",
+          "confidence": 0.58067,
+          "bbox": [
+            0.720811,
+            0.553639,
+            0.028559,
+            0.120639
+          ],
+          "zoneId": "zone-1"
+        }
+      ]
+    },
+    {
+      "t": 7.8,
+      "objects": []
+    },
+    {
+      "t": 8.0,
+      "objects": []
+    },
+    {
+      "t": 8.2,
+      "objects": []
+    },
+    {
+      "t": 8.4,
+      "objects": []
+    },
+    {
+      "t": 8.6,
+      "objects": []
+    },
+    {
+      "t": 8.8,
+      "objects": []
+    },
+    {
+      "t": 9.0,
+      "objects": []
+    },
+    {
+      "t": 9.2,
+      "objects": []
+    },
+    {
+      "t": 9.4,
+      "objects": [
+        {
+          "trackId": "car-7",
+          "className": "car",
+          "confidence": 0.86619,
+          "bbox": [
+            0.659699,
+            0.626015,
+            0.064083,
+            0.322084
+          ],
+          "zoneId": null
+        }
+      ]
+    },
+    {
+      "t": 9.6,
+      "objects": [
+        {
+          "trackId": "car-7",
+          "className": "car",
+          "confidence": 0.88838,
+          "bbox": [
+            0.649195,
+            0.625075,
+            0.084405,
+            0.332822
+          ],
+          "zoneId": null
+        }
+      ]
+    },
+    {
+      "t": 9.8,
+      "objects": []
+    }
+  ],
+  "visits": [
+    {
+      "id": "visit-1",
+      "trackId": "car-1",
+      "zoneId": "zone-1",
+      "startSec": 0.0,
+      "endSec": null,
+      "observedSec": 4.0,
+      "status": "lost"
+    },
+    {
+      "id": "visit-2",
+      "trackId": "car-2",
+      "zoneId": "zone-1",
+      "startSec": 0.0,
+      "endSec": null,
+      "observedSec": 0.4,
+      "status": "lost"
+    },
+    {
+      "id": "visit-3",
+      "trackId": "car-6",
+      "zoneId": "zone-1",
+      "startSec": 6.0,
+      "endSec": null,
+      "observedSec": 1.6,
+      "status": "lost"
+    }
+  ]
+}

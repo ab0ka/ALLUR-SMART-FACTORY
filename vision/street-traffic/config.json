@@ -1,0 +1,23 @@
+{
+  "sampleFps": 5,
+  "confidence": 0.15,
+  "trackActivationThreshold": 0.35,
+  "lostSec": 1.0,
+  "enterSec": 0.4,
+  "exitSec": 0.4,
+  "boundaryMargin": 0.01,
+  "source": {
+    "id": "street-traffic-01",
+    "title": "Street traffic, San Francisco — сторонняя дорожная демонстрация, не Allur",
+    "url": "https://commons.wikimedia.org/wiki/File:Street_traffic.webm",
+    "license": "CC BY 3.0; author: Editor (YouTube); https://creativecommons.org/licenses/by/3.0/",
+    "synthetic": false
+  },
+  "zones": [{
+    "id": "zone-1",
+    "name": "Демонстрационная зона дорожного движения",
+    "polygon": [[0.10,0.40],[0.90,0.40],[0.90,0.95],[0.10,0.95]],
+    "thresholdSec": 5,
+    "thresholdSource": "demo_assumption"
+  }]
+}
