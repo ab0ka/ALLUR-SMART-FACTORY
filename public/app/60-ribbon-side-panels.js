@@ -100,6 +100,17 @@ function panelProblem(pr) {
   const statusTag = pr.status === 'open' ? tag(`${ico('warn', '')}Открыта · с ${clock(pr.detectedAt)}`, 'warn') : pr.status === 'resolved' ? tag(`${ico('ok', '')}Закрыта ${clock(pr.resolvedAt)}`, 'ok') : tag('Не устранена к концу смены', 'stop');
   let body = '';
   const jobs = pr.jobs, decisions = state.decisions.filter(d => d.problemId === pr.id);
+  const activeJobs = pr.status === 'open' && !state.finished ? jobs.filter(j => ['queued', 'running'].includes(j.status)).map(j => ({ ...state.jobs.find(x => x.id === j.id), ...j })) : [];
+  const activeJob = activeJobs.find(j => j.status === 'running') ?? activeJobs[0];
+  if (activeJob) {
+    const kind = activeJob.type ?? state.jobKinds.find(k => k.id === activeJob.kind)?.type;
+    const task = kind === 'verify' ? 'проверка после ремонта' : kind === 'check' ? 'диагностика' : activeJob.kind === 'adjust' ? 'наладка' : kind === 'repair' ? 'ремонт' : 'работа';
+    const status = activeJob.status === 'running' ? `Идёт ${task}` : `${task[0].toUpperCase()}${task.slice(1)} ожидает техника`;
+    const decision = activeJob.decisionId ? ` по ${activeJob.decisionId}` : '';
+    const queued = activeJobs.filter(j => j.status === 'queued').length;
+    const workKind = activeJob.status === 'queued' ? 'wait' : kind === 'repair' ? 'stop' : 'check';
+    body += `<section class="now ${workKind}" aria-labelledby="problem-work-title"><div class="now-head">${ico(workKind, 'ТЕКУЩИЕ РАБОТЫ')}</div><p class="now-title" id="problem-work-title">${esc(status + decision)}</p><p><span class="mono">${esc(activeJob.id)}</span> · ${esc(activeJob.title)}${activeJob.status === 'running' ? ` · осталось ${fmt(activeJob.remaining, 0)} мин` : ''}</p>${activeJob.decisionId ? '' : '<p class="fine-print">Работа запущена без решения из сравнения.</p>'}${queued ? `<p class="fine-print">В очереди по проблеме: ${queued}.</p>` : ''}<p class="fine-print" id="problem-work-note">Ход выполнения показан ниже. Сравнение поставит смену на паузу и пересчитает варианты с учётом уже запущенных работ.</p></section>`;
+  }
   if (jobs.length || decisions.length) {
     const items = [[pr.detectedAt, -1, `<li class="done">${ico('ok', '')}<span><span class="mono t">${clock(pr.detectedAt)}</span>Обнаружено отклонение</span></li>`]];
     for (const d of decisions) items.push([d.appliedAt, 0, `<li class="done">${ico('ok', '')}<span><span class="mono t">${clock(d.appliedAt)} · ${esc(d.id)}</span>Решение: ${esc(d.title)} · ожидание: приёмка ${fmt(d.expected.accepted)}</span></li>`]);
@@ -110,7 +121,7 @@ function panelProblem(pr) {
       items.push([j.startedAt ?? j.createdAt ?? 1e9, 1, `<li class="${j.status} ${jk}">${ico(jk, '')}<span><span class="mono t">${j.startedAt !== null ? clock(j.startedAt) : 'в очереди'}${j.completedAt !== null ? `–${clock(j.completedAt)}` : ''} · ${esc(j.id)}</span>${esc(j.title)}${j.status === 'running' ? ` — ${full.duration - j.remaining} из ${full.duration} мин` : ''}${j.result ? `<br><b>${esc(j.result.text)}</b>` : ''}${j.status === 'running' ? bar((full.duration - j.remaining) / full.duration, `wide ${jk}`) : ''}</span></li>`]);
     }
     body += `<h3>Ход работ</h3><ol class="timeline">${items.sort((x, y) => x[0] - y[0] || x[1] - y[1]).map(x => x[2]).join('')}</ol>`;
-    if (pr.status === 'open' && jobs.some(j => j.status !== 'done')) body += '<p class="fine-print">Работы идут в модельном времени; ускорение меняет только темп показа. После ремонта проверка запускается автоматически.</p>';
+    if (activeJob) body += `<p class="fine-print">Работы идут в модельном времени; ускорение меняет только темп показа.${pr.kind === 'equipment' ? ' После ремонта проверка запускается автоматически.' : ''}</p>`;
   }
   if (pr.latest) {
     body += `<h3>Симптом</h3><p>Отклонение ${fmt(pr.anomalyScore)} при пороге 4,5${pr.status === 'open' ? '' : ' (на момент закрытия)'}. Средние за 30 мин против нормы:</p>
@@ -123,7 +134,7 @@ function panelProblem(pr) {
     body += `<h3>Доступные проверки · ТЕХ-1 ${t.jobId ? `занят ${esc(t.jobId)}` : 'свободен'}</h3><div class="checks">${pr.availableChecks.map(c => `<div class="check-card${c.done ? ' done' : ''}"><div class="cc-head"><b>${esc(c.title)}</b><span>${c.duration} мин</span></div><p>${c.stopsPost ? '<b class="stop-text">Пост останавливается</b>' : 'Пост работает'} · ${esc(CHECK_RULES[c.kind] ?? '')}</p>${c.done ? `<p>${ico('ok', 'Выполнена')}</p>` : `<button class="${c.stopsPost ? '' : 'primary'}" data-check="${esc(c.kind)}" data-post-id="${esc(pr.postId)}" ${c.ok ? '' : 'disabled'}>Запустить проверку…</button>${c.ok ? '' : `<p class="why">${esc(c.reason)}</p>`}`}</div>`).join('')}</div>
       <p class="fine-print">Склад: ${state.stock.map(s => `${esc(s.name.toLowerCase())} — ${s.available}`).join(', ')}</p>`;
   }
-  const foot = pr.status === 'open' && !state.finished ? `<button class="primary" data-compare="${esc(pr.id)}">Сравнить решения</button>` : '';
+  const foot = pr.status === 'open' && !state.finished ? `<button class="${activeJob ? 'secondary' : 'primary'}" data-compare="${esc(pr.id)}"${activeJob ? ' aria-describedby="problem-work-note"' : ''}>Сравнить решения</button>` : '';
   return sideHead(`ПРОБЛЕМА · ${pr.kind === 'equipment' ? 'ОБОРУДОВАНИЕ' : 'РУЧНОЙ СЦЕНАРИЙ'}`, `<span class="mono">${esc(pr.id)}</span> · ${esc(pr.title)}`, statusTag + tag(`Затронуты: ${pr.vehicleIds.map(id => `<button class="link mono" data-vehicle="${esc(id)}">${esc(id)}</button>`).join(', ') || '—'}`), chatBtn('problem', pr.id))
     + `<div class="side-body">${body}${lockNote}<p><button class="link" data-legacy="dispatcher" data-legacy-id="${esc(pr.id)}">Журнал решений в диспетчере →</button></p></div>${foot ? `<div class="side-foot">${foot}<button class="secondary" data-open-chat="1" data-ctx-type="problem" data-ctx-id="${esc(pr.id)}">Обсудить в чате</button></div>` : ''}`;
 }
