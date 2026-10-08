@@ -23,13 +23,13 @@ test('build keeps only allowlisted public assets and moves unexpected dist entri
     const clean = await buildDist({ publicDir, distDir, quarantineRoot }); assert.deepEqual(clean.strays, []); assert.equal(clean.quarantineDir, null);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
-test('build refuses client assets that look like an NVIDIA key', async () => {
+for (const prefix of ['nvapi-', 'sk-proj-']) test(`build refuses client assets that look like a ${prefix} key`, async () => {
   const dir = await mkdtemp(path.join(tmpdir(), 'allur-build-'));
   try {
     const publicDir = path.join(dir, 'public');
     await mkdir(publicDir);
     for (const file of PUBLIC_ASSETS) await copyFile(path.join(root, 'public', file), path.join(publicDir, file));
-    await writeFile(path.join(publicDir, 'app.js'), `const k = 'nvapi-${'x'.repeat(24)}';`);
+    await writeFile(path.join(publicDir, 'app.js'), `const k = '${prefix}${'x'.repeat(24)}';`);
     await assert.rejects(buildDist({ publicDir, distDir: path.join(dir, 'dist'), quarantineRoot: path.join(dir, 'q') }), /Possible secret/);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });

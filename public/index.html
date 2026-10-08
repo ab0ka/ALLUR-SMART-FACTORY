@@ -1,57 +1,103 @@
 <!doctype html>
 <html lang="ru">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101719"><title>Allur · мастерская — синтетическое демо</title><meta name="description" content="Учебная производственная мастерская: посты, автомобили, очереди, задания и аналитика смены. Только синтетические данные."><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/styles.css"><script type="module" src="/app.js"></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#F5F7FA"><title>Allur Smart Factory — синтетическое демо</title><meta name="description" content="Учебная производственная сцена: цех сборки, диагностика подъёмников, сравнение решений и чат диспетчера. Только синтетические данные."><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/styles.css"><script type="module" src="/app.js"></script></head>
 <body>
 <header class="topbar">
-  <a class="brand" href="#workshop" aria-label="Allur Smart Factory, раздел Цех"><span class="brand-mark">a</span><strong>ALLUR<span>SMART FACTORY</span></strong></a>
+  <a class="brand" href="#space/assembly" aria-label="Allur Smart Factory — к цеху «Сборка»"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 22 22"><path d="M2.5 19 11 2.5 19.5 19h-4.4L11 10.6 6.9 19z"/><rect x="8.2" y="14.2" width="5.6" height="2.2"/></svg></span><span class="brand-text"><b>ALLUR</b><span>Smart Factory</span></span></a>
+  <nav class="spaces" aria-label="Пространства">
+    <a href="#space/enterprise" data-space-link="enterprise">Предприятие</a>
+    <a href="#space/assembly" data-space-link="assembly">Сборка</a>
+    <a href="#space/tests" data-space-link="tests">Испытания<i class="later" title="Подробная сцена в разработке" aria-hidden="true"></i></a>
+    <a href="#space/diag" data-space-link="diag">Диагностика<span id="diag-count" class="badge" hidden></span></a>
+    <a href="#space/rework" data-space-link="rework">Доработка<i class="later" title="Подробная сцена в разработке" aria-hidden="true"></i></a>
+    <a href="#space/ship" data-space-link="ship">Отгрузка<i class="later" title="Подробная сцена в разработке" aria-hidden="true"></i></a>
+  </nav>
+  <div class="timebox">
+    <div class="clockbox"><strong id="clock">--:--</strong><span id="run-status">Загрузка…</span></div>
+    <button id="play" class="icon-btn" aria-label="Запустить" disabled><svg viewBox="0 0 16 16" aria-hidden="true"><path class="ico-play" d="M4 2.2v11.6L13.5 8z"/><rect class="ico-pause" x="3" y="2" width="3.6" height="12" rx="1"/><rect class="ico-pause" x="9.4" y="2" width="3.6" height="12" rx="1"/></svg></button>
+    <button id="step" class="icon-btn small" aria-label="Шаг: плюс 5 модельных минут" disabled>+5</button>
+    <div class="speed" role="group" aria-label="Скорость: модельных минут за 1,2 с"><button data-speed="1" aria-pressed="false">1</button><button data-speed="5" aria-pressed="true">5</button><button data-speed="15" aria-pressed="false">15</button></div>
+  </div>
+  <span class="grow"></span>
+  <a class="planfact" href="#shift" id="planfact" aria-label="План-факт смены"><span class="pf-row"><span>Принято <b id="pf-accepted">—</b> / <span id="pf-plan">—</span></span><span id="pf-forecast">прогноз —</span></span><svg class="pf-bar" viewBox="0 0 100 5" preserveAspectRatio="none" aria-hidden="true"><rect class="pf-bg" width="100" height="5" rx="2.5"/><rect id="pf-fill" class="pf-fill" width="0" height="5" rx="2.5"/><rect id="pf-mark" class="pf-mark" x="0" width="1.5" height="5"/></svg></a>
+  <a class="alerts" id="alerts" href="#space/diag" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path class="ic-warn" d="M8 1.2 15.3 14.3H.7z"/><rect class="ic-dark" x="7.1" y="5.6" width="1.8" height="4.6" rx=".6"/><circle class="ic-dark" cx="8" cy="12" r="1"/></svg><span id="alerts-count">0</span></a>
   <span class="synthetic">Синтетические данные</span>
-  <div class="shift-clock"><strong id="clock">--:--</strong><span id="run-status">Загрузка…</span></div>
-</header>
-<div class="shell">
-  <nav class="sidenav" aria-label="Разделы мастерской">
-    <a href="#workshop" data-nav="workshop">Цех</a>
+  <button id="chat-toggle" class="icon-btn" aria-label="Открыть чат" data-open-chat="1"><svg viewBox="0 0 20 20" aria-hidden="true"><path class="ico-chat" d="M3 4.5A2.5 2.5 0 0 1 5.5 2h9A2.5 2.5 0 0 1 17 4.5v6a2.5 2.5 0 0 1-2.5 2.5H9l-4 3.5V13a2.5 2.5 0 0 1-2-2.5z"/></svg></button>
+  <details class="menu" id="menu"><summary>Разделы</summary><div class="menu-list">
+    <a href="#dispatcher" data-nav="dispatcher">Диспетчер смены <span id="nav-problems" class="nav-count"></span></a>
+    <a href="#workshop" data-nav="workshop">Схема цеха (2D)</a>
     <a href="#vehicles" data-nav="vehicles">Автомобили <span id="nav-vehicles" class="nav-count"></span></a>
     <a href="#orders" data-nav="orders">Производственные задания <span id="nav-orders" class="nav-count"></span></a>
     <a href="#shift" data-nav="shift">Смена и аналитика</a>
-  </nav>
-  <main>
-    <section class="toolbar" aria-label="Управление сменой">
-      <div class="controls">
-        <button id="play" class="primary" disabled>▶ Запустить</button>
-        <button id="step" disabled>+5 минут</button>
-        <label class="speed-label">Модельных минут за 1,2 с <select id="speed"><option value="1">1</option><option value="5" selected>5</option><option value="15">15</option></select></label>
+    <a href="#lab" data-nav="lab">Лаборатория моделей</a>
+    <button id="step-menu" class="quiet">+5 модельных минут (шаг)</button>
+    <button id="reset" class="quiet">↺ Сбросить смену</button>
+  </div></details>
+</header>
+<div id="error" role="alert" hidden></div>
+<main>
+  <section id="view-space" class="view space-view" aria-labelledby="space-title">
+    <div class="space-stage" id="space-stage">
+      <div class="scene-wrap" id="scene-wrap"><svg id="scene" class="scene" role="group" aria-label="Изометрическая сцена цеха «Сборка»: посты, буферы, автомобили и ремонтник"></svg></div>
+      <div class="enterprise-wrap" id="enterprise-wrap" hidden><svg id="enterprise" class="scene" viewBox="0 0 1440 836" role="group" aria-label="Карта предприятия: цеха по маршруту и их состояние"></svg></div>
+      <div id="stage-card" class="stage-card" hidden></div>
+      <div id="table-view" class="table-view" hidden></div>
+      <div class="hud">
+        <div class="hud-card"><nav class="crumbs" aria-label="Путь" id="crumbs"></nav><h1 id="space-title" class="space-title">Сборка</h1><p id="space-sub" class="space-sub"></p><div id="space-chips" class="space-chips"></div></div>
+        <div class="hud-row">
+          <div class="seg" role="group" aria-label="Представление"><button data-mode="scene" aria-pressed="true">Сцена</button><button data-mode="table" aria-pressed="false">Таблица</button></div>
+          <label class="toggle" id="diag-toggle-wrap"><input type="checkbox" id="diag-toggle"> Слой диагностики</label>
+        </div>
       </div>
-      <div class="toolbar-end"><span id="shift-progress">— / 480 мин</span><button id="reset" class="quiet">↺ Сбросить смену</button></div>
-    </section>
-    <div id="error" role="alert" hidden></div>
-    <div id="summary" class="summary" aria-live="off"></div>
+      <p class="hint" id="scene-hint">Нажмите на автомобиль или пост — откроется карточка</p>
+      <div class="cam" role="group" aria-label="Камера"><button data-cam="home" aria-label="Общий вид"><svg viewBox="0 0 20 20" aria-hidden="true"><path class="ico-line" d="M3 9.5 10 3l7 6.5M5.5 8v8.5h9V8"/></svg></button><button data-cam="in" aria-label="Приблизить">+</button><button data-cam="out" aria-label="Отдалить">−</button></div>
+      <section id="ribbon" class="ribbon" aria-label="Лента событий"></section>
+    </div>
+    <aside id="side" class="side" hidden aria-label="Карточка выбранного объекта"></aside>
+  </section>
 
-    <section id="view-workshop" class="view" aria-labelledby="h-workshop">
+  <div id="legacy" class="legacy" hidden>
+    <div id="summary" class="summary" aria-live="off"></div>
+    <section id="view-dispatcher" class="view" aria-labelledby="h-dispatcher">
+      <h1 id="h-dispatcher" class="view-title">Диспетчер смены <span>отклонение → диагностика → сравнение → решение → результат</span></h1>
+      <div class="dispatch-grid">
+        <div class="dispatch-main">
+          <section class="panel" aria-labelledby="h-threat"><h2 id="h-threat" class="panel-title">Что угрожает плану</h2><div id="threat"></div></section>
+          <section id="problem-card" class="panel" aria-live="polite"></section>
+          <section id="comparison" class="panel" aria-labelledby="h-compare"></section>
+          <section class="panel" aria-labelledby="h-decisions"><h2 id="h-decisions" class="panel-title">Принятые решения: прогноз и факт</h2><div id="decision-log"></div></section>
+        </div>
+        <aside class="panel chat-panel" aria-labelledby="h-chat">
+          <h2 id="h-chat" class="panel-title">Чат диспетчера</h2>
+          <p id="chat-mode" class="fine-print"></p>
+          <div id="chat-context" class="chat-context"></div>
+          <div id="chat-suggest" class="chips small" role="group" aria-label="Предложенные вопросы"></div>
+          <ol id="chat-log" class="chat-log" aria-live="polite"></ol>
+          <form id="chat-form" class="chat-form"><label for="chat-input" class="sr-only">Вопрос диспетчеру</label><textarea id="chat-input" rows="2" maxlength="500" placeholder="Спросите о посте, автомобиле, задании или проблеме"></textarea><div class="chat-send"><span id="chat-count" class="fine-print">0/500</span><button class="primary" type="submit" id="chat-send">Спросить</button></div></form>
+        </aside>
+      </div>
+    </section>
+
+    <section id="view-workshop" class="view" aria-labelledby="h-workshop" hidden>
       <h1 id="h-workshop" class="view-title">Цех <span>условная 2D-схема зон и постов</span></h1>
-      <div id="active-incidents" class="incident-strip"></div>
+      <div id="active-problems" class="incident-strip"></div>
       <div class="workshop-grid">
         <div class="panel map-panel">
           <div class="map-scroll" role="region" aria-label="Карта цеха, прокручивается по горизонтали" tabindex="0">
             <svg id="workshop-map" viewBox="0 0 1200 560" role="group" aria-label="Карта цеха: зоны, посты, буферы и автомобили"></svg>
           </div>
-          <div class="legend"><span><i class="dot working"></i>Выполняет</span><span><i class="dot slow"></i>Снижен темп</span><span><i class="dot blocked"></i>Блокирован буфером</span><span><i class="dot fault"></i>Неисправность</span><span><i class="dot idle"></i>Свободен</span></div>
-          <p class="fine-print">Синтетическая планировка, не реальный цех Allur. Пост вмещает один автомобиль; буферы ограничены. Нажмите на пост или автомобиль.</p>
+          <div class="legend"><span><i class="dot working"></i>Выполняет</span><span><i class="dot slow"></i>Снижен темп / отклонение</span><span><i class="dot blocked"></i>Блокирован буфером</span><span><i class="dot maintenance"></i>Работы техника</span><span><i class="dot fault"></i>Неисправность</span><span><i class="dot idle"></i>Свободен</span></div>
+          <p class="fine-print">Синтетическая планировка, не реальный цех Allur. Пост вмещает один автомобиль; буферы ограничены; доработка — отдельный пост. Нажмите на пост или автомобиль.</p>
         </div>
         <aside id="post-detail" class="panel detail-panel" aria-live="polite"></aside>
       </div>
-      <div class="panel">
-        <h2 class="panel-title">Посты по участкам</h2>
-        <div id="post-board" class="post-board"></div>
-      </div>
+      <div class="panel"><h2 class="panel-title">Посты по участкам</h2><div id="post-board" class="post-board"></div></div>
     </section>
 
     <section id="view-vehicles" class="view" aria-labelledby="h-vehicles" hidden>
       <h1 id="h-vehicles" class="view-title">Автомобили <span>синтетические ID DEMO-xxx, не VIN</span></h1>
       <div id="vehicle-filters" class="chips" role="group" aria-label="Фильтр по статусу"></div>
-      <div class="split">
-        <div id="vehicle-list" class="panel list-panel"></div>
-        <article id="vehicle-passport" class="panel passport" aria-live="polite"></article>
-      </div>
+      <div class="split"><div id="vehicle-list" class="panel list-panel"></div><article id="vehicle-passport" class="panel passport" aria-live="polite"></article></div>
     </section>
 
     <section id="view-orders" class="view" aria-labelledby="h-orders" hidden>
@@ -75,17 +121,19 @@
       <h1 id="h-shift" class="view-title">Смена и аналитика <span>все показатели из того же состояния мастерской</span></h1>
       <div class="shift-grid">
         <div class="panel">
-          <h2 class="panel-title">Приёмка: план, факт и прогноз</h2>
-          <svg id="shift-chart" viewBox="0 0 760 270" role="img" aria-label="Накопленная приёмка автомобилей: план, факт и прогноз"></svg>
-          <div class="chart-legend"><span class="k-fact">— Факт</span><span class="k-plan">┄ План (эталонный прогон)</span><span class="k-forecast">··· Прогноз</span></div>
+          <h2 class="panel-title">Приёмка: план, эталон, прогноз и факт</h2>
+          <svg id="shift-chart" viewBox="0 0 760 270" role="img" aria-label="Накопленная приёмка автомобилей: план смены, эталонная мощность, прогноз и факт"></svg>
+          <div class="chart-legend"><span class="k-fact">— Факт</span><span class="k-plan">┄ Эталонная мощность (симуляция)</span><span class="k-forecast">··· Прогноз</span><span class="k-target">— План смены (задан)</span></div>
+          <form id="plan-form" class="plan-form"><label>План смены, принятых автомобилей <input id="plan-target" type="number" min="1" max="24" inputmode="numeric" required></label><button type="submit">Задать план</button><span class="fine-print">План задаёт оператор; система не меняет его, чтобы скрыть недовыполнение.</span></form>
           <dl id="shift-numbers" class="numbers"></dl>
         </div>
         <div class="panel">
-          <h2 class="panel-title">Прогноз и ограничения</h2>
+          <h2 class="panel-title">Прогноз и качество</h2>
           <div id="forecast-box"></div>
+          <div id="quality-box"></div>
           <div class="ai-header"><div><strong>Объяснение</strong><span id="ai-source">Локальный режим доступен без ключа</span></div><button id="explain" class="primary">Объяснить ↗</button></div>
           <p class="ai-synthetic">Синтетические данные · объяснение учебного снимка, не диагноз реального оборудования Allur</p>
-          <div id="ai-text" class="ai-text" aria-live="polite">Нажмите «Объяснить», чтобы получить разбор текущего снимка. Без ключа NVIDIA работает локальное объяснение.</div>
+          <div id="ai-text" class="ai-text" aria-live="polite">Нажмите «Объяснить», чтобы получить разбор текущего снимка. Поддерживаются OpenAI и NVIDIA. Без ключа работает локальное объяснение.</div>
           <p id="ai-stale" class="fine-print"></p>
         </div>
       </div>
@@ -93,17 +141,30 @@
         <h2 class="panel-title">Посты: доступность, производительность, качество</h2>
         <div class="table-scroll" tabindex="0" role="region" aria-label="Таблица OEE постов"><table id="oee-table"></table></div>
         <details class="definitions"><summary>Определения метрик</summary>
-          <p><b>Плановое время</b> поста — прошедшие минуты смены. <b>A</b> = минуты работы / плановое время; все остановки поста считаются потерями доступности и показаны раздельно: неисправность, нет автомобиля на входе, блокировка заполненным следующим буфером.</p>
-          <p><b>P</b> = нормативная работа / минуты работы (норматив операции модели; фактическая длительность автомобиля отличается на −5…+10% по seed, снижение темпа поста — 60%). <b>Q</b> = 100%: контроль и доработка моделируются на этапе 2. <b>OEE</b> = A × P × Q по каждому посту; среднего «OEE завода» нет — общий выпуск показан отдельно.</p>
-          <p><b>Принято</b> — автомобили, завершившие контроль; считаются один раз. Отгрузка уже принятых машин выпуск не увеличивает. <b>План</b> — эталонный прогон того же движка с тем же seed и начальными заданиями без инцидентов. <b>Прогноз</b> — прогон копии текущего состояния до 16:00.</p>
+          <p><b>Плановое время</b> поста — прошедшие минуты смены. <b>A</b> = минуты работы / плановое время; все остановки — неисправность, работы техника, нет автомобиля на входе, блокировка следующим буфером — потери доступности, показаны раздельно.</p>
+          <p><b>P</b> = нормативная работа / минуты работы (снижение темпа и износ подъёмника уменьшают P). <b>Q</b> поста = (выполненные операции − операции на автомобилях, у которых контроль выявил дефект этого участка именно с этого поста) / выполненные операции. Для контроля, доработки и отгрузки Q = 100%: они не создают продукцию. Доработка не считается выпуском. <b>OEE</b> = A × P × Q по каждому посту; среднего «OEE завода» нет — общий выпуск показан отдельно.</p>
+          <p><b>Принято</b> — автомобили, прошедшие контроль; каждый засчитывается один раз, после доработки — только при успешном повторном контроле. <b>Доля годных с первого предъявления</b> = прошедшие первый контроль / впервые проверенные. <b>План смены</b> задаёт оператор. <b>Эталонная мощность</b> — прогон того же движка без отклонений оборудования и инцидентов с типовой долей брака 15%. <b>Прогноз</b> — прогон копий текущего состояния по гипотезам причин без новых вмешательств.</p>
         </details>
       </div>
       <div class="split">
-        <div class="panel"><h2 class="panel-title">Журнал инцидентов</h2><div id="incident-log" class="incident-list"></div></div>
+        <div class="panel"><h2 class="panel-title">Инциденты и работы техника</h2><div id="incident-log" class="incident-list"></div></div>
         <div class="panel"><h2 class="panel-title">Журнал событий <span id="event-count" class="tag"></span></h2><ol id="event-log" class="event-log" reversed></ol></div>
       </div>
     </section>
-    <footer><span>ALLUR SMART FACTORY · МАСТЕРСКАЯ · ЭТАП 1 · SYNTHETIC DEMO</span><span>Состояние в памяти сервера · перезапуск сбрасывает смену</span></footer>
-  </main>
-</div>
+
+    <section id="view-lab" class="view" aria-labelledby="h-lab" hidden>
+      <h1 id="h-lab" class="view-title">Лаборатория моделей <span>синтетическое обучение и проверка, не для реального оборудования Allur</span></h1>
+      <div id="lab"></div>
+    </section>
+    <footer><span>ALLUR SMART FACTORY · SYNTHETIC DEMO</span><span>Состояние сохраняется локально в data/ · «Сбросить смену» — в меню «Разделы»</span></footer>
+  </div>
+</main>
+<dialog id="confirm" aria-labelledby="confirm-title">
+  <form method="dialog" class="confirm-form">
+    <h2 id="confirm-title">Подтвердите действие</h2>
+    <div id="confirm-body"></div>
+    <p class="fine-print">Действие изменит рабочую смену. Сервер ещё раз проверит актуальность снимка и предусловия.</p>
+    <div class="confirm-actions"><button value="cancel" class="quiet">Отмена</button><button value="ok" class="primary" id="confirm-ok">Подтвердить</button></div>
+  </form>
+</dialog>
 </body></html>

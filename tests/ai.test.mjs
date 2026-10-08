@@ -6,7 +6,7 @@ const s = new Workshop().snapshot();
 
 test('no key: complete local explanation without any network request', async () => {
   const r = await explain(s, { fetchImpl: () => { throw new Error('must not call'); } });
-  assert.equal(r.source, 'local'); assert.equal(r.reason, 'missing_key'); assert.ok(r.text.includes(`Прогноз к 16:00 — ${s.forecast.projected}`)); assert.ok(r.synthetic);
+  assert.equal(r.source, 'local'); assert.equal(r.reason, 'missing_key'); assert.ok(r.text.includes(`Прогноз к 16:00 без новых вмешательств — ${s.forecast.projected}`)); assert.ok(r.synthetic);
 });
 test('NVIDIA success uses fixed endpoint, server Bearer key, and only synthetic snapshot', async () => {
   const key = 'test-server-secret';
@@ -41,18 +41,18 @@ test('network exception does not expose exception text', async () => {
 for (const [name, response] of [['invalid JSON', () => new Response('not json')], ['empty content', () => Response.json({ choices: [] })], ['oversized', () => new Response('x'.repeat(70000))]]) test(`${name} returns local explanation`, async () => {
   const r = await explain(s, { key: 'secret', fetchImpl: async () => response() }); assert.equal(r.reason, 'invalid_response');
 });
-test('local explanation is labelled synthetic and built from workshop state, incidents and recommendations', () => {
-  const w = new Workshop(); const base = localExplanation(w.snapshot());
+test('local explanation is labelled synthetic and built from workshop state, problems and recommendations', () => {
+  const w = new Workshop({ episode: false }); const base = localExplanation(w.snapshot());
   assert.match(base, /^Синтетические данные/); assert.ok(base.includes('Ограничивающий участок до конца смены — сборка'));
-  assert.ok(base.includes(`принято контролем ${w.acceptedCount()} из плана смены ${w.planProfile[480]}`));
+  assert.ok(base.includes(`принято контролем ${w.acceptedCount()} при плане смены ${w.planTarget}`)); assert.ok(base.includes(`эталонная мощность симуляции — ${w.planProfile[480]}`));
   w.injectIncident('A1', 'breakdown'); const fault = localExplanation(w.snapshot());
   assert.ok(fault.includes('Неисправность поста СБ-1')); assert.ok(fault.includes('Рекомендации:'));
-  const end = new Workshop(); for (let i = 0; i < 4; i++) end.advance(60); end.advance(55); end.injectIncident('A2', 'breakdown'); end.advance(5);
+  const end = new Workshop({ episode: false }); for (let i = 0; i < 4; i++) end.advance(60); end.advance(55); end.injectIncident('A2', 'breakdown'); end.advance(5);
   const text = localExplanation(end.snapshot());
-  assert.ok(text.includes('Смена завершена')); assert.ok(text.includes('не устранён к концу смены'));
+  assert.ok(text.includes('Смена завершена')); assert.ok(text.includes('не устранена к концу смены'));
 });
 test('a transfer recommendation is produced only when a free working parallel post exists', () => {
-  const w = new Workshop();
+  const w = new Workshop({ episode: false });
   for (let i = 0; i < 200; i++) {
     const s = w.snapshot(), busy = s.posts.find(p => p.vehicleId && p.progress < 1 && s.posts.some(q => q.stage === p.stage && q.id !== p.id && !q.vehicleId));
     if (busy) { w.injectIncident(busy.id, 'breakdown'); break; }
@@ -60,6 +60,6 @@ test('a transfer recommendation is produced only when a free working parallel po
   }
   const s = w.snapshot(), recs = recommendations(s), inc = s.incidents[0];
   assert.ok(inc, 'scenario found');
-  const post = s.posts.find(p => p.id === inc.postId), spare = s.posts.find(p => p.stage === post.stage && p.id !== post.id && !p.vehicleId && p.state !== 'fault');
-  if (spare) assert.ok(recs[0].startsWith(`Перевести ${post.vehicleId} с ${post.code} на свободный ${spare.code}`)); else assert.ok(recs[0].startsWith(post.code));
+  const post = s.posts.find(p => p.id === inc.postId), spare = s.posts.find(p => p.stage === post.stage && p.id !== post.id && !p.vehicleId && !['fault', 'maintenance'].includes(p.state) && !p.problemId && !p.hold);
+  if (spare) assert.ok(recs.some(r => r.startsWith(`Перевести ${post.vehicleId} с ${post.code} на свободный ${spare.code}`))); else assert.ok(!recs.some(r => r.startsWith('Перевести')));
 });

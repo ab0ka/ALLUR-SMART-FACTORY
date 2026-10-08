@@ -33,7 +33,7 @@ test('rejects invalid actions, oversized requests, invalid content type and JSON
   assert.equal((await post('/api/action', {}, { 'Content-Type': 'text/plain' })).status, 415);
   assert.equal((await fetch(base + '/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: '{broken' })).status, 400);
 });
-test('API roundtrip: release order -> fault one post -> step -> resolve -> priority -> reset', async () => {
+test('API roundtrip: release order -> fault one post -> step -> repair job -> priority -> reset', async () => {
   const before = await (await fetch(base + '/api/state')).json();
   const released = await (await post('/api/action', { action: 'release', model: 'B', quantity: 2, priority: 'high' })).json();
   assert.equal(released.totals.created, before.totals.created + 2); assert.equal(released.orders.at(-1).priority, 'high');
@@ -43,7 +43,12 @@ test('API roundtrip: release order -> fault one post -> step -> resolve -> prior
   const held = faulted.posts.find(p => p.id === 'A1').vehicleId;
   const step = await (await post('/api/action', { action: 'step' })).json(); assert.equal(step.elapsed, before.elapsed + 5);
   assert.equal(step.vehicles.find(v => v.id === held).state, 'paused'); assert.ok(step.posts.filter(p => p.id !== 'A1').some(p => p.state === 'working'));
-  const resolved = await (await post('/api/action', { action: 'resolve', id: faulted.incidents[0].id })).json(); assert.equal(resolved.incidents[0].status, 'resolved');
+  const repair = await (await post('/api/action', { action: 'job', postId: 'A1', kind: 'repair_generic', requestId: 'roundtrip-repair-1' })).json();
+  assert.equal(repair.posts.find(p => p.id === 'A1').state, 'maintenance'); assert.equal(repair.incidents[0].status, 'active');
+  const again = await (await post('/api/action', { action: 'job', postId: 'A1', kind: 'repair_generic', requestId: 'roundtrip-repair-1' })).json();
+  assert.equal(again.duplicate, true); assert.equal(again.jobs.filter(j => j.kind === 'repair_generic').length, 1);
+  for (let i = 0; i < 6; i++) await post('/api/action', { action: 'step' });
+  const repaired = await (await fetch(base + '/api/state')).json(); assert.equal(repaired.incidents[0].status, 'resolved'); assert.equal(repaired.jobs[0].status, 'done');
   assert.equal((await post('/api/action', { action: 'priority', orderId: 'ORD-103', priority: 'high' })).status, 200);
   const reset = await (await post('/api/action', { action: 'reset' })).json(); assert.equal(reset.elapsed, 180); assert.equal(reset.incidents.length, 0); assert.equal(reset.totals.created, before.totals.created);
 });
@@ -94,10 +99,13 @@ test('expected client errors are 4xx with clear messages', async () => {
     const act = body => fetch(url + '/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token }, body: JSON.stringify(body) });
     assert.equal((await act({ action: 'fault', postId: 'W1', kind: 'breakdown' })).status, 200);
     const dup = await act({ action: 'fault', postId: 'W1', kind: 'slowdown' }); assert.equal(dup.status, 409); assert.equal((await dup.json()).error, 'На этом посту уже есть активный инцидент');
-    assert.equal((await act({ action: 'resolve', id: 999 })).status, 404);
+    assert.equal((await act({ action: 'job', postId: 'W1', kind: 'repair_pump' })).status, 409);
     assert.equal((await act({ action: 'fault', postId: '__proto__', kind: 'breakdown' })).status, 404);
     assert.equal((await act({ action: 'fault', postId: 'W2', kind: 'constructor' })).status, 400);
-    assert.equal((await act({ action: 'resolve', id: '1' })).status, 400);
+    assert.equal((await act({ action: 'job', postId: 'W1', kind: 'verify' })).status, 400);
+    assert.equal((await act({ action: 'job', postId: 'W1', kind: 'repair_generic', requestId: 'bad id!' })).status, 400);
+    assert.equal((await act({ action: 'resolve', id: 1 })).status, 400);
+    assert.equal((await act({ action: 'plan', target: 0 })).status, 400);
     assert.equal((await act({ action: 'release', model: 'Z', quantity: 1, priority: 'high' })).status, 400);
     assert.equal((await act({ action: 'release', model: 'A', quantity: '3', priority: 'high' })).status, 400);
     assert.equal((await act({ action: 'release', model: 'A', quantity: 8, priority: 'high' })).status, 409);
