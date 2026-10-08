@@ -19,12 +19,21 @@ function renderHandoverItems(report) {
     present(item.problemId) ? link('problem', item.problemId, `Проблема ${item.problemId}`, `${key}:problem`) : '',
     present(item.vehicleId) ? link('vehicle', item.vehicleId, `Автомобиль ${item.vehicleId}`, `${key}:vehicle`) : '',
   ].filter(Boolean).join(' · ');
+  const vehicleRefs = (ids, key) => {
+    const occurrences = new Map();
+    return (Array.isArray(ids) ? ids : []).filter(present).map(id => {
+      const identity = String(id), occurrence = occurrences.get(identity) ?? 0;
+      occurrences.set(identity, occurrence + 1);
+      return link('vehicle', id, `Автомобиль ${id}`, `${key}:vehicle:${encodeURIComponent(identity)}:${occurrence}`);
+    });
+  };
   const card = (title, body, references = '') => `<div class="handover-items-title">${title}</div>${body}${references ? `<p class="handover-items-refs">${references}</p>` : ''}`;
   const section = (id, title, items, empty, render, note = '') => {
     const occurrences = new Map();
     const rows = items.map(item => {
       // Occurrence disambiguates duplicate/missing IDs while preserving stable keys for valid IDs.
-      const identity = present(item.id) ? `id:${String(item.id)}` : 'missing';
+      const baseIdentity = present(item.id) ? `id:${String(item.id)}` : 'missing';
+      const identity = id === 'tasks' ? JSON.stringify([baseIdentity, item.object?.type ?? null, item.object?.id ?? null]) : baseIdentity;
       const occurrence = occurrences.get(identity) ?? 0;
       occurrences.set(identity, occurrence + 1);
       const key = `handover-items:${id}:${encodeURIComponent(identity)}:${occurrence}`;
@@ -41,7 +50,7 @@ function renderHandoverItems(report) {
     section('problems', 'Открытые проблемы', problems, 'Открытых проблем нет.', (p, key) => card(
       link('problem', p.id, p.title ?? p.id, `${key}:title`),
       fields([['Статус', status(p.status)], ['Обнаружена, мин', display(p.detectedAt)]]),
-      [refs(p, key), ...(Array.isArray(p.vehicleIds) ? p.vehicleIds : []).filter(present).map((id, i) => link('vehicle', id, `Автомобиль ${id}`, `${key}:vehicle:${i}`))].filter(Boolean).join(' · '))),
+      [refs(p, key), ...vehicleRefs(p.vehicleIds, key)].filter(Boolean).join(' · '))),
     section('jobs', 'Работы техника', jobs, 'Работ в очереди или в исполнении нет.', (j, key) => card(
       display(j.title ?? j.id), fields([['Работа', display(j.id)], ['Статус', status(j.status)], ['Техник', display(j.technicianId)], ['Осталось, мин', display(j.remaining)], ['Создана, мин', display(j.createdAt)]]), refs(j, key))),
     section('tasks', 'Текущие задачи', sorted(data.tasks), 'Текущих задач нет.', (t, key) => card(
