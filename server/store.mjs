@@ -18,7 +18,8 @@ export function saveState(file, workshop, extraSecrets = []) {
   const tmp = `${file}.tmp`;
   writeFileSync(tmp, payload, 'utf8'); renameSync(tmp, file);
 }
-// Returns { workshop } on success, or { error } with the reason; a bad file is moved aside, never deleted.
+// Returns { workshop } on success, or { error } after moving a bad file aside.
+// A failed move throws so startup cannot overwrite the only rejected state file.
 export function loadState(file) {
   if (!existsSync(file)) return { error: 'missing' };
   let reason;
@@ -34,6 +35,8 @@ export function loadState(file) {
     }
   } catch { reason = 'unreadable'; }
   const aside = `${file}.rejected-${new Date().toISOString().replace(/[:.]/g, '-')}`;
-  try { renameSync(file, aside); } catch { /* keep going with a fresh shift */ }
+  try { renameSync(file, aside); } catch (cause) {
+    throw new Error('Cannot quarantine rejected shift state; refusing to start a new shift', { cause });
+  }
   return { error: reason, movedTo: aside };
 }

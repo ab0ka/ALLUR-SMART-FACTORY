@@ -1,24 +1,38 @@
 // ---------- Routing and render ----------
 function setView(hash) {
   const parts = hash.split('/');
-  // A route owns its card. Never carry a selection from another shop or screen.
-  ui.panel = null; ui.selected = null; ui.car3d = null; ui.ribbonOnlySelected = false;
-  let type, id;
-  if (VIEWS.includes(parts[0])) { view = parts[0]; [, type, id] = parts; }
-  else { view = 'space'; space = SPACES[parts[1]] ? parts[1] : 'assembly'; [, , type, id] = parts; }
-  // Deep links: #<screen>/<vehicle|post|problem|compare|chat|car3d>/<id> open the same card as a click.
-  const objId = id ? decodeURIComponent(id) : undefined;
-  if (type === 'car3d' && objId) { ui.car3d = objId; if (view === 'vehicles') selectedVehicle = objId; chatContext = { type: 'vehicle', id: objId }; }
-  else if (type === 'vehicle' && view === 'vehicles') { if (objId) { selectedVehicle = objId; chatContext = { type: 'vehicle', id: objId }; } }
-  else if (['vehicle', 'post', 'problem', 'compare'].includes(type) && objId) {
-    ui.panel = { type, id: objId };
-    if (type === 'vehicle' || type === 'post') ui.selected = { type, id: objId };
-    chatContext = { type: type === 'compare' ? 'problem' : type, id: objId };
-  } else if (type === 'chat') {
+  // A route owns its selection and context, including a return through browser history.
+  ui.panel = null; ui.selected = null; ui.car3d = null; ui.ribbonOnlySelected = false; ui.routeRef = null;
+  let tail;
+  if (VIEWS.includes(parts[0])) { view = parts[0]; tail = parts.slice(1); }
+  else { view = 'space'; space = Object.hasOwn(SPACES, parts[1]) ? parts[1] : 'assembly'; tail = parts.slice(2); }
+  // Keep published ID-only order links readable; new links follow the screen/type/id convention.
+  if (view === 'orders' && tail.length === 1 && tail[0] && tail[0] !== 'chat') tail = ['order', tail[0]];
+  const [type, rawId] = tail, objId = decodeRoutePart(rawId);
+  let ctx = null, missing = false;
+  if (type === 'chat') {
     ui.panel = { type: 'chat' };
-    const [ct, ...rest] = (objId ?? '').split(':');
-    if (ct && rest.length) chatContext = { type: ct, id: rest.join(':') };
+    const resolved = chatRouteContext(tail.slice(1)); ctx = resolved.context; missing = resolved.missing;
+    if (ctx && ['vehicle', 'post'].includes(ctx.type)) ui.selected = { ...ctx };
+  } else if (tail.length === 2) {
+    if (type === 'car3d' && (ctx = validChatContext('vehicle', objId))) {
+      ui.car3d = ctx.id; if (view === 'vehicles') selectedVehicle = ctx.id;
+    } else if (type === 'vehicle' && view === 'vehicles') {
+      ctx = validChatContext('vehicle', objId); selectedVehicle = ctx?.id ?? null;
+    } else if (['vehicle', 'post', 'problem', 'compare'].includes(type)) {
+      ctx = validChatContext(type === 'compare' ? 'problem' : type, objId);
+      if (ctx) { ui.panel = { type, id: ctx.id }; if (['vehicle', 'post'].includes(type)) ui.selected = { ...ctx }; }
+    } else if (type === 'order' && view === 'orders') {
+      ctx = validChatContext('order', objId); if (ctx) ui.routeRef = { ...ctx };
+    } else if (type === 'decision' && view === 'dispatcher') {
+      const item = state.decisions.find(x => x.id === objId);
+      if (item) { ui.routeRef = { type, id: item.id }; ctx = recordChatContext(item); }
+    } else if (type === 'event' && view === 'space') {
+      const item = state.events.find(x => String(x.seq) === objId);
+      if (item) { ui.routeRef = { type, id: String(item.seq) }; ui.ribbonOpen = true; ctx = recordChatContext(item); }
+    }
   }
+  setChatContext(ctx); ui.chatMissing = missing;
   $('view-space').hidden = view !== 'space'; $('legacy').hidden = view === 'space';
   for (const s of document.querySelectorAll('#legacy .view')) s.hidden = s.id !== `view-${view}`;
   for (const a of document.querySelectorAll('[data-nav]')) { if (a.dataset.nav === view) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); }
@@ -27,7 +41,19 @@ function setView(hash) {
   renderNavigation();
   if (view !== 'space') destroyScene();
   if (view === 'lab' && !lab) loadLab();
-  render();
+  $('summary').hidden = view === 'handover';
+  if (typeof handoverRoute === 'function') handoverRoute();
+  render(); revealRouteReference();
+}
+function revealRouteReference() {
+  const ref = ui.routeRef;
+  if (!ref) return;
+  requestAnimationFrame(() => {
+    if (ui.routeRef?.type !== ref.type || ui.routeRef?.id !== ref.id) return;
+    const id = ref.type === 'event' ? `ribbon-event-${ref.id}` : `${ref.type}-${ref.id}`;
+    const box = document.getElementById(id), target = ref.type === 'order' ? box?.querySelector('h2') : box;
+    if (target) { target.tabIndex = -1; target.scrollIntoView({ block: 'center', inline: 'center' }); target.focus({ preventScroll: true }); }
+  });
 }
 function renderNavigation() {
   const section = view === 'space' || view === 'workshop' ? 'shops' : view === 'vehicles' ? 'vehicles' : ['dispatcher', 'orders'].includes(view) ? 'manage' : 'analytics';
@@ -41,7 +67,7 @@ function renderNavigation() {
   $('manage-navigation').hidden = section !== 'manage';
   $('analytics-navigation').hidden = section !== 'analytics';
   $('shop-select').value = space;
-  document.title = `${view === 'space' ? SPACES[space].short : { workshop: '2D-схема', vehicles: 'Автомобили', dispatcher: 'Задачи и решения', orders: 'Задания', shift: 'Результаты смены', lab: 'Модели и эксперименты' }[view]} · Allur`;
+  document.title = `${view === 'space' ? SPACES[space].short : { workshop: '2D-схема', vehicles: 'Автомобили', dispatcher: 'Задачи и решения', orders: 'Задания', shift: 'Результаты смены', handover: 'Передача смены', lab: 'Модели и эксперименты' }[view]} · Allur`;
 }
 function focusKey(el) {
   if (!el || el === document.body || !el.closest('main')) return null;
@@ -58,11 +84,12 @@ function render() {
   else if (view === 'vehicles') renderVehicles();
   else if (view === 'orders') renderOrders();
   else if (view === 'shift') renderShift();
+  else if (view === 'handover') renderHandover();
   else renderLab();
   renderSide(); renderCar3d();
-  if (key && !document.activeElement?.closest('main')) document.querySelector(key)?.focus({ preventScroll: true });
+  if (key && !document.activeElement?.closest('main')) visibleNavigationTarget(key)?.focus({ preventScroll: true });
 }
-window.addEventListener('hashchange', () => { setView(location.hash.slice(1)); restoreScroll(history.state?.scroll); });
+window.addEventListener('hashchange', () => { setView(location.hash.slice(1)); restoreScroll(history.state?.scroll); restoreNavigationFocus(); });
 $('shop-select').addEventListener('change', e => goSpace(e.target.value));
 document.addEventListener('click', e => { if (!$('menu').contains(e.target)) $('menu').open = false; });
 $('play').addEventListener('click', () => action({ action: state.running ? 'pause' : 'play' }));
@@ -72,10 +99,12 @@ $('menu').addEventListener('click', e => { if (e.target.closest('a, button')) $(
 $('reset').addEventListener('click', async () => { if (await confirmAction('Сбросить смену?', '<p>Смена начнётся заново в 11:00 с тем же seed. Решения, проверки, сравнения и история чата текущей смены будут удалены из сохранённого состояния.</p>')) action({ action: 'reset' }); });
 $('release-form').addEventListener('submit', async e => {
   e.preventDefault();
-  const quantity = Number($('release-quantity').value), priority = new FormData(e.target).get('release-priority');
-  if (await action({ action: 'release', model: $('release-model').value, quantity, priority, requestId: requestId() })) text('release-note', `Задание ${state.orders.at(-1).id} выпущено: ${quantity} авт. во входном буфере. ${$('release-note').textContent}`);
+  const quantity = Number($('release-quantity').value), priority = new FormData(e.target).get('release-priority'), model = $('release-model').value;
+  if (!await confirmAction(`Выпустить задание: модель ${model} × ${quantity}`, `<p>Во входном буфере появятся ${quantity} синтетических автомобилей. Приоритет: ${esc(PRIORITY[priority])}. Они займут место в очереди; начатые операции не прерываются.</p>`)) return;
+  if (await action({ action: 'release', model, quantity, priority, requestId: requestId() })) text('release-note', `Задание ${state.orders.at(-1).id} выпущено: ${quantity} авт. во входном буфере. ${$('release-note').textContent}`);
 });
-$('plan-form').addEventListener('submit', async e => { e.preventDefault(); const target = Number($('plan-target').value); if (await confirmAction(`Задать план смены: ${target}`, `<p>План — обязательство смены, его задаёт оператор. Сейчас: ${state.plan.target}. Прогноз и факт от этого не меняются.</p>`)) action({ action: 'plan', target }); });
+$('plan-form').addEventListener('submit', async e => { e.preventDefault(); const target = Number($('plan-target').value); if (await confirmAction(`Задать план смены: ${target}`, `<p>План — обязательство смены, его задаёт оператор. Сейчас: ${state.plan.target}. Прогноз и факт от этого не меняются.</p>`)) action({ action: 'plan', target, requestId: requestId() }); });
+
 document.addEventListener('click', async e => {
   const t = e.target.closest('button, [role=button]'); if (!t || !state || t.closest('dialog')) return;
   const d = t.dataset;
@@ -88,11 +117,14 @@ document.addEventListener('click', async e => {
   if (d.compare) return compare(d.compare);
   if (d.apply) return applyDecision(d.exp, d.apply);
   if (d.check) { const p = post(d.postId), job = state.jobKinds.find(j => j.id === d.check); if (await confirmAction(`${job.title} на ${p.code}`, `<p>Техник ТЕХ-1 будет занят ${job.duration} мин${job.stopsPost ? `, ${esc(p.code)} остановится на это время` : ', пост продолжит работу'}. Результат проверки появится в наблюдениях проблемы. Ремонт этим действием не назначается.</p>`)) action({ action: 'job', postId: d.postId, kind: d.check, requestId: requestId() }); return; }
-  if (d.job) { const p = post(d.postId), job = state.jobKinds.find(j => j.id === d.job); if (await confirmAction(`${job.title} на ${p.code}`, `<p>Техник ТЕХ-1 будет занят ${job.duration} мин${job.stopsPost ? `, пост остановлен на время работ` : ''}. Если техник занят, работа встанет в очередь.</p>`)) action({ action: 'job', postId: d.postId, kind: d.job, requestId: requestId() }); return; }
+  if (d.job) { const p = post(d.postId), job = state.jobKinds.find(j => j.id === d.job); if (await confirmAction(`${job.title} на ${p.code}`, `<p>Техник ТЕХ-1 будет занят ${job.duration} мин${job.stopsPost ? `, пост остановлен на время работ` : ''}. Если техник занят, работа встанет в очередь.</p>${job.part ? `<p>Запчасть: ${esc(state.stock.find(s => s.id === job.part)?.name ?? job.part)} × 1 — будет зарезервирована для работы.</p>` : ''}`)) action({ action: 'job', postId: d.postId, kind: d.job, requestId: requestId() }); return; }
   if (d.fault) { if (await confirmAction(`Ручной сценарий на ${post(d.fault).code}`, `<p>Будет создан демонстрационный инцидент «${d.kind === 'breakdown' ? 'неисправность' : 'снижение темпа'}». Неисправность не исчезнет сама: потребуется ремонт.</p>`)) action({ action: 'fault', postId: d.fault, kind: d.kind, requestId: requestId() }); return; }
-  if (d.transfer) { if (await confirmAction(`Перевести ${d.transfer} на ${post(d.to).code}`, '<p>Автомобиль переедет на параллельный пост; остаток операции сохранится. Сервер проверит, что пост свободен и исправен.</p>')) action({ action: 'transfer', vehicleId: d.transfer, postId: d.to, requestId: requestId() }); return; }
-  if (d.hold) { const on = d.on === '1'; if (await confirmAction(on ? `Не загружать ${post(d.hold).code} новыми автомобилями` : `Вернуть ${post(d.hold).code} в загрузку`, `<p>${on ? 'Следующие автомобили из очереди пойдут на параллельные посты. Текущая операция на посту продолжится.' : 'Пост снова будет получать автомобили из очереди.'}</p>`)) action({ action: 'hold', postId: d.hold, on }); return; }
-  if (d.priority) action({ action: 'priority', orderId: d.order, priority: d.priority });
+  if (d.transfer) { if (await confirmAction(`Перевести ${d.transfer} на ${post(d.to).code}`, `<p>Автомобиль освободит пост ${esc(post(vehicle(d.transfer)?.location.id)?.code ?? 'источника')} и переедет на ${esc(post(d.to).code)}; остаток операции сохранится. Сервер повторно проверит доступность перевода.</p>`)) action({ action: 'transfer', vehicleId: d.transfer, postId: d.to, requestId: requestId() }); return; }
+  if (d.hold) { const on = d.on === '1'; if (await confirmAction(on ? `Не загружать ${post(d.hold).code} новыми автомобилями` : `Вернуть ${post(d.hold).code} в загрузку`, `<p>${on ? 'Следующие автомобили из очереди пойдут на параллельные посты. Текущая операция на посту продолжится.' : 'Пост снова будет получать автомобили из очереди.'}</p>`)) action({ action: 'hold', postId: d.hold, on, requestId: requestId() }); return; }
+  if (d.priority) {
+    const orderId = d.order, priority = d.priority;
+    if (await confirmAction(`Изменить приоритет ${orderId}: ${PRIORITY[priority]}`, '<p>Изменится порядок ещё не начатых операций этого задания в очередях. Уже начатые операции не прерываются.</p>')) action({ action: 'priority', orderId, priority, requestId: requestId() });
+  }
 });
 $('workshop-map').addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('[role=button]')) { e.preventDefault(); e.target.closest('[role=button]').dispatchEvent(new MouseEvent('click', { bubbles: true })); } });
 $('explain').addEventListener('click', async () => {
@@ -105,10 +137,14 @@ $('explain').addEventListener('click', async () => {
 async function refresh() {
   if (updating || fetching || chatBusy) return;
   fetching = true;
+  // A completed POST can replace state while this GET is still in flight.
+  // Identity also works across reset/restart, where revisions can decrease.
+  const requestedState = state;
+  const stillCurrent = () => !updating && !chatBusy && state === requestedState;
   try {
     const next = await api('/api/state');
-    if (!updating) { const changed = !state || state.revision !== next.revision || state.recordVersion !== next.recordVersion || state.running !== next.running || state.speed !== next.speed || state.csrf !== next.csrf; state = next; if (changed && !$('confirm').open) render(); error(''); }
-  } catch { error('Нет связи с локальным сервером. Проверьте, что npm start продолжает работать. Повторяем подключение…'); }
+    if (stillCurrent()) { const changed = !state || state.revision !== next.revision || state.recordVersion !== next.recordVersion || state.running !== next.running || state.speed !== next.speed || state.csrf !== next.csrf; state = next; if (changed && !$('confirm').open) render(); error(''); }
+  } catch { if (stillCurrent()) error('Нет связи с локальным сервером. Проверьте, что npm start продолжает работать. Повторяем подключение…'); }
   finally { fetching = false; }
 }
 await refresh(); setView(location.hash.slice(1)); setInterval(refresh, 1200);
