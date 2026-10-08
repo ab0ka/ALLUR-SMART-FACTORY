@@ -85,6 +85,8 @@ function render() {
   else if (view === 'orders') renderOrders();
   else if (view === 'shift') renderShift();
   else if (view === 'handover') renderHandover();
+  else if (view === 'video') renderVideo();
+  else if (view === 'case') renderCase();
   else renderLab();
   renderSide(); renderCar3d();
   if (key && !document.activeElement?.closest('main')) visibleNavigationTarget(key)?.focus({ preventScroll: true });

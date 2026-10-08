@@ -168,6 +168,66 @@
       <h1 id="h-lab" class="view-title">Лаборатория моделей <span>синтетическое обучение и проверка, не для реального оборудования Allur</span></h1>
       <div id="lab"></div>
     </section>
+    <section id="view-case" class="view" aria-labelledby="h-case" hidden>
+      <p class="case-mode" role="note">Тестовые данные задания. Не подтверждённые реальные показатели Allur</p>
+      <h1 id="h-case" class="view-title">Данные кейса <span>отклонения по участкам → подтверждающие записи → проверки</span></h1>
+      <form id="case-filters" class="panel case-filters no-print">
+        <div class="case-source" id="case-source">Загрузка набора данных…</div>
+        <label>С даты <select id="case-from"></select></label>
+        <label>По дату <select id="case-to"></select></label>
+        <label>Участок <select id="case-stage"></select></label>
+        <button type="button" id="case-reset" class="quiet">Сбросить фильтр</button>
+        <span class="grow"></span>
+        <button type="button" id="case-csv">Экспорт CSV</button>
+        <button type="button" id="case-print" class="primary">Отчёт / PDF</button>
+      </form>
+      <div id="case-body"></div>
+    </section>
+
+    <section id="view-video" class="view" aria-labelledby="h-video" hidden>
+      <h1 id="h-video" class="view-title">Видеоанализ <span>воспроизведение результатов анализа записи — не прямой эфир</span></h1>
+      <div class="panel va-load no-print">
+        <label class="va-file">Видеозапись <input type="file" id="va-video-file" accept="video/*"></label>
+        <label class="va-file">Результаты анализа (JSON) <input type="file" id="va-json-file" accept=".json,application/json"></label>
+        <button type="button" id="va-demo" class="secondary">Синтетическая фикстура</button>
+        <p class="fine-print">Файлы открываются только в этом браузере и не отправляются на сервер. Видео не обязательно: без него показываются только результаты на схеме кадра.</p>
+        <div id="va-messages" aria-live="polite"></div>
+      </div>
+      <div id="va-body" hidden>
+        <div id="va-source" class="panel va-source"></div>
+        <div class="va-grid">
+          <div class="panel va-player-panel">
+            <div id="va-stage" class="va-stage no-video">
+              <video id="va-video" class="va-video" playsinline muted hidden></video>
+              <svg id="va-overlay" class="va-overlay" role="img" aria-label="Рамки объектов и зоны наблюдения на кадре"></svg>
+            </div>
+            <div class="va-controls no-print">
+              <button type="button" id="va-play" class="icon-btn" aria-label="Воспроизвести">▶</button>
+              <input type="range" id="va-seek" min="0" max="1" step="0.1" value="0" aria-label="Время записи">
+              <output id="va-time" class="va-time">00:00.0</output>
+            </div>
+            <p id="va-frame-note" class="fine-print" aria-live="polite"></p>
+          </div>
+          <div class="panel va-side">
+            <h2 class="panel-title">Возможные задержки <span class="tag">причины — гипотезы</span></h2>
+            <ol id="va-delays" class="va-delays"></ol>
+          </div>
+        </div>
+        <div class="panel">
+          <h2 class="panel-title">Число наблюдаемых объектов в зоне по времени</h2>
+          <svg id="va-chart" class="va-chart" viewBox="0 0 900 200" role="img" aria-label="Число наблюдаемых объектов в каждой зоне по времени записи"></svg>
+          <div id="va-chart-legend" class="chart-legend"></div>
+          <p class="fine-print">Количество объектов, которые видны в зоне на проанализированном кадре. Это не длина очереди; разрыв линии — нет наблюдений.</p>
+        </div>
+        <div class="panel">
+          <div class="va-table-head"><h2 class="panel-title">Посещения зон</h2><span class="grow"></span><button type="button" id="va-csv" class="no-print">Экспорт CSV</button><button type="button" id="va-print" class="no-print">Печатный отчёт / PDF</button></div>
+          <div class="table-scroll" tabindex="0" role="region" aria-label="Таблица посещений зон"><table id="va-visits" class="va-table"></table></div>
+          <h3 class="va-subtitle">Незавершённые посещения</h3>
+          <div class="table-scroll" tabindex="0" role="region" aria-label="Незавершённые посещения"><table id="va-open" class="va-table"></table></div>
+          <p class="fine-print">Наблюдаемая длительность — время, когда объект виден в зоне на записи; это не подтверждённое время операции. Превышение = max(0, наблюдаемая длительность − порог). Для потерянных и оставшихся в зоне объектов это нижняя оценка. OEE, брак и вероятность поломки по рамкам видео не рассчитываются.</p>
+        </div>
+      </div>
+    </section>
     <footer><span>ALLUR SMART FACTORY · SYNTHETIC DEMO · учебная симуляция, не система Allur</span><span>Состояние сохраняется локально в data/ · «Сбросить смену» — в меню «Смена»</span></footer>
   </div>
   <aside id="side" class="side" hidden aria-label="Карточка выбранного объекта"></aside>

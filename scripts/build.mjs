@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const CAR_SPRITES = ["car-kia-a-done.webp", "car-kia-a-body.webp", "car-kia-b-done.webp", "car-kia-b-body.webp", "car-kia-c-done.webp", "car-kia-c-body.webp"]; // scripts/render-car-sprites.mjs
-export const PUBLIC_ASSETS = ['index.html', 'styles.css', 'app.js', 'scene.js', 'viewer3d.js', 'three.module.js', 'three-orbit-controls.js', 'favicon.svg', 'shop-scene.js', ...CAR_SPRITES];
+export const PUBLIC_ASSETS = ['index.html', 'styles.css', 'app.js', 'scene.js', 'viewer3d.js', 'three.module.js', 'three-orbit-controls.js', 'favicon.svg', 'shop-scene.js', 'video-analytics.js', 'video-fixture.json', 'case-analysis.js', 'case-dataset.json', ...CAR_SPRITES];
 // The client script is kept as ordered parts in public/app/ (NN-name.js) so several people can work on different
 // screens without editing one large file. The build joins them in name order into a single dist/app.js.
 export const APP_PART = /^\d{2}-[a-z0-9-]+\.js$/;
@@ -47,6 +47,7 @@ export async function buildDist({ publicDir = path.join(root, 'public'), distDir
   return { files: result, strays, quarantineDir };
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  for (const json of ['video-fixture.json', 'case-dataset.json']) JSON.parse(await readFile(path.join(root, 'public', json), 'utf8'));
   for (const file of ['server/index.mjs', 'server/simulation.mjs', 'server/ai.mjs', 'server/ai-config.mjs', 'scripts/build.mjs']) execFileSync(process.execPath, ['--check', path.join(root, file)], { stdio: 'inherit' });
   const { files, strays, quarantineDir } = await buildDist();
   const { parts } = await assembleApp(path.join(root, 'public'));
