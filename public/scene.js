@@ -190,6 +190,7 @@ const JOB_SHORT = { pump_check: 'замер тока', pressure_hold: 'тест 
 const MODEL_COLOR = { A: 'sc-model-a', B: 'sc-model-b', C: 'sc-model-c' };
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const lenOf = (p, q) => Math.hypot(q.x - p.x, q.y - p.y);
+const CAM_MS = 450, FOCUS_SCALE = 1.35, HOME_CAM = { s: 1, cx: 500, cy: 330 };
 
 export class AssemblyScene {
   constructor(svg, { onSelect } = {}) {
@@ -226,15 +227,31 @@ export class AssemblyScene {
     const { s, cx, cy } = this.cam;
     this.camEl.setAttribute('transform', `translate(${r1(VIEW.w / 2 - s * cx)} ${r1(VIEW.h / 2 - s * cy)}) scale(${s})`);
   }
+  // Manual zoom and pan always win: they stop a running camera move and keep the user's view.
   zoom(f, cx, cy) {
+    this.camAnim = null; this.userMoved = true;
     this.cam.s = Math.min(2.6, Math.max(.7, this.cam.s * f));
     if (cx !== undefined) { this.cam.cx = cx; this.cam.cy = cy; }
     this.applyCamera();
   }
-  pan(dx, dy) { this.cam.cx -= dx / this.cam.s; this.cam.cy -= dy / this.cam.s; this.cam.cx = Math.min(950, Math.max(50, this.cam.cx)); this.cam.cy = Math.min(620, Math.max(40, this.cam.cy)); this.applyCamera(); }
-  home(minScale = 1) { this.cam = { s: minScale, cx: 500, cy: 330 }; this.applyCamera(); }
-  focusVehicle(id, s) { const c = this.cars.get(id); if (!c) return; const [x, y] = iso(c.pos.x, c.pos.y); this.cam = { s: Math.max(s, this.cam.s), cx: x, cy: y - 30 }; this.applyCamera(); }
-  focusPost(postId, s) { if (BAY_Y[postId] === undefined) return; const [x, y] = iso(310, BAY_Y[postId] + 25); this.cam = { s: Math.max(s, this.cam.s), cx: x + 60, cy: y - 20 }; this.applyCamera(); }
+  pan(dx, dy) { this.camAnim = null; this.userMoved = true; this.cam.cx -= dx / this.cam.s; this.cam.cy -= dy / this.cam.s; this.cam.cx = Math.min(950, Math.max(50, this.cam.cx)); this.cam.cy = Math.min(620, Math.max(40, this.cam.cy)); this.applyCamera(); }
+  // Programmatic moves glide (CAM_MS); before the first snapshot and with prefers-reduced-motion they jump.
+  moveCamera(to) {
+    if (!this.firstDone || reduceMotion() || document.hidden) { this.camAnim = null; this.cam = { ...to }; this.applyCamera(); return; }
+    this.camAnim = { from: { ...this.cam }, to: { ...to }, t0: performance.now() }; this.kick();
+  }
+  camTarget() { return this.camAnim?.to ?? this.cam; }
+  home(minScale = 1) { this.overview = { ...HOME_CAM, s: minScale }; this.focused = false; this.moveCamera(this.overview); }
+  focusVehicle(id, s) { const c = this.cars.get(id); if (!c?.pos) return; const [x, y] = iso(c.pos.x, c.pos.y); this.focusAt(x, y - 30, s); }
+  focusPost(postId, s) { if (BAY_Y[postId] === undefined) return; const [x, y] = iso(310, BAY_Y[postId] + 25); this.focusAt(x + 60, y - 20, s); }
+  focusAt(cx, cy, s) { this.focused = true; this.userMoved = false; this.moveCamera({ s: Math.max(s, this.camTarget().s), cx, cy }); }
+  // The camera follows the selection on every screen width; closing the card returns to the overall view
+  // unless the user has moved the camera since.
+  followSelection(sel) {
+    if (sel?.type === 'vehicle') this.focusVehicle(sel.id, FOCUS_SCALE);
+    else if (sel?.type === 'post') this.focusPost(sel.id, FOCUS_SCALE);
+    else if (!sel && this.focused && !this.userMoved) { this.focused = false; this.moveCamera(this.overview); }
+  }
 
   // ----- snapshot update -----
   update(state, ui) {
@@ -274,8 +291,11 @@ export class AssemblyScene {
     this.tech.el.querySelector('.sc-techbadge').innerHTML = !job || !post ? '' : jobType === 'check'
       ? '<circle cx="17" cy="-46" r="11" class="sc-badge-check"/><circle cx="15.5" cy="-47.5" r="4" class="sc-badge-glyph"/><path d="M18.5 -44.5l3.5 3.5" class="sc-badge-glyph"/>'
       : '<circle cx="17" cy="-46" r="11" class="sc-badge-repair"/><path d="M12.5 -41.5l6-6M18 -50a3 3 0 1 0 3 3" class="sc-badge-glyph"/>';
-    this.firstDone = true;
     this.renderRings(state, ui); this.renderOverlay(state, ui);
+    if (!this.firstDone) { this.overview = { ...this.cam }; this.focused = false; } // the opening view is the overall view
+    const selKey = ui.selected ? `${ui.selected.type}:${ui.selected.id}` : '';
+    if (selKey !== this.selKey) { this.selKey = selKey; this.followSelection(ui.selected); }
+    this.firstDone = true;
     this.kick(); this.sortObjects();
   }
   createCar(v) {
@@ -315,6 +335,12 @@ export class AssemblyScene {
   }
   frame(now) {
     this.raf = 0; let moving = false, changed = false;
+    if (this.camAnim) {
+      const { from, to, t0 } = this.camAnim, f = Math.min(1, Math.max(0, (now - t0) / CAM_MS)), e = f < .5 ? 2 * f * f : 1 - (-2 * f + 2) ** 2 / 2;
+      this.cam = { s: from.s + (to.s - from.s) * e, cx: from.cx + (to.cx - from.cx) * e, cy: from.cy + (to.cy - from.cy) * e };
+      this.applyCamera();
+      if (f >= 1) this.camAnim = null; else moving = true;
+    }
     for (const [id, car] of this.cars) {
       if (!car.path) continue;
       const { p, done } = this.sample(car.path, now);
