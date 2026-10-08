@@ -247,6 +247,14 @@ export async function main() {
   } catch (error) { failure = error; throw error; }
   finally {
     clearTimeout(deadline);
+    // The functional deadline does not cover cleanup. Bound that phase independently.
+    const cleanupDeadline = setTimeout(() => {
+      console.error(failure?.stack || 'FAIL: cleanup exceeded 120 seconds');
+      console.error(`Cleanup deadline: profile may remain at ${profile}`);
+      try { child?.kill(); } catch { /* Only this invocation's child is eligible. */ }
+      server.closeAllConnections();
+      process.exit(1);
+    }, 120000);
     const cleanupErrors = [];
     let browserExited = !child?.pid;
     try {
@@ -275,12 +283,22 @@ export async function main() {
         try {
           // Remove only this run's exact temporary directory, after confirmed browser exit.
           assert.equal(path.dirname(profile), path.resolve(os.tmpdir()));
-          if (browserExited) await rm(profile, { recursive: true, force: true, maxRetries: 20, retryDelay: 300 });
+          if (browserExited) {
+            // Node rimraf nests retry loops; disable internal retries and bound our own attempts.
+            for (let attempt = 0; ; attempt++) {
+              try { await rm(profile, { recursive: true, force: true, maxRetries: 0 }); break; }
+              catch (error) {
+                if (attempt >= 4 || !['EBUSY', 'EPERM', 'ENOTEMPTY'].includes(error.code)) throw error;
+                await delay(250);
+              }
+            }
+          }
           else throw new Error(`Profile retained for live browser: ${profile}`);
         } catch (error) { cleanupErrors.push(error); }
       }
     }
     for (const error of cleanupErrors) console.error(`Cleanup: ${error.message}`);
+    clearTimeout(cleanupDeadline);
     if (!failure && cleanupErrors.length) throw new AggregateError(cleanupErrors, 'E2E cleanup failed');
   }
   console.log('PASS: handover E2E complete, server/browser/profile cleanup confirmed');
