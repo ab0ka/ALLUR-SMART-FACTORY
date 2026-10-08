@@ -1,11 +1,12 @@
 // ---------- Shift and analytics ----------
 // Engine defaults for empty denominators are not observed measurements.
 function shiftOeeValue(p, metric) {
+  const qualityDefined = ['quality', 'rework', 'shipping'].includes(p.stage) || p.stats.completed > 0;
   const available = {
     availability: state.elapsed > 0,
     performance: p.stats.run > 0,
-    quality: p.stats.completed > 0,
-    oee: state.elapsed > 0 && p.stats.run > 0 && p.stats.completed > 0,
+    quality: qualityDefined,
+    oee: state.elapsed > 0 && p.stats.run > 0 && qualityDefined,
   };
   return available[metric] ? pct(p.metrics[metric]) : '<span title="Нет данных для расчёта" aria-label="Нет данных для расчёта">—</span>';
 }

@@ -14,7 +14,7 @@ function render(snapshot) {
 test('shift: zero denominators are unavailable, not measured 0% or 100%',()=>{
  const s=new Workshop({warmup:0}).snapshot();const {get,context}=render(s);
  assert.equal(s.posts[0].metrics.quality,1);
- assert.equal((get('oee-table').innerHTML.match(/aria-label="Нет данных для расчёта"/g)||[]).length,s.posts.length*4);
+ assert.equal((get('oee-table').innerHTML.match(/aria-label="Нет данных для расчёта"/g)||[]).length,s.posts.length*3 + s.posts.filter(p=>['weld','paint','assembly'].includes(p.stage)).length);
  const p=structuredClone(s.posts[0]);p.stats.run=5;p.metrics.availability=.5;p.metrics.performance=0;p.metrics.quality=0;p.metrics.oee=0;context.state.elapsed=10;context.p=p;
  assert.equal(vm.runInContext("shiftOeeValue(p,'performance')",context),'0%','real zero must remain zero');
  assert.match(vm.runInContext("shiftOeeValue(p,'quality')",context),/Нет данных/);
@@ -36,4 +36,22 @@ test('shift: absent reference is unavailable and retains a separate forecast',()
  assert.match(get('shift-summary').innerHTML,/Эталон недоступен/);
  assert.doesNotMatch(get('shift-chart').innerHTML,/class="chart-plan"/);
  assert.match(get('shift-chart').innerHTML,/class="chart-forecast"/);
+});
+
+test('shift: service-stage Q is a model constant and OEE exists before the first completed operation',()=>{
+ const w=new Workshop({warmup:0});const pending=new Set(['quality','rework','shipping']);
+ for(let minute=0;minute<480&&pending.size;minute++,w.advance(1)){
+  const matches=Object.entries(w.posts).filter(([,p])=>p.stats.run>0&&p.stats.completed===0);
+  if(!matches.length)continue;
+  const s=w.snapshot();
+  for(const p of s.posts.filter(p=>pending.has(p.stage)&&p.stats.run>0&&p.stats.completed===0)){
+   const {context}=render(s);context.p=p;
+   assert.equal(p.metrics.quality,1);
+   assert.equal(vm.runInContext("shiftOeeValue(p,'quality')",context),'100%');
+   assert.ok(p.metrics.oee>0);
+   assert.equal(vm.runInContext("shiftOeeValue(p,'oee')",context),`${new Intl.NumberFormat('ru-RU',{maximumFractionDigits:1}).format(p.metrics.oee*100)}%`);
+   pending.delete(p.stage);
+  }
+ }
+ assert.deepEqual([...pending],[], 'real engine must exercise all three service stages');
 });
